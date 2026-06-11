@@ -107,7 +107,7 @@ function WeeklyLineChart({runs, strength}){
   const runKm=weeks.map(w=>runs.filter(r=>actInBucket(r,w)).reduce((acc,r)=>acc+(r.distance/1000),0));
   const strMins=weeks.map(w=>strength.filter(s=>actInBucket(s,w)).reduce((acc,s)=>acc+(s.duration/60),0));
 
-  const W=340, H=110, PAD={t:10,b:28,l:36,r:8};
+  const W=340, H=110, PAD={t:10,b:28,l:36,r:28};
   const cw=W-PAD.l-PAD.r, ch=H-PAD.t-PAD.b;
   const maxKm=Math.max(...runKm,1);
   const maxMins=Math.max(...strMins,1);
@@ -120,8 +120,9 @@ function WeeklyLineChart({runs, strength}){
   const runPts=runKm.map((v,i)=>`${xPos(i)},${yRun(v)}`).join(" ");
   const strPts=strMins.map((v,i)=>`${xPos(i)},${yStr(v)}`).join(" ");
 
-  // Y axis ticks (run km side)
+  // Y axis ticks — km on the left (run line), minutes on the right (strength line)
   const yTicks=[0, Math.round(maxKm/2), Math.round(maxKm)];
+  const minTicks=[0, Math.round(maxMins/2), Math.round(maxMins)];
 
   function handleMove(e){
     const rect=e.currentTarget.getBoundingClientRect();
@@ -140,9 +141,13 @@ function WeeklyLineChart({runs, strength}){
         {yTicks.map(t=>(
           <line key={t} x1={PAD.l} x2={W-PAD.r} y1={yRun(t)} y2={yRun(t)} stroke="#f3f4f6" strokeWidth="1"/>
         ))}
-        {/* Y axis labels (km) */}
+        {/* Y axis labels (km, left — matches run line color) */}
         {yTicks.map(t=>(
-          <text key={t} x={PAD.l-4} y={yRun(t)+4} textAnchor="end" fontSize="9" fill={C.textFaint}>{t}</text>
+          <text key={"l"+t} x={PAD.l-4} y={yRun(t)+4} textAnchor="end" fontSize="9" fill="#fb923c">{t}</text>
+        ))}
+        {/* Y axis labels (mins, right — matches strength line color) */}
+        {minTicks.map(t=>(
+          <text key={"r"+t} x={W-PAD.r+6} y={yStr(t)+4} textAnchor="start" fontSize="9" fill={C.blue}>{t}</text>
         ))}
         {/* Strength area fill */}
         {strMins.some(v=>v>0)&&(
