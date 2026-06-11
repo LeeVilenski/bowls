@@ -34,12 +34,46 @@ const S={
   statCard:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 12px",textAlign:"center",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"},
 };
 
-function Sparkline({values,color="#2563eb",width=100,height=36}){
+// labels[i] / formatValue(displayValues[i]) drive the hover/tap tooltip;
+// displayValues defaults to values when not given (e.g. pace sparklines plot 1/pace but want to show pace).
+function Sparkline({values,color="#2563eb",width=100,height=36,labels,displayValues,formatValue}){
+  const [hover,setHover]=useState(null);
   if(!values||values.length<2)return <span style={{color:C.textFaint,fontSize:12}}>not enough data yet</span>;
   const min=Math.min(...values),max=Math.max(...values),range=max-min||1,w=typeof width==="number"?width:100;
-  const pts=values.map((v,i)=>{const x=(i/(values.length-1))*w,y=height-((v-min)/range)*(height-6)-3;return `${x},${y}`;}).join(" ");
-  const lp=pts.split(" ").slice(-1)[0].split(",");
-  return <svg width={w} height={height} style={{display:"block",overflow:"visible"}}><polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/><circle cx={lp[0]} cy={lp[1]} r="3" fill={color}/></svg>;
+  const pts=values.map((v,i)=>({x:(i/(values.length-1))*w,y:height-((v-min)/range)*(height-6)-3}));
+  const ptsStr=pts.map(p=>`${p.x},${p.y}`).join(" ");
+  const lp=pts[pts.length-1];
+  const showVals=displayValues||values;
+  const fmt=formatValue||(v=>String(v));
+
+  function handleMove(e){
+    const rect=e.currentTarget.getBoundingClientRect();
+    const clientX=e.touches?e.touches[0].clientX:e.clientX;
+    const x=((clientX-rect.left)/rect.width)*w;
+    const idx=Math.max(0,Math.min(values.length-1,Math.round((x/w)*(values.length-1))));
+    setHover(idx);
+  }
+
+  return(
+    <div style={{position:"relative",width:w}}>
+      <svg width={w} height={height} style={{display:"block",overflow:"visible",touchAction:"none",cursor:"crosshair"}}
+        onMouseMove={handleMove} onMouseLeave={()=>setHover(null)}
+        onTouchStart={handleMove} onTouchMove={handleMove} onTouchEnd={()=>setHover(null)}>
+        <polyline points={ptsStr} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+        <circle cx={lp.x} cy={lp.y} r="3" fill={color}/>
+        {hover!=null&&<>
+          <line x1={pts[hover].x} y1="0" x2={pts[hover].x} y2={height} stroke={color} strokeWidth="1" strokeDasharray="2,2" opacity="0.35"/>
+          <circle cx={pts[hover].x} cy={pts[hover].y} r="4" fill={color} stroke="#fff" strokeWidth="1.5"/>
+        </>}
+      </svg>
+      {hover!=null&&(
+        <div style={{position:"absolute",bottom:height+6,left:Math.min(Math.max(pts[hover].x,30),w-30),transform:"translateX(-50%)",background:"#111827",color:"#fff",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:"600",whiteSpace:"nowrap",pointerEvents:"none",zIndex:10,boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}>
+          {labels&&<div style={{fontSize:9,color:"#9ca3af",fontWeight:"500"}}>{labels[hover]}</div>}
+          {fmt(showVals[hover])}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Compute 4-week buckets (Mon-Sun) going back from today ──
@@ -170,7 +204,7 @@ function RunStatsPanel({runs}){
               <div style={{fontSize:10,color:C.textFaint}}>latest avg</div>
             </div>
           </div>
-          <Sparkline values={paces.map(p=>1/p)} color={C.orange} width={260} height={30}/>
+          <Sparkline values={paces.map(p=>1/p)} color={C.orange} width={260} height={30} displayValues={paces} formatValue={fmtPace} labels={recentRuns.map(r=>dayLabel(r.date))}/>
           <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
             <span style={{fontSize:10,color:C.textFaint}}>{fmtPace(firstPace)}</span>
             <span style={{fontSize:10,color:C.textFaint}}>now: {fmtPace(latestPace)}</span>
@@ -226,7 +260,7 @@ function StrengthStatsPanel({strength}){
       {weeklySessions.some(v=>v>0)&&(
         <div style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px"}}>
           <div style={{fontSize:11,color:C.textMuted,fontWeight:"600",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Sessions per week</div>
-          <Sparkline values={weeklySessions} color={C.blue} width={260} height={30}/>
+          <Sparkline values={weeklySessions} color={C.blue} width={260} height={30} labels={weeks.map(w=>w.label)} formatValue={v=>`${v} session${v===1?"":"s"}`}/>
           <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
             {weeks.map((w,i)=><span key={i} style={{fontSize:9,color:C.textFaint}}>{weeklySessions[i]||"—"}</span>)}
           </div>
