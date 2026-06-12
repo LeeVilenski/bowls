@@ -1087,7 +1087,8 @@ function ExercisePBList({allExercises, sortedStrength, notes}){
 function LogManualModal({allExercises, onSave, onClose}){
   const [date, setDate] = useState(new Date().toISOString().slice(0,10));
   const [name, setName] = useState("");
-  const [duration, setDuration] = useState("");
+  const [durationMin, setDurationMin] = useState("");
+  const [durationSec, setDurationSec] = useState("");
   const [exercises, setExercises] = useState({});
   const [sessionNotes, setSessionNotes] = useState("");
   const [showPicker, setShowPicker] = useState(false);
@@ -1103,7 +1104,7 @@ function LogManualModal({allExercises, onSave, onClose}){
       name: name.trim(),
       sport_type: "Workout",
       date,
-      distance:0, duration:(parseInt(duration)||0)*60,
+      distance:0, duration:(parseInt(durationMin)||0)*60+(parseInt(durationSec)||0),
       calories:0, effort:0, avg_hr:null, max_hr:null, elevation:0,
       isManual: true,
     };
@@ -1128,8 +1129,12 @@ function LogManualModal({allExercises, onSave, onClose}){
             <input type="date" style={S.input} value={date} onChange={e=>setDate(e.target.value)}/>
           </div>
           <div>
-            <div style={{fontSize:12,color:C.textMuted,fontWeight:"500",marginBottom:5}}>Duration (min)</div>
-            <input type="number" style={S.input} placeholder="e.g. 15" value={duration} onChange={e=>setDuration(e.target.value)}/>
+            <div style={{fontSize:12,color:C.textMuted,fontWeight:"500",marginBottom:5}}>Duration (min:sec)</div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <input type="number" style={{...S.input,width:0,flex:1}} placeholder="min" min="0" value={durationMin} onChange={e=>setDurationMin(e.target.value)}/>
+              <span style={{color:C.textMuted}}>:</span>
+              <input type="number" style={{...S.input,width:0,flex:1}} placeholder="sec" min="0" max="59" value={durationSec} onChange={e=>setDurationSec(e.target.value)}/>
+            </div>
           </div>
         </div>
 
