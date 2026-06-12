@@ -1417,6 +1417,13 @@ export default function App(){
     }
   }
 
+  async function removeCachedActivity(id) {
+    if (!confirm("Remove this session? It's no longer needed if it was deleted on Strava.")) return;
+    await fetch("/api/delete-activity",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({activity_id:id})}).catch(()=>{});
+    setStrength(strength.filter(s=>s.id!==id));
+    const updatedNotes={...notes}; delete updatedNotes[id]; setNotes(updatedNotes);
+  }
+
   function deleteManualSession(id) {
     const updated = manualSessions.filter(s=>s.id!==id);
     setManualSessions(updated);
@@ -1754,6 +1761,7 @@ export default function App(){
                   {s.calories>0&&<div style={{fontSize:12,color:C.textFaint}}>{s.calories}kcal</div>}
                   {s.isManual&&!s.stravaActivityId&&<button onClick={()=>pushManualSessionToStrava(s)} disabled={pushingToStrava===s.id} style={{background:"none",border:`1px solid ${C.blueBorder}`,borderRadius:6,padding:"2px 8px",color:C.blue,fontSize:11,cursor:pushingToStrava===s.id?"default":"pointer",fontFamily:"inherit",marginTop:4,display:"block",marginLeft:"auto"}}>{pushingToStrava===s.id?"Pushing…":"Push to Strava"}</button>}
                   {s.isManual&&<button onClick={()=>deleteManualSession(s.id)} style={{background:"none",border:"none",color:C.textFaint,fontSize:11,cursor:"pointer",padding:0,fontFamily:"inherit",marginTop:4}}>delete</button>}
+                  {!s.isManual&&<button onClick={()=>removeCachedActivity(s.id)} style={{background:"none",border:"none",color:C.textFaint,fontSize:11,cursor:"pointer",padding:0,fontFamily:"inherit",marginTop:4}}>remove</button>}
                 </div>
               </div>
               {(s.avg_hr||s.max_hr)&&<div style={{display:"flex",gap:20,marginBottom:12,background:C.bg,borderRadius:8,padding:"10px 14px"}}>{s.avg_hr&&<div><div style={{fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:"500"}}>Avg HR</div><div style={{fontSize:24,color:hrColor(s.avg_hr),fontWeight:"700"}}>{Math.round(s.avg_hr)}</div></div>}{s.max_hr&&<div><div style={{fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:"500"}}>Max HR</div><div style={{fontSize:24,color:hrColor(s.max_hr),fontWeight:"700"}}>{Math.round(s.max_hr)}</div></div>}</div>}
