@@ -144,6 +144,8 @@ The app is currently named "Ed's Strength Tracker". To change it to your name:
 
 Vercel will automatically redeploy when you save changes on GitHub.
 
+If you want the installed app/APK to show your new name too, also update `name` and `short_name` in `public/manifest.json` and `apple-mobile-web-app-title` in `pages/_document.js`. To change the app icon, edit `scripts/icon-source.svg` and regenerate the PNGs with `npm install sharp --no-save && node scripts/gen-icons.js`.
+
 ---
 
 ## How to record strength sessions
@@ -195,6 +197,31 @@ Strava limits each app to **200 requests every 15 minutes, and 2,000 per day**. 
 - **Pushing manual sessions / renaming activities** — each of these is a one-off action and uses only a handful of requests.
 
 If you ever hit the rate limit (e.g. by repeatedly hammering **⟳ Sync Strava** or leaving many distance buckets open at once), Strava will start returning errors for a little while. The app is designed to fail quietly when this happens — the best-efforts backfill simply stops and picks up again on your next visit, and the "Indexing N more runs…" counter will just take longer to reach zero. You don't need to do anything; just wait 15 minutes and it'll recover on its own.
+
+---
+
+## Installing as an app, and building an Android APK
+
+The site is a Progressive Web App (PWA), so it can be "installed" without any app store:
+
+- **Android (Chrome)**: open the site, tap the menu (⋮) → **Add to Home screen** / **Install app**.
+- **iOS (Safari)**: tap the Share icon → **Add to Home Screen**.
+- **Desktop (Chrome/Edge)**: click the install icon (⊕) in the address bar.
+
+This gives you a standalone window with its own icon and no browser address bar, and it always loads your live Vercel URL — so any future change you push to the web app shows up there too, with no extra steps.
+
+### Building a real `.apk` (optional)
+
+If you'd like an actual Android app file (e.g. to sideload, or to publish on the Play Store), use [PWABuilder](https://www.pwabuilder.com):
+
+1. Make sure your app is deployed and the manifest/icons/service worker are live (they're already set up — `public/manifest.json`, `public/sw.js`, `public/icons/`).
+2. Go to **pwabuilder.com** and enter your Vercel app URL.
+3. PWABuilder analyses the site (it should score well, since the manifest, icons, and service worker are already in place) and lets you **Package for stores** → **Android**.
+4. This downloads a ready-to-build Android project (or a signed `.apk`/`.aab`) that's just a wrapper loading your live site — there's nothing to keep in sync, since it always shows your deployed Vercel URL.
+5. **Optional — remove the browser address bar for a fully "native" look:** PWABuilder will generate a signing key and an `assetlinks.json` snippet containing its SHA256 fingerprint. Save that snippet as `public/.well-known/assetlinks.json` in your repo, commit and push (Vercel will redeploy automatically). This proves to Android that your app and your website are the same thing, so the APK opens full-screen with no URL bar. Without this step, the APK still works fine — it just shows a minimal browser bar at the top.
+6. Install the generated `.apk` on your Android device (transfer the file and open it, enabling "install unknown apps" if prompted), or upload the `.aab` to the Play Console if you want to distribute it via the Play Store.
+
+Because the APK just loads your Vercel URL, any change you make to the web app (new features, layout tweaks, etc.) automatically applies to the APK too — you only need to repeat the PWABuilder steps if you change the app's **name** or **icon**, since those are baked into the APK itself.
 
 ---
 

@@ -10,6 +10,12 @@ The header has five tabs: **dashboard**, **muscles**, **progress**, **strength**
 
 ---
 
+## Installing on your phone
+
+The app is a Progressive Web App — on Android, use Chrome's **Add to Home screen** / **Install app**; on iOS, use Safari's **Add to Home Screen**. It opens in its own window with a dumbbell icon, no browser bar. See the README for how to package it as a real `.apk` if you want one.
+
+---
+
 ## PIN lock for Strava-writing actions
 
 If `APP_PIN` is set (in Vercel env vars), every action that actually changes something on Strava is gated behind a PIN prompt:
