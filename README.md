@@ -161,6 +161,20 @@ For quick sessions you don't want on your Strava feed, use the **+ Log Session**
 
 ---
 
+## A note on Strava's API rate limits
+
+Strava limits each app to **200 requests every 15 minutes, and 2,000 per day**. Most of the app only needs one request per page load (thanks to the local cache), but a couple of features make extra calls and are worth knowing about:
+
+- **Run distance "best efforts" (5K, 10K, Half Marathon, etc.)** — to show your true fastest splits (e.g. your fastest 5K *within* a longer run), the app has to fetch full activity details from Strava one run at a time and cache the results. This runs gradually in the background:
+  - A couple of runs are processed on each normal page load
+  - A few more are processed every ~10 seconds while you have a distance bucket expanded on the Runs tab
+  - If you have a long Strava history, it can take a while (potentially hours of normal usage) for every run to be indexed. Until a run is indexed, that bucket falls back to ranking by overall pace instead of split times.
+- **Pushing manual sessions / renaming activities** — each of these is a one-off action and uses only a handful of requests.
+
+If you ever hit the rate limit (e.g. by repeatedly hammering **⟳ Sync Strava** or leaving many distance buckets open at once), Strava will start returning errors for a little while. The app is designed to fail quietly when this happens — the best-efforts backfill simply stops and picks up again on your next visit, and the "Indexing N more runs…" counter will just take longer to reach zero. You don't need to do anything; just wait 15 minutes and it'll recover on its own.
+
+---
+
 ## Troubleshooting
 
 **"token_exchange_failed" when connecting Strava**
@@ -174,3 +188,6 @@ Wait a minute and try again. If it still fails, check the Vercel dashboard → L
 
 **I made a change on GitHub but the app hasn't updated**
 Vercel should redeploy automatically. Check the Deployments tab — if the latest build shows an error, click it to see what went wrong.
+
+**A distance bucket on the Runs tab still shows "Indexing N more runs…" / rankings look off**
+This is normal for accounts with a lot of history — see [A note on Strava's API rate limits](#a-note-on-stravas-api-rate-limits) above. The list will keep filling in over time as you use the app; no action needed.
