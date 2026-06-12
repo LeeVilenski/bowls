@@ -1397,16 +1397,11 @@ export default function App(){
   async function pushManualSessionToStrava(session) {
     setPushingToStrava(session.id);
     try {
-      const utcOffset = -new Date().getTimezoneOffset()*60;
-      const res = await fetch("/api/push-strava",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session,notes:notes[session.id],utcOffset})}).then(r=>r.json());
+      const res = await fetch("/api/push-strava",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session,notes:notes[session.id]})}).then(r=>r.json());
       if(res.error){ setStravaError(res.error); return; }
-      if(res.activityId){
-        const updated = manualSessions.map(s=>s.id===session.id?{...s,stravaActivityId:res.activityId}:s);
-        setManualSessions(updated);
-        try { localStorage.setItem("manual_sessions_v1", JSON.stringify(updated)); } catch {}
-      } else {
-        setStravaError("Upload is still processing on Strava - check back shortly.");
-      }
+      const updated = manualSessions.map(s=>s.id===session.id?{...s,stravaActivityId:res.activityId}:s);
+      setManualSessions(updated);
+      try { localStorage.setItem("manual_sessions_v1", JSON.stringify(updated)); } catch {}
     } catch(e) {
       setStravaError(e.message);
     } finally {
