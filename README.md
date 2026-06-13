@@ -78,7 +78,7 @@ These are the secret keys that let your app talk to Strava, the database, and op
 | `STRAVA_CLIENT_SECRET` | The Client Secret from Step 2 |
 | `NEXT_PUBLIC_APP_URL` | Your Vercel URL from Step 3, e.g. `https://eds-strength-tracker-abc.vercel.app` — no trailing slash |
 | `ANTHROPIC_API_KEY` | From [console.anthropic.com](https://console.anthropic.com) — optional, skip if you don't want the AI coach |
-| `APP_PIN` | Optional — a short PIN (e.g. `1234`) required before pushing a session to Strava or renaming a Strava activity. Recommended if you ever let other people use the app, e.g. to show it off. Skip to leave these actions unprotected. |
+| `SESSION_SECRET` | A random secret used to sign sign-in sessions. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and paste the output here. |
 
 > **Important:** `NEXT_PUBLIC_APP_URL` must exactly match your Vercel URL — copy and paste it rather than typing it.
 
@@ -129,17 +129,19 @@ If you see an error, wait 30 seconds and try again — the database sometimes ta
 
 The first load may take 10–20 seconds as it pulls your full Strava history. After that it caches everything locally so it loads quickly.
 
+Anyone you share the app URL with can do the same — each person clicks **Connect with Strava** and signs in with their own account, and only ever sees their own data. There's no separate account system to set up.
+
 ---
 
 ## Personalising the app
 
-The app is currently named "Ed's Strength Tracker". To change it to your name:
+The app is named "Strength Tracker" by default — since everyone signs in with their own Strava account, this name is shared across everyone using your deployment. If you'd like to rename it (e.g. to a group name):
 
 1. Go to your forked repository on GitHub
 2. Open `pages/index.js`
 3. Click the pencil ✏️ icon to edit
-4. Press **Ctrl+F** (or **Cmd+F** on Mac) and search for `Ed's Strength Tracker`
-5. Replace both occurrences with your own name
+4. Press **Ctrl+F** (or **Cmd+F** on Mac) and search for `Strength Tracker`
+5. Replace the occurrences in the page title and header with your own name
 6. Scroll down and click **Commit changes**
 
 Vercel will automatically redeploy when you save changes on GitHub.
@@ -160,7 +162,7 @@ For your sessions to appear in the tracker automatically, record them on your Ga
 - **CrossFit**
 - **HIIT**
 
-Once the activity syncs to Strava, it will appear automatically in the app. Tap **+ add exercise breakdown** on the session to log your sets, reps and weight — this also writes the breakdown into that activity's Strava description, so it's PIN-protected if you've set `APP_PIN` (see Step 5).
+Once the activity syncs to Strava, it will appear automatically in the app. Tap **+ add exercise breakdown** on the session to log your sets, reps and weight — this also writes the breakdown into that activity's Strava description.
 
 ### Logging a session manually
 
@@ -176,8 +178,6 @@ Manually logged sessions can include heart rate data in two ways:
 ### Pushing a manual session to Strava
 
 If a manually logged session has an exercise breakdown and/or imported HR data, you can tap **Push to Strava** on it to create a real Strava activity for it. This builds a `.fit` file containing your sets (reps/weight per exercise) and, if you imported one, the full heart rate stream — so the Strava activity shows both the Strength Training set breakdown and an HR graph. Once pushed, the session is linked to its new Strava activity and won't be duplicated.
-
-If you've set `APP_PIN` (see Step 5), the first time you push a session, rename an activity, or save an exercise breakdown on a synced session in a browser session, you'll be asked for the PIN — all three write to Strava (a new activity, an activity's name, or its description). Enter it once and it's remembered for the rest of that browser session — handy if you want to demo the app to someone without letting them write to your Strava account. A **🔓 Lock Strava** button appears in the header once unlocked, so you can re-lock it before handing the device over. Editing breakdowns on **manual** sessions that haven't been pushed yet is always PIN-free, since nothing on Strava changes.
 
 ### Removing old sessions
 

@@ -1,4 +1,5 @@
-import { saveTokens } from "../../../lib/db";
+import { upsertUser } from "../../../lib/db";
+import { sessionCookie } from "../../../lib/session";
 
 export default async function handler(req, res) {
   const { code, error } = req.query;
@@ -26,13 +27,17 @@ export default async function handler(req, res) {
 
     const data = await tokenRes.json();
 
-    await saveTokens({
+    await upsertUser({
       athlete_id: data.athlete.id,
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       expires_at: data.expires_at,
+      first_name: data.athlete.firstname,
+      last_name: data.athlete.lastname,
+      profile_url: data.athlete.profile,
     });
 
+    res.setHeader("Set-Cookie", sessionCookie(data.athlete.id));
     res.redirect("/?connected=true");
   } catch (e) {
     res.redirect(`/?error=server_error`);

@@ -3,27 +3,31 @@ import {
   getCachedActivities, getMostRecentCachedDate, upsertActivities, getCacheCount,
   backfillBestEfforts,
 } from "../../lib/db";
+import { requireUser } from "../../lib/session";
 
 export default async function handler(req, res) {
+  const athleteId = requireUser(req, res);
+  if (!athleteId) return;
+
   try {
-    const accessToken = await getValidAccessToken();
+    const accessToken = await getValidAccessToken(athleteId);
     if (!accessToken) {
       return res.status(401).json({ error: "Not authenticated. Visit /api/auth/login" });
     }
 
     const forceSync = req.query.sync === "true";
-    const cacheCount = await getCacheCount();
+    const cacheCount = await getCacheCount(athleteId);
 
     if (cacheCount > 0 && !forceSync) {
       // Return cached data immediately — fast
-      const cached = await getCachedActivities();
+      const cached = await getCachedActivities(athleteId);
       const runs = cached.filter(a => isRun(a.sport_type));
       const strength = cached.filter(a => isStrength(a.sport_type));
 
       // Background incremental sync — don't await, return fast
-      incrementalSync(accessToken).catch(() => {});
+      incrementalSync(athleteId, accessToken).catch(() => {});
       // Passively chip away at best-efforts backfill, a couple at a time
-      backfillBestEfforts(2).catch(() => {});
+      backfillBestEfforts(athleteId, 2).catch(() => {});
 
       return res.status(200).json({ runs, strength, total: cached.length, fromCache: true });
     }
@@ -31,7 +35,7 @@ export default async function handler(req, res) {
     // First load or forced full sync — fetch everything
     const raw = await fetchAllStravaActivities(accessToken);
     const shaped = raw.map(shapeActivity);
-    await upsertActivities(shaped);
+    await upsertActivities(athleteId, shaped);
 
     const runs = shaped.filter(a => isRun(a.sport_type));
     const strength = shaped.filter(a => isStrength(a.sport_type));
@@ -42,8 +46,8 @@ export default async function handler(req, res) {
   }
 }
 
-async function incrementalSync(accessToken) {
-  const mostRecentDate = await getMostRecentCachedDate();
+async function incrementalSync(athleteId, accessToken) {
+  const mostRecentDate = await getMostRecentCachedDate(athleteId);
   if (!mostRecentDate) return;
 
   const afterEpoch = Math.floor(new Date(mostRecentDate + "T00:00:00Z").getTime() / 1000);
@@ -55,6 +59,6 @@ async function incrementalSync(accessToken) {
 
   const newActivities = await res.json();
   if (newActivities.length > 0) {
-    await upsertActivities(newActivities.map(shapeActivity));
+    await upsertActivities(athleteId, newActivities.map(shapeActivity));
   }
 }

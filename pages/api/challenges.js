@@ -1,9 +1,13 @@
 import { getMonthlyChallenges, saveMonthlyChallenge, completeMonthlyChallenge } from "../../lib/db";
+import { requireUser } from "../../lib/session";
 
 export default async function handler(req, res) {
+  const athleteId = requireUser(req, res);
+  if (!athleteId) return;
+
   if (req.method === "GET") {
     try {
-      const challenges = await getMonthlyChallenges();
+      const challenges = await getMonthlyChallenges(athleteId);
       res.status(200).json({ challenges });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -15,9 +19,9 @@ export default async function handler(req, res) {
       if (!monthKey) return res.status(400).json({ error: "monthKey required" });
       if (action === "save") {
         if (!challenge) return res.status(400).json({ error: "challenge required" });
-        await saveMonthlyChallenge(monthKey, challenge);
+        await saveMonthlyChallenge(athleteId, monthKey, challenge);
       } else if (action === "complete") {
-        await completeMonthlyChallenge(monthKey, bonusXp || 0);
+        await completeMonthlyChallenge(athleteId, monthKey, bonusXp || 0);
       } else {
         return res.status(400).json({ error: "action must be save or complete" });
       }

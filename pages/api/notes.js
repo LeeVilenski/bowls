@@ -1,45 +1,41 @@
 import { getAllExerciseNotes, saveExerciseNotes, getCustomExercises, getStravaActivity, updateStravaActivityDescription } from "../../lib/db";
 import { EXERCISE_LIBRARY } from "../../lib/exercises";
 import { buildExerciseBlock, mergeDescription } from "../../lib/description";
-import { pinOk } from "../../lib/pin";
+import { requireUser } from "../../lib/session";
 
 export default async function handler(req, res) {
+  const athleteId = requireUser(req, res);
+  if (!athleteId) return;
+
   if (req.method === "GET") {
     try {
-      const notes = await getAllExerciseNotes();
+      const notes = await getAllExerciseNotes(athleteId);
       res.status(200).json({ notes });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   } else if (req.method === "POST") {
     try {
-      const { activity_id, notes, pin, xpGain } = req.body;
+      const { activity_id, notes, xpGain } = req.body;
       if (!activity_id || !notes) {
         return res.status(400).json({ error: "activity_id and notes required" });
       }
 
-      // Synced Strava activities get their description updated below, so this
-      // whole save is PIN-gated. Manual sessions (non-numeric ids) are local
-      // only and don't require a PIN.
-      const isStravaActivity = /^\d+$/.test(String(activity_id));
-      if (isStravaActivity && !pinOk(pin)) {
-        return res.status(401).json({ error: "Incorrect PIN", pinRequired: true });
-      }
-
-      await saveExerciseNotes(activity_id, notes);
+      await saveExerciseNotes(athleteId, activity_id, notes);
 
       // Mirror the exercise breakdown into the Strava activity's description.
       // Manual (locally-logged) sessions have no corresponding Strava activity.
+      const isStravaActivity = /^\d+$/.test(String(activity_id));
       let stravaSynced = false;
       let stravaError = null;
       if (isStravaActivity) {
         try {
-          const customExercises = await getCustomExercises();
+          const customExercises = await getCustomExercises(athleteId);
           const allExercises = [...EXERCISE_LIBRARY, ...customExercises];
           const block = buildExerciseBlock(notes, allExercises, { xpGain, appUrl: process.env.NEXT_PUBLIC_APP_URL });
-          const activity = await getStravaActivity(activity_id);
+          const activity = await getStravaActivity(athleteId, activity_id);
           const merged = mergeDescription(activity.description, block);
-          await updateStravaActivityDescription(activity_id, merged);
+          await updateStravaActivityDescription(athleteId, activity_id, merged);
           stravaSynced = true;
         } catch (e) {
           stravaError = e.message;

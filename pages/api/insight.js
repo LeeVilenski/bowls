@@ -1,5 +1,9 @@
+import { requireUser } from "../../lib/session";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
+  const athleteId = requireUser(req, res);
+  if (!athleteId) return;
 
   const { recentRuns, strengthSummary, strengthCount, runCount } = req.body;
 

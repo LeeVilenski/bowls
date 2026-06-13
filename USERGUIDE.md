@@ -16,20 +16,9 @@ The app is a Progressive Web App — on Android, use Chrome's **Add to Home scre
 
 ---
 
-## PIN lock for Strava-writing actions
+## Accounts
 
-If `APP_PIN` is set (in Vercel env vars), every action that actually changes something on Strava is gated behind a PIN prompt:
-
-- **Push to Strava** (creates a new Strava activity)
-- Renaming an activity (the editable title on a session — updates the Strava activity's name)
-- Saving an exercise breakdown / sets+reps/notes on a **synced** session (updates that activity's Strava description)
-
-- The first time any of these is used in a browser session, a bottom-sheet asks for the PIN.
-- A correct PIN is remembered for the rest of that browser session (`sessionStorage`) — no need to re-enter it every time.
-- A **🔓 Lock Strava** button appears in the header while unlocked; tap it to re-lock before handing the device to someone else (e.g. when demoing the app).
-- Editing the exercise breakdown on a **manual** session that hasn't been pushed to Strava yet is never PIN-gated — it's local-only until you push it.
-- Everything else — viewing data, opening Strava links, drafts/templates, custom exercises, removing cached sessions — is unaffected, since none of that writes to Strava.
-- If `APP_PIN` isn't set, none of this appears and these actions behave as before.
+Everyone signs in with their own Strava account via **Connect with Strava** — there's no separate username/password. Each person only ever sees and edits their own runs, strength sessions, custom exercises, drafts, XP/levels and challenges. Use **Sign out** in the header to switch accounts on a shared device.
 
 ---
 
@@ -164,4 +153,4 @@ Strava allows 200 requests/15min and 2,000/day. Normal usage (cached page loads)
 
 ## Personalising
 
-The app name ("Ed's Strength Tracker") appears twice in `pages/index.js` — search and replace to rename it, then Vercel redeploys automatically from GitHub.
+The app name ("Strength Tracker") appears in `pages/index.js` (page title and header) — search and replace to rename it, then Vercel redeploys automatically from GitHub. Since the app is shared, this name applies to everyone who signs in.

@@ -2,21 +2,20 @@ import { getCustomExercises, createStravaActivity, uploadStravaActivity, pollStr
 import { EXERCISE_LIBRARY } from "../../lib/exercises";
 import { buildExerciseBlock } from "../../lib/description";
 import { buildWorkoutFit } from "../../lib/fit-builder";
-import { pinOk } from "../../lib/pin";
+import { requireUser } from "../../lib/session";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  const athleteId = requireUser(req, res);
+  if (!athleteId) return;
 
   try {
-    const { session, notes, pin, xpGain } = req.body;
-    if (!pinOk(pin)) {
-      return res.status(401).json({ error: "Incorrect PIN", pinRequired: true });
-    }
+    const { session, notes, xpGain } = req.body;
     if (!session?.id || !session?.date) {
       return res.status(400).json({ error: "session required" });
     }
 
-    const customExercises = await getCustomExercises();
+    const customExercises = await getCustomExercises(athleteId);
     const allExercises = [...EXERCISE_LIBRARY, ...customExercises];
 
     const block = buildExerciseBlock(notes, allExercises, { xpGain, appUrl: process.env.NEXT_PUBLIC_APP_URL });
@@ -32,16 +31,16 @@ export default async function handler(req, res) {
       // Upload a FIT file with structured "set" messages so Strava's Strength
       // Training UI can show per-exercise sets/reps/weight, alongside the
       // same plain-text description block used for non-manual activities.
-      const upload = await uploadStravaActivity({
+      const upload = await uploadStravaActivity(athleteId, {
         fitBuffer,
         name: session.name,
         sportType,
         description,
         externalId: session.id,
       });
-      activityId = await pollStravaUpload(upload.id);
+      activityId = await pollStravaUpload(athleteId, upload.id);
     } else {
-      const activity = await createStravaActivity({
+      const activity = await createStravaActivity(athleteId, {
         name: session.name,
         sportType,
         startDateLocal: `${session.date}T12:00:00`,
