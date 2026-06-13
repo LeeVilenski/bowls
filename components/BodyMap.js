@@ -254,7 +254,7 @@ export default function BodyMap({ stats, onSelect, selectedMuscle }) {
           const isSelected = selectedMuscle === mgId;
           return muscle.regions.map((r, i) => (
             <div
-              key={`${mgId}-${i}`}
+              key={`${view}-${mgId}-${i}`}
               onClick={() => handleTap(mgId)}
               title={muscle.label}
               style={{
