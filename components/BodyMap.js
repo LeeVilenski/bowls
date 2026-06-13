@@ -95,8 +95,8 @@ const BACK_HOTSPOTS = {
   shoulders: {
     label: "Shoulders",
     regions: [
-      { top:18, left:41, width:6, height:5, borderRadius:"50%" },   // L — in 1%
-      { top:18, left:54, width:6, height:5, borderRadius:"50%" },   // R — in 5%
+      { top:18, left:43, width:6, height:5, borderRadius:"50%" },   // L — in 3%
+      { top:18, left:56, width:6, height:5, borderRadius:"50%" },   // R — in 3%
     ],
   },
   back: {
@@ -109,7 +109,7 @@ const BACK_HOTSPOTS = {
   triceps: {
     label: "Triceps",
     regions: [
-      { top:24, left:35, width:6, height:10, borderRadius:"50%" },
+      { top:24, left:37, width:6, height:10, borderRadius:"50%" },  // L — in 2%
       { top:24, left:62, width:6, height:10, borderRadius:"50%" },  // R — in 3%
     ],
   },
