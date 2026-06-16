@@ -145,20 +145,29 @@ function yFromFar(frac) {
 }
 
 function bowlStart() {
-  // Player stands between delivery lines; use midpoint of that zone
+  // Player stands on delivery mat near the near end
   const cx = MAT.x + MAT.w / 2;
-  return { x: cx, y: yFromNear((L.DELIV_OUT + L.DELIV_IN) / 2) };
+  return { x: cx, y: yFromNear((L.DEAD + L.MAT_END) / 2) };
 }
 
-// Jack is placed at the FAR end's jack line (in front of the opponent)
+// Jack is placed at the FAR end's jack mark
 function jackLineY()   { return yFromFar(L.JACK); }
 
 // Dead zone: the near end's back strip — bowl ending here is dead
 function nearDeadY()   { return yFromNear(L.DEAD); }
 
-// Is bowl stuck in the near dead zone?
+// Minimum running distance — bowl must reach FAR side of this line
+function minDistY()    { return yFromFar(L.MIN_DIST); }
+
+// Is bowl in the near dead zone (too close to near end)?
 function isInNearDeadZone(b) {
   return delivDir === 1 ? b.y > nearDeadY() : b.y < nearDeadY();
+}
+
+// Did bowl stop short — didn't reach the minimum distance line?
+function isShortBowl(b) {
+  const my = minDistY();
+  return delivDir === 1 ? b.y > my : b.y < my;
 }
 
 function playerForTurn(t) {
