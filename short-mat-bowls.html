@@ -84,15 +84,19 @@ const FW = 88, FH = 22;
 const FENDER = { x: MAT.x + MAT.w/2 - FW/2, y: MAT.y + MAT.h/2 - FH/2, w: FW, h: FH };
 
 // ── Symmetric mat layout (same at BOTH ends) ──────────────────────
-// All fractions measured from each respective end (0 = that end's board)
-// From each end inward: dead line → outer delivery → inner delivery → jack line → open → block
+// Mat is ~40ft long, 6ft wide. All fractions from each respective end.
+// Dead line: 1ft from end board = 1/40 = 0.025
+// Delivery lines: roughly 2ft and 3.5ft from end ≈ 0.05, 0.0875
+// Jack line: ~9ft from far end ≈ 0.225
 const L = {
-  DEAD:      0.08,  // dead line — bowl in zone between this & end board → dead
-  DELIV_OUT: 0.115, // outer delivery line (player stands between these two)
-  DELIV_IN:  0.155, // inner delivery line
-  JACK:      0.235, // jack line — jack placed at FAR end's jack line
+  DEAD:      0.025, // dead line — 1ft from end board
+  DELIV_OUT: 0.055, // outer delivery line (~2.2ft from end)
+  DELIV_IN:  0.090, // inner delivery line (~3.6ft from end)
+  JACK:      0.225, // jack line (~9ft from far end)
 };
 
+// Centre block: 3in wide × 15in long on a 6ft×40ft mat
+// In pixels: 3/72*300 ≈ 13px wide, 15/480*760 ≈ 24px along mat
 const RB = 13, RJ = 7;
 const MAX_SPD  = 22;
 const FRICTION = 0.9865;
