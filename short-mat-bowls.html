@@ -74,20 +74,24 @@ const W = 440, H = 840;
 
 const MAT = { x: 70, y: 40, w: 300, h: 760 };
 
-// End boards (white timber at each end — bowl or jack hitting these → dead)
-const BOARD_H   = 16;
+// End boards — white timber at each end, bowl/jack hitting them → dead
+const BOARD_H    = 16;
 const FAR_BOARD  = { x: MAT.x - 4, y: MAT.y - BOARD_H, w: MAT.w + 8, h: BOARD_H };
 const NEAR_BOARD = { x: MAT.x - 4, y: MAT.y + MAT.h,   w: MAT.w + 8, h: BOARD_H };
 
-// Centre block (navigating around it is the challenge; hitting it → bowl dead)
+// Centre block — hitting it → bowl dead
 const FW = 88, FH = 22;
 const FENDER = { x: MAT.x + MAT.w/2 - FW/2, y: MAT.y + MAT.h/2 - FH/2, w: FW, h: FH };
 
-// Proportional positions along mat (from near/delivery end)
-const DEAD_LINE_FRAC  = 0.165; // dead line (bowl must cross this from delivery end)
-const DELIV_OUTER_FRAC = 0.10; // outer delivery line
-const DELIV_INNER_FRAC = 0.135; // inner delivery line
-const JACK_LINE_FRAC  = 0.85;  // jack line (from near end = 85% up mat)
+// ── Symmetric mat layout (same at BOTH ends) ──────────────────────
+// All fractions measured from each respective end (0 = that end's board)
+// From each end inward: dead line → outer delivery → inner delivery → jack line → open → block
+const L = {
+  DEAD:      0.08,  // dead line — bowl in zone between this & end board → dead
+  DELIV_OUT: 0.115, // outer delivery line (player stands between these two)
+  DELIV_IN:  0.155, // inner delivery line
+  JACK:      0.235, // jack line — jack placed at FAR end's jack line
+};
 
 const RB = 13, RJ = 7;
 const MAX_SPD  = 22;
