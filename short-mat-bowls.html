@@ -460,74 +460,82 @@ function drawMat() {
   ctx.strokeRect(MAT.x,MAT.y,MAT.w,MAT.h);
 
   // ── Symmetric lines — draw BOTH ends the same ──────────────────
-  // Lines are permanent markings; which role they play just depends on
-  // which direction is active this end.
   function hLine(y, color, width, dash=[]) {
     ctx.strokeStyle=color; ctx.lineWidth=width; ctx.setLineDash(dash);
     ctx.beginPath(); ctx.moveTo(MAT.x,y); ctx.lineTo(MAT.x+MAT.w,y); ctx.stroke();
     ctx.setLineDash([]);
   }
-  function smallLabel(text, y, align, xPos, color='rgba(255,255,255,0.35)') {
+  function smallLabel(text, y, side, color='rgba(255,255,255,0.4)') {
     ctx.fillStyle=color; ctx.font='8px Segoe UI';
-    ctx.textAlign=align; ctx.textBaseline='bottom';
-    ctx.fillText(text, xPos, y-2);
+    ctx.textAlign= side==='L' ? 'left' : 'right';
+    ctx.textBaseline='bottom';
+    ctx.fillText(text, side==='L' ? MAT.x+4 : MAT.x+MAT.w-4, y-2);
     ctx.textBaseline='alphabetic';
   }
 
-  // Top-end lines (frac from top)
-  const tDead   = MAT.y + L.DEAD      * MAT.h;
-  const tDOut   = MAT.y + L.DELIV_OUT * MAT.h;
-  const tDIn    = MAT.y + L.DELIV_IN  * MAT.h;
-  const tJack   = MAT.y + L.JACK      * MAT.h;
+  // Positions from top end
+  const tDead    = MAT.y + L.DEAD     * MAT.h;
+  const tJack    = MAT.y + L.JACK     * MAT.h;
+  const tMinDist = MAT.y + L.MIN_DIST * MAT.h;
+  const tMatEnd  = MAT.y + L.MAT_END  * MAT.h;
 
-  // Bottom-end lines (frac from bottom)
-  const bDead   = MAT.y + (1-L.DEAD)      * MAT.h;
-  const bDOut   = MAT.y + (1-L.DELIV_OUT) * MAT.h;
-  const bDIn    = MAT.y + (1-L.DELIV_IN)  * MAT.h;
-  const bJack   = MAT.y + (1-L.JACK)      * MAT.h;
+  // Positions from bottom end
+  const bDead    = MAT.y + (1-L.DEAD)     * MAT.h;
+  const bJack    = MAT.y + (1-L.JACK)     * MAT.h;
+  const bMinDist = MAT.y + (1-L.MIN_DIST) * MAT.h;
+  const bMatEnd  = MAT.y + (1-L.MAT_END)  * MAT.h;
 
-  // Dead lines (solid white, thin)
-  hLine(tDead, C.line, 1.5); smallLabel('DEAD', tDead, 'left', MAT.x+5);
-  hLine(bDead, C.line, 1.5); smallLabel('DEAD', bDead, 'left', MAT.x+5);
+  // Dead-zone tint
+  ctx.fillStyle='rgba(200,50,50,0.06)';
+  ctx.fillRect(MAT.x, MAT.y,  MAT.w, tDead - MAT.y);
+  ctx.fillRect(MAT.x, bDead,  MAT.w, MAT.y+MAT.h - bDead);
 
-  // Delivery lines (solid white, slightly thicker — these are "wide lines")
-  hLine(tDOut, C.line, 2);
-  hLine(tDIn,  C.line, 2);
-  hLine(bDOut, C.line, 2);
-  hLine(bDIn,  C.line, 2);
+  // Ditch/dead lines
+  hLine(tDead, C.line, 1.5); smallLabel('DITCH', tDead, 'L');
+  hLine(bDead, C.line, 1.5); smallLabel('DITCH', bDead, 'L');
 
-  // Dead-zone tint (between end board and dead line) — subtle shading
-  ctx.fillStyle='rgba(200,50,50,0.05)';
-  ctx.fillRect(MAT.x, MAT.y,        MAT.w, tDead - MAT.y);        // top dead zone
-  ctx.fillRect(MAT.x, bDead,        MAT.w, MAT.y+MAT.h - bDead);  // bottom dead zone
+  // Minimum distance lines (bowl must reach the far side of this)
+  hLine(tMinDist, 'rgba(255,255,255,0.55)', 1.5); smallLabel('MIN', tMinDist, 'R');
+  hLine(bMinDist, 'rgba(255,255,255,0.55)', 1.5); smallLabel('MIN', bMinDist, 'R');
 
-  // Jack lines (dashed yellow, both ends)
-  const activeJackY = jackLineY(); // the far end's jack line for current delivDir
-  [tJack, bJack].forEach(jy => {
+  // Jack marks — short perpendicular mark at centre of mat (not full width)
+  const activeJackY = jackLineY();
+  const jackMarkW = 70; // short — only ~23% of mat width
+  const jackCx = MAT.x + MAT.w / 2;
+  [[tJack, false], [bJack, false]].forEach(([jy]) => {
     const isActive = Math.abs(jy - activeJackY) < 2;
-    hLine(jy, isActive ? 'rgba(255,220,50,0.85)' : 'rgba(255,220,50,0.35)', 1.5, [6,4]);
-    smallLabel('JACK LINE', jy, 'center', MAT.x+MAT.w/2, isActive ? 'rgba(255,220,50,0.6)' : 'rgba(255,220,50,0.25)');
+    const col = isActive ? 'rgba(255,220,50,0.85)' : 'rgba(255,220,50,0.3)';
+    // Short horizontal segment
+    ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(jackCx-jackMarkW/2, jy); ctx.lineTo(jackCx+jackMarkW/2, jy); ctx.stroke();
+    ctx.setLineDash([]);
+    // Short vertical tick at centre (the "T" stem — 90° component)
+    ctx.strokeStyle=col; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(jackCx, jy-8); ctx.lineTo(jackCx, jy+8); ctx.stroke();
+    if (isActive) {
+      ctx.fillStyle='rgba(255,220,50,0.55)'; ctx.font='8px Segoe UI';
+      ctx.textAlign='right'; ctx.textBaseline='bottom';
+      ctx.fillText('JACK', jackCx - jackMarkW/2 - 3, jy - 2);
+      ctx.textBaseline='alphabetic';
+    }
   });
 
-  // Jack-line glow when placing
+  // Jack mark glow when placing
   if (state==='place-jack') {
-    ctx.strokeStyle='rgba(255,220,50,0.75)'; ctx.lineWidth=3; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(MAT.x,activeJackY); ctx.lineTo(MAT.x+MAT.w,activeJackY); ctx.stroke();
+    ctx.strokeStyle='rgba(255,220,50,0.6)'; ctx.lineWidth=2.5; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(jackCx-jackMarkW/2, activeJackY); ctx.lineTo(jackCx+jackMarkW/2, activeJackY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(jackCx, activeJackY-10); ctx.lineTo(jackCx, activeJackY+10); ctx.stroke();
   }
 
-  // Delivery mat — yellow/cream rectangle between the two active delivery lines
-  const nearDOut = delivDir===1 ? bDOut : tDOut;
-  const nearDIn  = delivDir===1 ? bDIn  : tDIn;
-  const dMatPad = 20; // side padding from mat edge
-  const dMatTop = Math.min(nearDOut, nearDIn);
-  const dMatH   = Math.abs(nearDOut - nearDIn);
-  ctx.fillStyle='rgba(210,185,80,0.75)';
-  ctx.strokeStyle='rgba(180,150,40,0.9)'; ctx.lineWidth=1.5;
-  ctx.beginPath();
-  ctx.roundRect(MAT.x+dMatPad, dMatTop, MAT.w-dMatPad*2, dMatH, 3);
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle='rgba(255,240,140,0.3)';
-  ctx.fillRect(MAT.x+dMatPad, dMatTop+2, 8, dMatH-4); // highlight edge
+  // Delivery mats — yellow/cream at each end, between ditch and mat-end line
+  [[tDead, tMatEnd], [bMatEnd, bDead]].forEach(([y1, y2]) => {
+    const top = Math.min(y1,y2), ht = Math.abs(y2-y1);
+    const pad = 22;
+    ctx.fillStyle='rgba(210,185,80,0.72)';
+    ctx.strokeStyle='rgba(170,140,30,0.8)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(MAT.x+pad, top, MAT.w-pad*2, ht, 3);
+    ctx.fill(); ctx.stroke();
+  });
 
   // Centre block
   ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(FENDER.x+3,FENDER.y+3,FENDER.w,FENDER.h);
