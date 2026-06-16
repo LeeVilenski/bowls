@@ -432,96 +432,108 @@ function drawMat() {
     ctx.fillRect(MAT.x, MAT.y+i, MAT.w, Math.min(50, MAT.h-i));
   }
 
-  // End boards (white timber)
+  // End boards (white timber, both ends always drawn)
   [FAR_BOARD, NEAR_BOARD].forEach(b => {
-    ctx.fillStyle = C.boardShadow;
-    ctx.fillRect(b.x+2, b.y+3, b.w, b.h);
-    ctx.fillStyle = C.board;
-    ctx.fillRect(b.x, b.y, b.w, b.h);
-    // Wood grain lines
-    ctx.strokeStyle = 'rgba(160,140,110,0.5)'; ctx.lineWidth = 1;
-    for (let gx = b.x+10; gx < b.x+b.w-5; gx+=18) {
-      ctx.beginPath(); ctx.moveTo(gx, b.y+2); ctx.lineTo(gx, b.y+b.h-2); ctx.stroke();
+    ctx.fillStyle=C.boardShadow; ctx.fillRect(b.x+2,b.y+3,b.w,b.h);
+    ctx.fillStyle=C.board;       ctx.fillRect(b.x,b.y,b.w,b.h);
+    ctx.strokeStyle='rgba(160,140,110,0.5)'; ctx.lineWidth=1;
+    for (let gx=b.x+10; gx<b.x+b.w-5; gx+=18) {
+      ctx.beginPath(); ctx.moveTo(gx,b.y+2); ctx.lineTo(gx,b.y+b.h-2); ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(80,60,30,0.4)'; ctx.lineWidth = 1.5;
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle='rgba(80,60,30,0.4)'; ctx.lineWidth=1.5;
+    ctx.strokeRect(b.x,b.y,b.w,b.h);
   });
 
   // Mat border
-  ctx.strokeStyle = C.border; ctx.lineWidth = 5;
-  ctx.strokeRect(MAT.x, MAT.y, MAT.w, MAT.h);
+  ctx.strokeStyle=C.border; ctx.lineWidth=5;
+  ctx.strokeRect(MAT.x,MAT.y,MAT.w,MAT.h);
 
-  // ── Mat lines ──────────────────────────────────────────────────
+  // ── Symmetric lines — draw BOTH ends the same ──────────────────
+  // Lines are permanent markings; which role they play just depends on
+  // which direction is active this end.
   function hLine(y, color, width, dash=[]) {
-    ctx.strokeStyle = color; ctx.lineWidth = width;
-    ctx.setLineDash(dash);
-    ctx.beginPath(); ctx.moveTo(MAT.x, y); ctx.lineTo(MAT.x+MAT.w, y); ctx.stroke();
+    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(MAT.x,y); ctx.lineTo(MAT.x+MAT.w,y); ctx.stroke();
     ctx.setLineDash([]);
   }
-
-  // Dead line (solid white) — bowl must cross this to be active
-  hLine(deadLineY(), C.line, 2);
-
-  // Delivery lines (solid white, two parallel lines)
-  hLine(delivInnerY(), C.line, 1.5);
-  hLine(delivOuterY(), C.line, 1.5);
-
-  // Jack line (dashed yellow) — jack placed here
-  hLine(jackLineY(), 'rgba(255,220,50,0.85)', 2, [6,4]);
-
-  // Dead line label
-  const dlY  = deadLineY();
-  const dlLX = delivDir===1 ? MAT.x+6 : MAT.x+MAT.w-6;
-  const dlAlign = delivDir===1 ? 'left' : 'right';
-  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='9px Segoe UI';
-  ctx.textAlign=dlAlign; ctx.textBaseline='bottom';
-  ctx.fillText('DEAD LINE', dlLX, dlY-2);
-
-  // Jack line label
-  const jlY = jackLineY();
-  ctx.fillStyle='rgba(255,220,50,0.55)'; ctx.font='9px Segoe UI';
-  ctx.textAlign='center'; ctx.textBaseline='bottom';
-  ctx.fillText('JACK LINE', MAT.x+MAT.w/2, jlY-2);
-  ctx.textBaseline='alphabetic';
-
-  // Jack-line highlight when placing
-  if (state==='place-jack') {
-    ctx.fillStyle='rgba(255,220,50,0.12)';
-    ctx.fillRect(MAT.x, jlY-1, MAT.w, 2);
-    // Glow
-    ctx.strokeStyle='rgba(255,220,50,0.6)'; ctx.lineWidth=3; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(MAT.x, jlY); ctx.lineTo(MAT.x+MAT.w, jlY); ctx.stroke();
+  function smallLabel(text, y, align, xPos, color='rgba(255,255,255,0.35)') {
+    ctx.fillStyle=color; ctx.font='8px Segoe UI';
+    ctx.textAlign=align; ctx.textBaseline='bottom';
+    ctx.fillText(text, xPos, y-2);
+    ctx.textBaseline='alphabetic';
   }
 
+  // Top-end lines (frac from top)
+  const tDead   = MAT.y + L.DEAD      * MAT.h;
+  const tDOut   = MAT.y + L.DELIV_OUT * MAT.h;
+  const tDIn    = MAT.y + L.DELIV_IN  * MAT.h;
+  const tJack   = MAT.y + L.JACK      * MAT.h;
+
+  // Bottom-end lines (frac from bottom)
+  const bDead   = MAT.y + (1-L.DEAD)      * MAT.h;
+  const bDOut   = MAT.y + (1-L.DELIV_OUT) * MAT.h;
+  const bDIn    = MAT.y + (1-L.DELIV_IN)  * MAT.h;
+  const bJack   = MAT.y + (1-L.JACK)      * MAT.h;
+
+  // Dead lines (solid white, thin)
+  hLine(tDead, C.line, 1.5); smallLabel('DEAD', tDead, 'left', MAT.x+5);
+  hLine(bDead, C.line, 1.5); smallLabel('DEAD', bDead, 'left', MAT.x+5);
+
+  // Delivery lines (solid white, slightly thicker — these are "wide lines")
+  hLine(tDOut, C.line, 2);
+  hLine(tDIn,  C.line, 2);
+  hLine(bDOut, C.line, 2);
+  hLine(bDIn,  C.line, 2);
+
+  // Dead-zone tint (between end board and dead line) — subtle shading
+  ctx.fillStyle='rgba(200,50,50,0.05)';
+  ctx.fillRect(MAT.x, MAT.y,        MAT.w, tDead - MAT.y);        // top dead zone
+  ctx.fillRect(MAT.x, bDead,        MAT.w, MAT.y+MAT.h - bDead);  // bottom dead zone
+
+  // Jack lines (dashed yellow, both ends)
+  const activeJackY = jackLineY(); // the far end's jack line for current delivDir
+  [tJack, bJack].forEach(jy => {
+    const isActive = Math.abs(jy - activeJackY) < 2;
+    hLine(jy, isActive ? 'rgba(255,220,50,0.85)' : 'rgba(255,220,50,0.35)', 1.5, [6,4]);
+    smallLabel('JACK LINE', jy, 'center', MAT.x+MAT.w/2, isActive ? 'rgba(255,220,50,0.6)' : 'rgba(255,220,50,0.25)');
+  });
+
+  // Jack-line glow when placing
+  if (state==='place-jack') {
+    ctx.strokeStyle='rgba(255,220,50,0.75)'; ctx.lineWidth=3; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(MAT.x,activeJackY); ctx.lineTo(MAT.x+MAT.w,activeJackY); ctx.stroke();
+  }
+
+  // Delivery mat marker (small dark rubber mat between the active delivery lines)
+  const nearDOut = delivDir===1 ? bDOut : tDOut;
+  const nearDIn  = delivDir===1 ? bDIn  : tDIn;
+  const matCx = MAT.x + MAT.w/2;
+  const matCy = (nearDOut + nearDIn) / 2;
+  ctx.fillStyle='rgba(30,30,30,0.65)';
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.roundRect(matCx-22, matCy-8, 44, 16, 3);
+  ctx.fill(); ctx.stroke();
+
   // Centre block
-  ctx.fillStyle='rgba(0,0,0,0.3)';
-  ctx.fillRect(FENDER.x+3, FENDER.y+3, FENDER.w, FENDER.h);
-  ctx.fillStyle=C.fen;
-  ctx.fillRect(FENDER.x, FENDER.y, FENDER.w, FENDER.h);
-  ctx.fillStyle=C.fenTop;
-  ctx.fillRect(FENDER.x, FENDER.y, FENDER.w, 5);
-  ctx.fillStyle='rgba(255,200,100,0.3)';
-  ctx.fillRect(FENDER.x, FENDER.y+5, 4, FENDER.h-5);
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(FENDER.x+3,FENDER.y+3,FENDER.w,FENDER.h);
+  ctx.fillStyle=C.fen;    ctx.fillRect(FENDER.x,FENDER.y,FENDER.w,FENDER.h);
+  ctx.fillStyle=C.fenTop; ctx.fillRect(FENDER.x,FENDER.y,FENDER.w,5);
+  ctx.fillStyle='rgba(255,200,100,0.3)'; ctx.fillRect(FENDER.x,FENDER.y+5,4,FENDER.h-5);
   ctx.fillStyle='#fde68a'; ctx.font='bold 9px Segoe UI';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('BLOCK', MAT.x+MAT.w/2, FENDER.y+FENDER.h/2);
   ctx.textBaseline='alphabetic';
 
-  // Subtle gap hints at block sides
+  // Gap hints at block sides
   ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-  const gY = FENDER.y+FENDER.h/2;
+  const gY=FENDER.y+FENDER.h/2;
   ctx.beginPath(); ctx.moveTo(MAT.x+4,gY); ctx.lineTo(FENDER.x-4,gY); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(FENDER.x+FENDER.w+4,gY); ctx.lineTo(MAT.x+MAT.w-4,gY); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Delivery mat marker
-  const bs = bowlStart();
-  ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.fillRect(bs.x-22, bs.y-4, 44, 8);
-
-  // End counter
-  ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.font='11px Segoe UI';
-  ctx.textAlign='center';
+  // End/score counter
+  ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.font='11px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(`End ${endNum} of ${ENDS}`, MAT.x+MAT.w/2, MAT.y-10);
 }
 
