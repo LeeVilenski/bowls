@@ -202,8 +202,8 @@ function stepObj(obj, bias) {
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.22) {
     obj.stopped = true; obj.vx = obj.vy = 0;
-    // Bowl resting in the near dead zone → dead
-    if (obj !== jack && isInNearDeadZone(obj)) obj.offMat = true;
+    // Bowl resting in the near dead zone or didn't reach minimum distance → dead
+    if (obj !== jack && (isInNearDeadZone(obj) || isShortBowl(obj))) obj.offMat = true;
     return;
   }
 
