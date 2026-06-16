@@ -127,42 +127,35 @@ let mouse    = { x: 0, y: 0, down: false };
 let aimActive = false;
 
 // ── Position helpers ──────────────────────────────────────────────
+// All helpers respect the current delivDir (1=bowl from bottom, -1=from top)
+
+// Fraction helpers: "fromNear" = fraction from the near/delivery end
+function yFromNear(frac) {
+  return delivDir === 1
+    ? MAT.y + MAT.h * (1 - frac)   // near end is bottom
+    : MAT.y + MAT.h * frac;         // near end is top
+}
+function yFromFar(frac) {
+  return delivDir === 1
+    ? MAT.y + MAT.h * frac          // far end is top
+    : MAT.y + MAT.h * (1 - frac);  // far end is bottom
+}
+
 function bowlStart() {
+  // Player stands between delivery lines; use midpoint of that zone
   const cx = MAT.x + MAT.w / 2;
-  return delivDir === 1
-    ? { x: cx, y: MAT.y + MAT.h - 28 }
-    : { x: cx, y: MAT.y + 28 };
+  return { x: cx, y: yFromNear((L.DELIV_OUT + L.DELIV_IN) / 2) };
 }
 
-function jackLineY() {
-  return delivDir === 1
-    ? MAT.y + MAT.h * (1 - JACK_LINE_FRAC)
-    : MAT.y + MAT.h * JACK_LINE_FRAC;
-}
+// Jack is placed at the FAR end's jack line (in front of the opponent)
+function jackLineY()   { return yFromFar(L.JACK); }
 
-function deadLineY() {
-  return delivDir === 1
-    ? MAT.y + MAT.h * DEAD_LINE_FRAC
-    : MAT.y + MAT.h * (1 - DEAD_LINE_FRAC);
-}
+// Dead zone: the near end's back strip — bowl ending here is dead
+function nearDeadY()   { return yFromNear(L.DEAD); }
 
-function delivInnerY() {
-  return delivDir === 1
-    ? MAT.y + MAT.h * DELIV_INNER_FRAC
-    : MAT.y + MAT.h * (1 - DELIV_INNER_FRAC);
-}
-
-function delivOuterY() {
-  return delivDir === 1
-    ? MAT.y + MAT.h * DELIV_OUTER_FRAC
-    : MAT.y + MAT.h * (1 - DELIV_OUTER_FRAC);
-}
-
-// Is this bowl on the wrong side of the dead line (didn't travel far enough)?
-function isShortOfDeadLine(b) {
-  return delivDir === 1
-    ? b.y > deadLineY()
-    : b.y < deadLineY();
+// Is bowl stuck in the near dead zone?
+function isInNearDeadZone(b) {
+  return delivDir === 1 ? b.y > nearDeadY() : b.y < nearDeadY();
 }
 
 function playerForTurn(t) {
