@@ -363,10 +363,12 @@ function startEnd() {
 }
 
 function aiPlaceJack() {
-  const margin = 30;
+  // Jack line is vertical at centre-x; vary y within the jack line range
+  const lo = Math.min(jackYMin(), jackYMax());
+  const hi = Math.max(jackYMin(), jackYMax());
   jack = {
-    x: MAT.x + margin + Math.random()*(MAT.w - margin*2),
-    y: jackLineY(),
+    x: jackLineX(),
+    y: lo + Math.random() * (hi - lo),
     vx:0, vy:0, stopped:true, offMat:false
   };
   beginTurns();
