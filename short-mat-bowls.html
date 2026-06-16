@@ -691,12 +691,13 @@ canvas.addEventListener('mousedown', e => {
   mouse={x:p.x,y:p.y,down:true};
 
   if (state==='place-jack') {
-    // Snap y to jack line; x must be within mat
-    if (p.x >= MAT.x+RJ && p.x <= MAT.x+MAT.w-RJ) {
-      jack={x:p.x, y:jackLineY(), vx:0, vy:0, stopped:true, offMat:false};
+    // Jack always placed on the FAR end's jack line (y fixed, x free within mat)
+    const jly = jackLineY();
+    if (p.x >= MAT.x+RJ+4 && p.x <= MAT.x+MAT.w-RJ-4) {
+      jack={x:p.x, y:jly, vx:0, vy:0, stopped:true, offMat:false};
       beginTurns();
     } else {
-      msg('Click somewhere on the jack line (inside the mat)!');
+      msg('Click anywhere left/right along the highlighted jack line!');
     }
   } else if (state==='aim') {
     aimActive=true;
