@@ -153,29 +153,35 @@ function yFromFar(frac) {
 }
 
 function bowlStart() {
-  // Player stands on delivery mat near the near end
-  const cx = MAT.x + MAT.w / 2;
-  return { x: cx, y: yFromNear((L.DEAD + L.MAT_END) / 2) };
+  // Bowl delivered from the ditch line (player stands on delivery mat just inside fender)
+  return { x: MAT.x + MAT.w / 2, y: yFromNear(L.DITCH) };
 }
 
-// Jack is placed at the FAR end's jack mark
-function jackLineY()   { return yFromFar(L.JACK); }
+// Jack y-range on the far jack line (jack line runs along the mat = vertical on screen)
+function jackYMin() { return yFromFar(L.JACK_N); } // closer to far fender (screen: smaller y when delivDir=1)
+function jackYMax() { return yFromFar(L.JACK_F); } // farther from far fender
+function jackLineX() { return MAT.x + MAT.w / 2; } // always centre-x
 
-// Dead zone: the near end's back strip — bowl ending here is dead
+// Dead zone: between near fender and ditch line
+function nearDitchY()  { return yFromNear(L.DITCH); }
+// Dead line: bowl must travel past this to count
 function nearDeadY()   { return yFromNear(L.DEAD); }
 
-// Minimum running distance — bowl must reach FAR side of this line
-function minDistY()    { return yFromFar(L.MIN_DIST); }
-
-// Is bowl in the near dead zone (too close to near end)?
-function isInNearDeadZone(b) {
-  return delivDir === 1 ? b.y > nearDeadY() : b.y < nearDeadY();
+// Bowl ended in ditch zone (too close to near fender)?
+function isInNearDitchZone(b) {
+  return delivDir === 1 ? b.y > nearDitchY() : b.y < nearDitchY();
+}
+// Bowl didn't reach minimum distance (dead line)?
+function isShortBowl(b) {
+  const dy = nearDeadY();
+  return delivDir === 1 ? b.y > dy : b.y < dy;
 }
 
-// Did bowl stop short — didn't reach the minimum distance line?
-function isShortBowl(b) {
-  const my = minDistY();
-  return delivDir === 1 ? b.y > my : b.y < my;
+// Clamp a y to the jack line range (jack line is vertical, x=centre)
+function clampToJackLine(y) {
+  const lo = Math.min(jackYMin(), jackYMax());
+  const hi = Math.max(jackYMin(), jackYMax());
+  return Math.max(lo, Math.min(hi, y));
 }
 
 function playerForTurn(t) {
