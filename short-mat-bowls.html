@@ -216,8 +216,14 @@ function stepObj(obj, bias) {
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.22) {
     obj.stopped = true; obj.vx = obj.vy = 0;
-    // Dead if in ditch zone OR didn't reach the dead line
-    if (obj !== jack && (isInNearDitchZone(obj) || isShortBowl(obj))) obj.offMat = true;
+    if (obj !== jack) {
+      // Dead: didn't reach the delivery-end dead line (too short)
+      // Dead: landed in near ditch zone
+      // Dead: overshot into far dead zone (past the far dead line toward far fender)
+      const farDeadY = yFromFar(L.DEAD);
+      const overshot = delivDir === 1 ? obj.y < farDeadY : obj.y > farDeadY;
+      if (isInNearDitchZone(obj) || isShortBowl(obj) || overshot) obj.offMat = true;
+    }
     return;
   }
 
