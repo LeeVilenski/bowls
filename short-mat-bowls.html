@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Short Mat Bowls</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0a0f1e;
+  color: #e2e8f0;
+  font-family: 'Segoe UI', sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  min-height: 100vh;
+  user-select: none;
+}
+h1 {
+  font-size: 20px;
+  color: #60a5fa;
+  letter-spacing: 3px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+#canvas { display: block; border-radius: 6px; cursor: crosshair; max-width: 100%; }
+#hud {
+  display: flex; align-items: stretch; gap: 10px; margin-top: 10px;
+  width: 440px; max-width: 100%;
+}
+.sbox {
+  background: #1e293b; border-radius: 8px; padding: 8px 14px;
+  text-align: center; min-width: 80px;
+}
+.sbox .lbl { font-size: 11px; opacity: 0.55; margin-bottom: 2px; }
+.sbox .val { font-size: 26px; font-weight: 700; }
+.p1 .val { color: #60a5fa; }
+.p2 .val { color: #f87171; }
+#msgBox {
+  flex: 1; background: #1e293b; border-radius: 8px;
+  padding: 8px 12px; display: flex; align-items: center;
+  justify-content: center; font-size: 13px; text-align: center; line-height: 1.4;
+}
+#controls { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+button {
+  padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s;
+}
+button:hover { opacity: .85; transform: scale(1.04); }
+#btnMode { background: #7c3aed; color: #fff; }
+#btnBias { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
+#btnNew  { background: #1d4ed8; color: #fff; }
+</style>
+</head>
+<body>
+<h1>Short Mat Bowls</h1>
+<canvas id="canvas" width="440" height="840"></canvas>
+<div id="hud">
+  <div class="sbox p1">
+    <div class="lbl" id="lbl1">Player 1</div>
+    <div class="val" id="sc1">0</div>
+  </div>
+  <div id="msgBox">Press <strong>New Game</strong> to start</div>
+  <div class="sbox p2">
+    <div class="lbl" id="lbl2">AI</div>
+    <div class="val" id="sc2">0</div>
+  </div>
+</div>
+<div id="controls">
+  <button id="btnMode">Mode: vs AI</button>
+  <button id="btnBias">Bias: Right ↗</button>
+  <button id="btnNew">New Game</button>
+</div>
+
+<script>
+// ── Canvas & layout ──────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const W = 440, H = 840;
+
+const MAT    = { x: 70, y: 40, w: 300, h: 760 };
+// Fender: small central block bowls must navigate around
+const FW = 90, FH = 22;
+const FENDER = { x: MAT.x + MAT.w/2 - FW/2, y: MAT.y + MAT.h/2 - FH/2, w: FW, h: FH };
+
+const RB = 13, RJ = 7;          // bowl / jack radii
+const MAX_SPD  = 22;
+const FRICTION = 0.9865;
+const BIAS_K   = 0.017;          // lateral force per unit speed
+const BPP      = 4;              // bowls per player
+const ENDS     = 6;
+
+const C = {
+  bg:'#0a0f1e', mat:'#1a6b35', matAlt:'#1f7d3e', border:'#0a3d1c',
+  fen:'#92400e', fenTop:'#d97706',
+  jack:'#fef08a', jackS:'#ca8a04',
+  p1:'#3b82f6', p1d:'#1d4ed8',
+  p2:'#ef4444', p2d:'#b91c1c',
+};
+
+// ── Game state ────────────────────────────────────────────────────
+let mode     = 'vs-ai';   // 'vs-ai' | 'vs-player'
+let state    = 'idle';    // idle | place-jack | aim | moving | end-result | game-over
+let biasDir  = 'right';   // 'right' | 'left' — shared by both players
+
+let bowls    = [];        // {x,y,vx,vy,player,bias,stopped,offMat}
+let jack     = null;      // {x,y,vx,vy,stopped,offMat}
+let scores   = [0, 0];
+let endNum   = 1;
+let jackOwner = 1;        // 1 or 2
+let turnIdx   = 0;        // 0‥7 within an end
+let delivDir  = 1;        // 1=bowl from bottom, -1=from top
+let aiTimer   = null;
+
+let mouse = { x: 0, y: 0, down: false };
+let aimActive = false;
+
+// ── Helpers ───────────────────────────────────────────────────────
+function bowlStart() {
+  return delivDir === 1
+    ? { x: MAT.x + MAT.w/2, y: MAT.y + MAT.h - 25 }
+    : { x: MAT.x + MAT.w/2, y: MAT.y + 25 };
+}
+
+function jackZone() {
+  if (delivDir === 1)
+    return { x1: MAT.x+30, x2: MAT.x+MAT.w-30, y1: MAT.y+50, y2: FENDER.y-30 };
+  else
+    return { x1: MAT.x+30, x2: MAT.x+MAT.w-30, y1: FENDER.y+FENDER.h+30, y2: MAT.y+MAT.h-50 };
+}
+
+function playerForTurn(t) {
+  const other = jackOwner === 1 ? 2 : 1;
+  return t % 2 === 0 ? jackOwner : other;
+}
+
+function allStopped() {
+  if (jack && !jack.stopped && !jack.offMat) return false;
+  return bowls.every(b => b.stopped || b.offMat);
+}
+
+function msg(html) { document.getElementById('msgBox').innerHTML = html; }
+function updateHUD() {
+  document.getElementById('sc1').textContent = scores[0];
+  document.getElementById('sc2').textContent = scores[1];
+}
+
+// ── Physics ───────────────────────────────────────────────────────
+function applyBias(obj, bias) {
+  const spd = Math.hypot(obj.vx, obj.vy);
+  if (spd < 0.01) return;
+  const nx = obj.vx/spd, ny = obj.vy/spd;
+  const sign = bias === 'right' ? 1 : -1;
+  // perpendicular pointing screen-right when moving up = (-ny, nx) with sign
+  obj.vx += -ny * sign * BIAS_K * spd;
+  obj.vy +=  nx * sign * BIAS_K * spd;
+}
+
+function stepObj(obj, bias) {
+  if (obj.stopped || obj.offMat) return;
+  const spd = Math.hypot(obj.vx, obj.vy);
+  if (spd < 0.22) { obj.stopped = true; obj.vx = obj.vy = 0; return; }
+
+  if (bias) applyBias(obj, bias);
+
+  obj.vx *= FRICTION; obj.vy *= FRICTION;
+  obj.x  += obj.vx;  obj.y  += obj.vy;
+
+  // Side walls — gentle bounce
+  const r = obj === jack ? RJ : RB;
+  if (obj.x - r < MAT.x)         { obj.x = MAT.x + r;           obj.vx =  Math.abs(obj.vx)*0.3; }
+  if (obj.x + r > MAT.x + MAT.w) { obj.x = MAT.x + MAT.w - r;  obj.vx = -Math.abs(obj.vx)*0.3; }
+
+  // Off the mat ends
+  if (obj.y + r < MAT.y || obj.y - r > MAT.y + MAT.h) {
+    obj.offMat = true; obj.stopped = true; return;
+  }
+
+  // Fender collision — resolve by least-penetration axis
+  const fx1 = FENDER.x, fx2 = FENDER.x + FENDER.w;
+  const fy1 = FENDER.y, fy2 = FENDER.y + FENDER.h;
+  if (obj.x - r < fx2 && obj.x + r > fx1 && obj.y - r < fy2 && obj.y + r > fy1) {
+    if (obj === jack) { obj.offMat = true; obj.stopped = true; return; }
+    const ovL = (obj.x + r) - fx1, ovR = fx2 - (obj.x - r);
+    const ovT = (obj.y + r) - fy1, ovB = fy2 - (obj.y - r);
+    const minOv = Math.min(ovL, ovR, ovT, ovB);
+    if (minOv === ovL)      { obj.x = fx1 - r; obj.vx = -Math.abs(obj.vx)*0.25; obj.vy *= 0.6; }
+    else if (minOv === ovR) { obj.x = fx2 + r; obj.vx =  Math.abs(obj.vx)*0.25; obj.vy *= 0.6; }
+    else if (minOv === ovT) { obj.y = fy1 - r; obj.vy = -Math.abs(obj.vy)*0.25; obj.vx *= 0.6; }
+    else                    { obj.y = fy2 + r; obj.vy =  Math.abs(obj.vy)*0.25; obj.vx *= 0.6; }
+  }
+}
+
+function stepCollisions() {
+  const active = bowls.filter(b => !b.offMat && !b.stopped);
+
+  for (let i = 0; i < bowls.length; i++) {
+    const a = bowls[i];
+    if (a.offMat) continue;
+    for (let j = i+1; j < bowls.length; j++) {
+      const b = bowls[j];
+      if (b.offMat) continue;
+      collide(a, b, RB, RB, 0.75);
+    }
+    if (jack && !jack.offMat) collide(a, jack, RB, RJ, 0.85);
+  }
+}
+
+function collide(a, b, ra, rb, restitution) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy);
+  const minD = ra + rb;
+  if (dist >= minD || dist < 0.01) return;
+  const nx = dx/dist, ny = dy/dist;
+  const rel = (a.vx - b.vx)*nx + (a.vy - b.vy)*ny;
+  if (rel > 0) {
+    const imp = rel * restitution;
+    a.vx -= imp*nx; a.vy -= imp*ny;
+    b.vx += imp*nx; b.vy += imp*ny;
+    a.stopped = false; b.stopped = false;
+  }
+  const ov = (minD - dist) / 2;
+  a.x -= nx*ov; a.y -= ny*ov;
+  b.x += nx*ov; b.y += ny*ov;
+}
+
+// ── Trajectory simulation (used by preview & AI) ─────────────────
+function simPath(startX, startY, angle, speed, bias) {
+  let x = startX, y = startY;
+  let vx = Math.cos(angle)*speed, vy = Math.sin(angle)*speed;
+  const path = [{x, y}];
+
+  for (let i = 0; i < 600; i++) {
+    const spd = Math.hypot(vx, vy);
+    if (spd < 0.22) break;
+    const nx = vx/spd, ny = vy/spd;
+    const sign = bias === 'right' ? 1 : -1;
+    vx += -ny * sign * BIAS_K * spd;
+    vy +=  nx * sign * BIAS_K * spd;
+    vx *= FRICTION; vy *= FRICTION;
+    x += vx; y += vy;
+    if (x < MAT.x || x > MAT.x+MAT.w || y < MAT.y || y > MAT.y+MAT.h) break;
+    // Stop trajectory preview if it would hit the fender
+    if (x-RB < FENDER.x+FENDER.w && x+RB > FENDER.x &&
+        y-RB < FENDER.y+FENDER.h && y+RB > FENDER.y) {
+      path.push({x, y}); break;
+    }
+    path.push({x, y});
+  }
+  return path;
+}
+
+// ── AI ────────────────────────────────────────────────────────────
+function aiPickShot() {
+  const bs  = bowlStart();
+  const jx  = jack.x, jy = jack.y;
+  const baseAngle = Math.atan2(jy - bs.y, jx - bs.x);
+
+  let bestAngle = baseAngle, bestPower = 0.65*MAX_SPD, bestDist = Infinity;
+
+  for (let da = -50; da <= 50; da += 3) {
+    const angle = baseAngle + da * Math.PI/180;
+    for (const pct of [0.40, 0.52, 0.64, 0.76, 0.88]) {
+      const spd = pct * MAX_SPD;
+      const path = simPath(bs.x, bs.y, angle, spd, biasDir);
+      const end  = path[path.length - 1];
+      const d    = Math.hypot(end.x - jx, end.y - jy);
+      if (d < bestDist) { bestDist = d; bestAngle = angle; bestPower = spd; }
+    }
+  }
+
+  // Add human-like inaccuracy
+  const noise = (Math.random() - 0.5) * 0.18;
+  return { angle: bestAngle + noise, speed: bestPower * (0.93 + Math.random()*0.14) };
+}
+
+// ── Scoring ───────────────────────────────────────────────────────
+function scoreEnd() {
+  if (!jack || jack.offMat) return null; // dead ball
+
+  const dists = bowls
+    .filter(b => !b.offMat)
+    .map(b => ({ p: b.player, d: Math.hypot(b.x - jack.x, b.y - jack.y) }))
+    .sort((a, b) => a.d - b.d);
+
+  if (!dists.length) return null;
+
+  const winner = dists[0].p;
+  let pts = 0;
+  for (const e of dists) {
+    if (e.p === winner) pts++;
+    else break;
+  }
+  return { winner, pts };
+}
+
+// ── Game flow ─────────────────────────────────────────────────────
+function startGame() {
+  clearTimeout(aiTimer);
+  bowls = []; jack = null;
+  scores = [0, 0]; endNum = 1;
+  jackOwner = 1; turnIdx = 0; delivDir = 1;
+  updateHUD(); startEnd();
+}
+
+function startEnd() {
+  bowls = []; jack = null; turnIdx = 0;
+  state = 'place-jack';
+
+  const isAiJack = jackOwner === 2 && mode === 'vs-ai';
+  if (isAiJack) {
+    aiPlaceJack();
+  } else {
+    const who = jackOwner === 1 ? '<span style="color:#60a5fa">Player 1</span>'
+                                : '<span style="color:#f87171">Player 2</span>';
+    msg(`End ${endNum}/${ENDS} — ${who}: click the yellow zone to place the jack`);
+  }
+}
+
+function aiPlaceJack() {
+  const jz = jackZone();
+  jack = {
+    x: jz.x1 + Math.random()*(jz.x2-jz.x1),
+    y: jz.y1 + Math.random()*(jz.y2-jz.y1),
+    vx: 0, vy: 0, stopped: true, offMat: false
+  };
+  beginTurns();
+}
+
+function beginTurns() {
+  const cur = playerForTurn(turnIdx);
+  promptPlayer(cur);
+}
+
+function promptPlayer(p) {
+  if (p === 2 && mode === 'vs-ai') {
+    state = 'ai-turn';
+    msg(`End ${endNum}/${ENDS} — <span style="color:#f87171">AI</span> is aiming…`);
+    aiTimer = setTimeout(() => {
+      if (state !== 'ai-turn') return;
+      const { angle, speed } = aiPickShot();
+      deliverBowl(p, angle, speed);
+    }, 1100);
+  } else {
+    state = 'aim';
+    const col  = p === 1 ? '#60a5fa' : '#f87171';
+    const name = p === 1 ? 'Player 1' : 'Player 2';
+    msg(`End ${endNum}/${ENDS} — <span style="color:${col}">${name}</span>: drag from the mat marker to bowl`);
+  }
+}
+
+function deliverBowl(player, angle, speed) {
+  const bs = bowlStart();
+  bowls.push({ x: bs.x, y: bs.y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+               player, bias: biasDir, stopped: false, offMat: false });
+  state = 'moving';
+}
+
+function onAllStopped() {
+  turnIdx++;
+  if (turnIdx >= BPP * 2) {
+    finishEnd(); return;
+  }
+  const cur = playerForTurn(turnIdx);
+  promptPlayer(cur);
+}
+
+function finishEnd() {
+  state = 'end-result';
+  const res = scoreEnd();
+  if (res) {
+    scores[res.winner - 1] += res.pts;
+    updateHUD();
+    const col  = res.winner === 1 ? '#60a5fa' : '#f87171';
+    const name = res.winner === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
+    msg(`End ${endNum} — <span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Click to continue.`);
+    jackOwner = res.winner;
+  } else {
+    msg(`End ${endNum} — Dead ball (jack left mat). No score. Click to continue.`);
+  }
+}
+
+function advanceEnd() {
+  endNum++;
+  if (endNum > ENDS) { gameOver(); return; }
+  delivDir = -delivDir;
+  startEnd();
+}
+
+function gameOver() {
+  state = 'game-over';
+  const n2 = mode === 'vs-ai' ? 'AI' : 'Player 2';
+  let res;
+  if (scores[0] > scores[1])      res = `<span style="color:#60a5fa">Player 1 wins</span> ${scores[0]}–${scores[1]}`;
+  else if (scores[1] > scores[0]) res = `<span style="color:#f87171">${n2} wins</span> ${scores[1]}–${scores[0]}`;
+  else                             res = `Draw! ${scores[0]}–${scores[1]}`;
+  msg(`Game over — ${res}. Press New Game to play again.`);
+}
+
+// ── Drawing ───────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  drawMat();
+  if (jack && !jack.offMat) drawJack();
+  for (const b of bowls) drawBowl(b);
+  if ((state === 'aim') && mouse.down && aimActive) drawAim();
+  drawSidePanels();
+}
+
+function drawMat() {
+  for (let i = 0; i < MAT.h; i += 50) {
+    ctx.fillStyle = Math.floor(i/50)%2 === 0 ? C.mat : C.matAlt;
+    ctx.fillRect(MAT.x, MAT.y+i, MAT.w, Math.min(50, MAT.h-i));
+  }
+
+  // Border
+  ctx.strokeStyle = C.border; ctx.lineWidth = 5;
+  ctx.strokeRect(MAT.x, MAT.y, MAT.w, MAT.h);
+
+  // Ditch lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([6,4]);
+  [[MAT.y+45],[MAT.y+MAT.h-45]].forEach(([y]) => {
+    ctx.beginPath(); ctx.moveTo(MAT.x,y); ctx.lineTo(MAT.x+MAT.w,y); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // Jack zone highlight
+  if (state === 'place-jack') {
+    const jz = jackZone();
+    ctx.fillStyle = 'rgba(255,230,50,0.10)';
+    ctx.fillRect(jz.x1, jz.y1, jz.x2-jz.x1, jz.y2-jz.y1);
+    ctx.strokeStyle = 'rgba(255,230,50,0.45)'; ctx.lineWidth = 1;
+    ctx.setLineDash([4,3]);
+    ctx.strokeRect(jz.x1, jz.y1, jz.x2-jz.x1, jz.y2-jz.y1);
+    ctx.setLineDash([]);
+  }
+
+  // Fender — small central wooden block
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(FENDER.x+3, FENDER.y+3, FENDER.w, FENDER.h);
+  // Body
+  ctx.fillStyle = C.fen;
+  ctx.fillRect(FENDER.x, FENDER.y, FENDER.w, FENDER.h);
+  // Top highlight edge
+  ctx.fillStyle = C.fenTop;
+  ctx.fillRect(FENDER.x, FENDER.y, FENDER.w, 5);
+  // Side highlight
+  ctx.fillStyle = 'rgba(255,200,100,0.3)';
+  ctx.fillRect(FENDER.x, FENDER.y+5, 4, FENDER.h-5);
+  // Label
+  ctx.fillStyle = '#fde68a'; ctx.font = 'bold 9px Segoe UI';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('BLOCK', MAT.x+MAT.w/2, FENDER.y+FENDER.h/2);
+  ctx.textBaseline = 'alphabetic';
+  // Show gap arrows (subtle hint that bowls go around)
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+  ctx.setLineDash([3,3]);
+  const gapY = FENDER.y + FENDER.h/2;
+  ctx.beginPath(); ctx.moveTo(MAT.x+4, gapY); ctx.lineTo(FENDER.x-4, gapY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(FENDER.x+FENDER.w+4, gapY); ctx.lineTo(MAT.x+MAT.w-4, gapY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Delivery marker
+  const bs = bowlStart();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(bs.x-22, bs.y-5, 44, 10);
+
+  // End counter
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '11px Segoe UI';
+  ctx.textAlign = 'center';
+  ctx.fillText(`End ${endNum} of ${ENDS}`, MAT.x+MAT.w/2, MAT.y-10);
+}
+
+function drawJack() {
+  ctx.beginPath(); ctx.arc(jack.x+1, jack.y+2, RJ, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fill();
+  const g = ctx.createRadialGradient(jack.x-2, jack.y-2, 1, jack.x, jack.y, RJ);
+  g.addColorStop(0, '#fffde0'); g.addColorStop(1, '#ca8a04');
+  ctx.beginPath(); ctx.arc(jack.x, jack.y, RJ, 0, Math.PI*2);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = C.jackS; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function drawBowl(b) {
+  if (b.offMat) return;
+  const c = b.player===1 ? C.p1 : C.p2;
+  const cd= b.player===1 ? C.p1d: C.p2d;
+
+  ctx.beginPath(); ctx.arc(b.x+2, b.y+3, RB, 0, Math.PI*2);
+  ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
+
+  const g = ctx.createRadialGradient(b.x-4,b.y-4,2,b.x,b.y,RB);
+  g.addColorStop(0,c); g.addColorStop(1,cd);
+  ctx.beginPath(); ctx.arc(b.x,b.y,RB,0,Math.PI*2);
+  ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=1; ctx.stroke();
+
+  // Bias dot
+  const dotX = b.x + (b.bias==='right' ? 5 : -5);
+  ctx.beginPath(); ctx.arc(dotX,b.y-4,3,0,Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fill();
+
+  // Player label
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 9px Segoe UI';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(b.player, b.x, b.y+2);
+  ctx.textBaseline='alphabetic';
+}
+
+function drawAim() {
+  const bs = bowlStart();
+  const dx = mouse.x - bs.x, dy = mouse.y - bs.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 8) return;
+
+  const angle = Math.atan2(dy, dx);
+  const power = Math.min(dist, 230);
+  const speed = (power/230) * MAX_SPD;
+  const pct   = power / 230;
+
+  // Trajectory
+  const path = simPath(bs.x, bs.y, angle, speed, biasDir);
+  if (path.length > 1) {
+    ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
+    for (const p of path) ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = 'rgba(255,225,50,0.45)';
+    ctx.lineWidth = 2; ctx.setLineDash([5,4]); ctx.stroke(); ctx.setLineDash([]);
+
+    // Ghost bowl at endpoint
+    const ep = path[path.length-1];
+    ctx.beginPath(); ctx.arc(ep.x, ep.y, RB, 0, Math.PI*2);
+    const col = playerForTurn(turnIdx)===1 ? 'rgba(59,130,246,0.4)' : 'rgba(239,68,68,0.4)';
+    ctx.fillStyle = col; ctx.fill();
+  }
+
+  // Direction stub
+  ctx.beginPath();
+  ctx.moveTo(bs.x, bs.y);
+  ctx.lineTo(bs.x + Math.cos(angle)*45, bs.y + Math.sin(angle)*45);
+  ctx.strokeStyle='rgba(255,230,50,0.8)'; ctx.lineWidth=2; ctx.setLineDash([]); ctx.stroke();
+
+  // Power arc
+  ctx.beginPath();
+  ctx.arc(bs.x, bs.y, 24, -Math.PI/2, -Math.PI/2 + Math.PI*2*pct);
+  ctx.strokeStyle=`hsl(${120*(1-pct)},100%,55%)`; ctx.lineWidth=4; ctx.stroke();
+
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='10px Segoe UI';
+  ctx.textAlign='center';
+  ctx.fillText(Math.round(pct*100)+'%', bs.x, bs.y-30);
+}
+
+function drawSidePanels() {
+  // Left panel — P1
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.fillRect(0,0,68,H);
+  ctx.fillStyle=C.p1; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('P1',34,55);
+
+  for (let i=0;i<BPP;i++) {
+    const bowled = bowls.filter(b=>b.player===1).length > i;
+    ctx.beginPath(); ctx.arc(34,72+i*30,10,0,Math.PI*2);
+    ctx.fillStyle = bowled ? 'rgba(59,130,246,0.25)' : C.p1;
+    ctx.fill();
+    ctx.strokeStyle=C.p1d; ctx.lineWidth=1.5; ctx.stroke();
+  }
+
+  // Right panel — P2 / AI
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.fillRect(W-68,0,68,H);
+  const lbl2 = mode==='vs-ai'?'AI':'P2';
+  ctx.fillStyle=C.p2; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText(lbl2,W-34,55);
+
+  for (let i=0;i<BPP;i++) {
+    const bowled = bowls.filter(b=>b.player===2).length > i;
+    ctx.beginPath(); ctx.arc(W-34,72+i*30,10,0,Math.PI*2);
+    ctx.fillStyle = bowled ? 'rgba(239,68,68,0.25)' : C.p2;
+    ctx.fill();
+    ctx.strokeStyle=C.p2d; ctx.lineWidth=1.5; ctx.stroke();
+  }
+
+  // Active player arrow
+  if (state==='aim'||state==='ai-turn') {
+    const cur = playerForTurn(turnIdx);
+    const ax  = cur===1 ? 34 : W-34;
+    ctx.fillStyle='#fbbf24';
+    ctx.beginPath(); ctx.arc(ax,45,6,0,Math.PI*2); ctx.fill();
+  }
+
+  // Nearest bowl distances indicator (during moving / end-result)
+  if (jack && !jack.offMat && bowls.some(b=>!b.offMat)) {
+    drawDistances();
+  }
+}
+
+function drawDistances() {
+  const dists = bowls
+    .filter(b=>!b.offMat)
+    .map(b=>({ p:b.player, d:Math.hypot(b.x-jack.x,b.y-jack.y)-RB-RJ }))
+    .sort((a,b)=>a.d-b.d);
+
+  if (!dists.length) return;
+
+  // Draw a thin line from each bowl to jack
+  for (const e of dists.slice(0,6)) {
+    const b = bowls.find(bw=>!bw.offMat && bw.player===e.p &&
+      Math.abs(Math.hypot(bw.x-jack.x,bw.y-jack.y)-RB-RJ - e.d)<0.5);
+    if (!b) continue;
+    ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(jack.x,jack.y);
+    ctx.strokeStyle = b.player===1 ? 'rgba(96,165,250,0.25)' : 'rgba(248,113,113,0.25)';
+    ctx.lineWidth=1; ctx.stroke();
+  }
+
+  // Leader crown on winning bowl
+  if (dists.length) {
+    const leader = dists[0];
+    const lb = bowls.find(bw=>!bw.offMat && bw.player===leader.p &&
+      Math.abs(Math.hypot(bw.x-jack.x,bw.y-jack.y)-RB-RJ - leader.d)<0.5);
+    if (lb) {
+      ctx.fillStyle='#fbbf24'; ctx.font='12px serif';
+      ctx.textAlign='center'; ctx.fillText('★',lb.x,lb.y-18);
+    }
+  }
+}
+
+// ── Main loop ─────────────────────────────────────────────────────
+function loop() {
+  if (state === 'moving') {
+    for (let s=0;s<3;s++) {
+      for (const b of bowls) stepObj(b, b.bias);
+      stepObj(jack, null);
+      stepCollisions();
+    }
+    if (allStopped()) onAllStopped();
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ── Input ─────────────────────────────────────────────────────────
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const sx = W/r.width, sy = H/r.height;
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x:(cx-r.left)*sx, y:(cy-r.top)*sy };
+}
+
+canvas.addEventListener('mousedown', e => {
+  const p = getPos(e);
+  mouse = { x:p.x, y:p.y, down:true };
+
+  if (state === 'place-jack') {
+    const jz = jackZone();
+    if (p.x>=jz.x1&&p.x<=jz.x2&&p.y>=jz.y1&&p.y<=jz.y2) {
+      jack = { x:p.x, y:p.y, vx:0, vy:0, stopped:true, offMat:false };
+      beginTurns();
+    } else {
+      msg('Click inside the yellow highlighted zone to place the jack!');
+    }
+  } else if (state === 'aim') {
+    aimActive = true;
+  } else if (state === 'end-result') {
+    advanceEnd();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const p = getPos(e); mouse.x=p.x; mouse.y=p.y;
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (state === 'aim' && aimActive && mouse.down) {
+    const bs = bowlStart();
+    const dx = mouse.x - bs.x, dy = mouse.y - bs.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 10) {
+      const angle = Math.atan2(dy, dx);
+      const speed = Math.min(dist, 230)/230 * MAX_SPD;
+      deliverBowl(playerForTurn(turnIdx), angle, speed);
+    }
+  }
+  aimActive = false; mouse.down = false;
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}));
+}, {passive:false});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}));
+}, {passive:false});
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  canvas.dispatchEvent(new MouseEvent('mouseup',{}));
+}, {passive:false});
+
+// Buttons
+document.getElementById('btnMode').addEventListener('click', () => {
+  mode = mode==='vs-ai' ? 'vs-player' : 'vs-ai';
+  document.getElementById('btnMode').textContent = `Mode: ${mode==='vs-ai'?'vs AI':'2 Players'}`;
+  document.getElementById('lbl2').textContent     = mode==='vs-ai' ? 'AI' : 'Player 2';
+});
+
+document.getElementById('btnBias').addEventListener('click', () => {
+  biasDir = biasDir==='right' ? 'left' : 'right';
+  document.getElementById('btnBias').textContent = `Bias: ${biasDir==='right'?'Right ↗':'Left ↖'}`;
+});
+
+document.getElementById('btnNew').addEventListener('click', startGame);
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
