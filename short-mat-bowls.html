@@ -326,22 +326,21 @@ function startGame() {
 function startEnd() {
   bowls=[]; jack=null; turnIdx=0;
   state='place-jack';
-  const jly = jackLineY();
   if (jackOwner === 2 && mode === 'vs-ai') {
-    aiPlaceJack(jly);
+    aiPlaceJack();
   } else {
     const who = jackOwner===1
       ? '<span style="color:#60a5fa">Player 1</span>'
       : '<span style="color:#f87171">Player 2</span>';
-    msg(`End ${endNum}/${ENDS} — ${who}: click the jack line to place the jack`);
+    msg(`End ${endNum}/${ENDS} — ${who}: click along the glowing jack line (far end) to place the jack`);
   }
 }
 
-function aiPlaceJack(jly) {
+function aiPlaceJack() {
   const margin = 30;
   jack = {
     x: MAT.x + margin + Math.random()*(MAT.w - margin*2),
-    y: jly,
+    y: jackLineY(),
     vx:0, vy:0, stopped:true, offMat:false
   };
   beginTurns();
