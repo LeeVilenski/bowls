@@ -83,15 +83,23 @@ const NEAR_BOARD = { x: MAT.x - 4, y: MAT.y + MAT.h,   w: MAT.w + 8, h: BOARD_H 
 const FW = 14, FH = 24; // 3in wide × 15in long on a 6ft×40ft mat
 const FENDER = { x: MAT.x + MAT.w/2 - FW/2, y: MAT.y + MAT.h/2 - FH/2, w: FW, h: FH };
 
-// ── Symmetric mat layout (same at BOTH ends) ──────────────────────
-// From each FAR end inward: end board → ditch line → [head area] → jack mark → min-dist line
-// From each NEAR (delivery) end: end board → ditch line → delivery mat → [approach]
-// All FAR-end fractions measured from that end inward.
+// ── Symmetric mat layout — from ESMBA Laws (13000mm mat, 1830mm wide) ────────
+// DITCH line:  300mm from each fender      → 300/13000  = 0.023
+// DEAD line:   2745mm from each ditch      → 3045/13000 = 0.234  (bowl must pass this)
+// JACK line:   short vertical mark centred on mat width, running ALONG the mat direction
+//   near tip from far end: 1215mm from far fender → 1215/13000 = 0.093
+//   far  tip from far end: 2130mm from far fender → 2130/13000 = 0.164
+// Delivery lines: 1370mm long from ditch toward centre, ±330mm from centre line
+// Delivery mat:   610mm long × 356mm wide, sits in ditch zone against fender
 const L = {
-  DEAD:     0.025, // ditch/dead line — 1ft from each end board
-  JACK:     0.22,  // jack mark — ~8.8ft from far end (jack placed here)
-  MIN_DIST: 0.28,  // minimum bowl running distance from far end — bowl must reach past this
-  MAT_END:  0.09,  // far edge of delivery mat from near end (mat spans DEAD→MAT_END)
+  DITCH:     0.023, // ditch line — 1ft from each fender
+  DEAD:      0.234, // dead line — bowl must travel past this from delivery end
+  JACK_N:    0.093, // jack line near tip (from far end, toward centre)
+  JACK_F:    0.164, // jack line far  tip (from far end, toward far fender)
+  // Delivery lines: used for visual only
+  DELIV_LEN: 0.105, // 1370mm/13000 — length of delivery bracket lines (from ditch toward centre)
+  DELIV_X:   0.054, // 330mm/1830*0.300px — side offset of delivery lines (fraction of mat width... actual px: 330/1830*300=54px)
+  MAT_LEN:   0.047, // 610mm/13000 — delivery mat extends this far from near fender
 };
 
 // Centre block: 3in wide × 15in long on a 6ft×40ft mat
