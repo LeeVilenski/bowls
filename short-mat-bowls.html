@@ -503,16 +503,19 @@ function drawMat() {
     ctx.beginPath(); ctx.moveTo(MAT.x,activeJackY); ctx.lineTo(MAT.x+MAT.w,activeJackY); ctx.stroke();
   }
 
-  // Delivery mat marker (small dark rubber mat between the active delivery lines)
+  // Delivery mat — yellow/cream rectangle between the two active delivery lines
   const nearDOut = delivDir===1 ? bDOut : tDOut;
   const nearDIn  = delivDir===1 ? bDIn  : tDIn;
-  const matCx = MAT.x + MAT.w/2;
-  const matCy = (nearDOut + nearDIn) / 2;
-  ctx.fillStyle='rgba(30,30,30,0.65)';
-  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+  const dMatPad = 20; // side padding from mat edge
+  const dMatTop = Math.min(nearDOut, nearDIn);
+  const dMatH   = Math.abs(nearDOut - nearDIn);
+  ctx.fillStyle='rgba(210,185,80,0.75)';
+  ctx.strokeStyle='rgba(180,150,40,0.9)'; ctx.lineWidth=1.5;
   ctx.beginPath();
-  ctx.roundRect(matCx-22, matCy-8, 44, 16, 3);
+  ctx.roundRect(MAT.x+dMatPad, dMatTop, MAT.w-dMatPad*2, dMatH, 3);
   ctx.fill(); ctx.stroke();
+  ctx.fillStyle='rgba(255,240,140,0.3)';
+  ctx.fillRect(MAT.x+dMatPad, dMatTop+2, 8, dMatH-4); // highlight edge
 
   // Centre block
   ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(FENDER.x+3,FENDER.y+3,FENDER.w,FENDER.h);
