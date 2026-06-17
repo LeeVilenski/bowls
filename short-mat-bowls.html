@@ -963,18 +963,18 @@ function drawMat() {
     ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y); ctx.closePath(); ctx.stroke();
   }
 
-  // Far fender (top) — back board above MAT.y, arms down to far dead line
+  // Far fender (top) — back board above MAT.y, arms down to far ditch line
   {
     const L4 = m2s(MAT.x - 8, MAT.y), R4 = m2s(MAT.x + MAT.w + 8, MAT.y);
-    drawFenderArm(MAT.x - 4, MAT.y, tDead_f, true);
-    drawFenderArm(MAT.x + MAT.w + 4, MAT.y, tDead_f, true);
+    drawFenderArm(MAT.x - 4, MAT.y, tDitch_f, true);
+    drawFenderArm(MAT.x + MAT.w + 4, MAT.y, tDitch_f, true);
     drawFenderBoard(L4, R4, true);
   }
-  // Near fender (bottom) — back board below MAT.y+MAT.h, arms up to near dead line
+  // Near fender (bottom) — back board below MAT.y+MAT.h, arms up to near ditch line
   {
     const L4 = m2s(MAT.x - 8, MAT.y + MAT.h), R4 = m2s(MAT.x + MAT.w + 8, MAT.y + MAT.h);
-    drawFenderArm(MAT.x - 4, MAT.y + MAT.h, bDead_f, false);
-    drawFenderArm(MAT.x + MAT.w + 4, MAT.y + MAT.h, bDead_f, false);
+    drawFenderArm(MAT.x - 4, MAT.y + MAT.h, bDitch_f, false);
+    drawFenderArm(MAT.x + MAT.w + 4, MAT.y + MAT.h, bDitch_f, false);
     drawFenderBoard(L4, R4, false);
   }
 
