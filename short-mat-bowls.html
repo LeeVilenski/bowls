@@ -594,9 +594,31 @@ function gameOver() {
 }
 
 // ── Drawing ───────────────────────────────────────────────────────
+function drawFloor() {
+  // Hardwood floor — warm oak planks
+  const plankH = 42, baseColors = ['#8B5C20','#7A5018','#96622A','#8A5A1E'];
+  for (let y = 0; y < H; y += plankH) {
+    const ci = Math.floor(y / plankH) % baseColors.length;
+    ctx.fillStyle = baseColors[ci];
+    ctx.fillRect(0, y, W, plankH);
+    // Subtle grain lines within each plank
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+    for (let g = 6; g < plankH; g += 10) {
+      ctx.beginPath(); ctx.moveTo(0, y+g); ctx.lineTo(W, y+g); ctx.stroke();
+    }
+    // Plank gap
+    ctx.strokeStyle = 'rgba(0,0,0,0.30)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // Slight warm vignette overlay so edges feel like a room
+  const vig = ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.85);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.35)');
+  ctx.fillStyle = vig; ctx.fillRect(0,0,W,H);
+}
+
 function draw() {
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = C.bg; ctx.fillRect(0,0,W,H);
+  drawFloor();
   drawMat();
   if (jack && !jack.offMat) drawJack();
   for (const b of bowls) drawBowl(b);
