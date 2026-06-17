@@ -1469,7 +1469,7 @@ function buildSplash() {
 
   seg('sEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>splashCfg.ends, v=>splashCfg.ends=v);
   seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player']], ()=>splashCfg.mode, v=>splashCfg.mode=v);
-  seg('sBias', [['Gentle',0.5],['Standard',1.0],['Strong',1.8],['Fierce',2.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
+  seg('sBias', [['Subtle',0.1],['Gentle',0.2],['Standard',0.5],['Strong',1.0]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
 
   const szSlider = document.getElementById('sSizeSlider');
   const szLbl    = document.getElementById('sSizeLbl');
