@@ -303,6 +303,9 @@ function updateHUD() {
 function applyBias(obj, bias) {
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.01) return;
+  // Only bias when travelling toward the far end — not on rebound or backward roll
+  const movingForward = delivDir === 1 ? obj.vy < 0 : obj.vy > 0;
+  if (!movingForward) return;
   const nx = obj.vx/spd, ny = obj.vy/spd;
   const sign = bias === 'right' ? 1 : -1;
   obj.vx += -ny * sign * BIAS_K * biasMult * spd;
