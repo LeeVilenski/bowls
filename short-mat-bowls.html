@@ -1271,14 +1271,20 @@ function drawAim() {
 }
 
 function drawSidePanels() {
-  const SP=50, SC=25; // panel width, panel centre x
+  const SP=38, SC=19; // panel width, panel centre x
   // Left — P1
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,SP,H);
-  ctx.fillStyle=C.p1; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText('P1',SC,50);
+  // Score (top)
+  const sc1 = document.getElementById('sc1')?.textContent || '0';
+  ctx.fillStyle=C.p1; ctx.font='bold 22px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText(sc1,SC,32);
+  // Label
+  ctx.font='bold 10px Segoe UI'; ctx.fillStyle=C.p1;
+  ctx.fillText('P1',SC,46);
+  // Bowl dots
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===1).length > i;
-    ctx.beginPath(); ctx.arc(SC,66+i*28,9,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(SC,62+i*24,7,0,Math.PI*2);
     ctx.globalAlpha = bowled ? 0.25 : 1;
     ctx.fillStyle = C.p1; ctx.fill();
     ctx.globalAlpha = 1;
@@ -1288,11 +1294,14 @@ function drawSidePanels() {
   // Right — P2/AI
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
   const lbl2 = mode==='vs-ai'?'AI':'P2';
-  ctx.fillStyle=C.p2; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(lbl2,W-SC,50);
+  const sc2 = document.getElementById('sc2')?.textContent || '0';
+  ctx.fillStyle=C.p2; ctx.font='bold 22px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText(sc2,W-SC,32);
+  ctx.font='bold 10px Segoe UI'; ctx.fillStyle=C.p2;
+  ctx.fillText(lbl2,W-SC,46);
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===2).length > i;
-    ctx.beginPath(); ctx.arc(W-SC,66+i*28,9,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(W-SC,62+i*24,7,0,Math.PI*2);
     ctx.globalAlpha = bowled ? 0.25 : 1;
     ctx.fillStyle = C.p2; ctx.fill();
     ctx.globalAlpha = 1;
@@ -1304,7 +1313,7 @@ function drawSidePanels() {
     const cur=playerForTurn(turnIdx);
     const ax=cur===1?SC:W-SC;
     ctx.fillStyle='#fbbf24';
-    ctx.beginPath(); ctx.arc(ax,45,6,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
   }
 
   // Distance lines + leader star
