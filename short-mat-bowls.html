@@ -1218,7 +1218,8 @@ function drawSidePanels() {
 }
 
 function drawDistances() {
-  const dists=bowls.filter(b=>!b.offMat)
+  const eligible = bowls.filter(b => !b.offMat && (!jack.inDitch || b.toucher));
+  const dists = eligible
     .map(b=>({b,d:Math.hypot(b.x-jack.x,b.y-jack.y)}))
     .sort((a,b)=>a.d-b.d);
   const js=m2s(jack.x,jack.y);
