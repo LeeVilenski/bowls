@@ -1257,41 +1257,63 @@ function drawAim() {
   }
 }
 
+// Hit areas for canvas-drawn buttons (in canvas px)
+const PANEL_BTN = { w: 34, h: 28, x1: 2, x2: 404, y: 174 };
+
+function drawPanelBtn(cx, y, label, bg, fg) {
+  const bx = cx - PANEL_BTN.w/2;
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.roundRect(bx, y, PANEL_BTN.w, PANEL_BTN.h, 5);
+  ctx.fill();
+  ctx.fillStyle = fg;
+  ctx.font = 'bold 9px Segoe UI';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, cx, y + PANEL_BTN.h/2);
+  ctx.textBaseline = 'alphabetic';
+}
+
 function drawSidePanels() {
   const SP=38, SC=19; // panel width, panel centre x
   // Left — P1
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,SP,H);
-  // Score (top)
-  ctx.fillStyle=C.p1; ctx.font='bold 22px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(scores[0],SC,32);
-  // Label
-  ctx.font='bold 10px Segoe UI'; ctx.fillStyle=C.p1;
-  ctx.fillText('P1',SC,46);
+  // Label (above score)
+  ctx.fillStyle=C.p1; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('P1',SC,16);
+  // Score
+  ctx.font='bold 22px Segoe UI';
+  ctx.fillText(scores[0],SC,38);
   // Bowl dots
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===1).length > i;
-    ctx.beginPath(); ctx.arc(SC,62+i*24,7,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(SC,58+i*24,7,0,Math.PI*2);
     ctx.globalAlpha = bowled ? 0.25 : 1;
     ctx.fillStyle = C.p1; ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p1d; ctx.lineWidth=1.5; ctx.stroke();
   }
+  // Mode button
+  const modeLabel = mode==='vs-ai'?'vs AI':'2P';
+  drawPanelBtn(SC, PANEL_BTN.y, modeLabel, '#4c1d95', '#c4b5fd');
 
   // Right — P2/AI
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
   const lbl2 = mode==='vs-ai'?'AI':'P2';
-  ctx.fillStyle=C.p2; ctx.font='bold 22px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(scores[1],W-SC,32);
-  ctx.font='bold 10px Segoe UI'; ctx.fillStyle=C.p2;
-  ctx.fillText(lbl2,W-SC,46);
+  ctx.fillStyle=C.p2; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText(lbl2,W-SC,16);
+  ctx.font='bold 22px Segoe UI';
+  ctx.fillText(scores[1],W-SC,38);
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===2).length > i;
-    ctx.beginPath(); ctx.arc(W-SC,62+i*24,7,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(W-SC,58+i*24,7,0,Math.PI*2);
     ctx.globalAlpha = bowled ? 0.25 : 1;
     ctx.fillStyle = C.p2; ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p2d; ctx.lineWidth=1.5; ctx.stroke();
   }
+  // New game button
+  drawPanelBtn(W-SC, PANEL_BTN.y, 'New', '#1e3a8a', '#93c5fd');
 
   // Active player dot
   if (state==='aim'||state==='ai-turn') {
