@@ -851,11 +851,15 @@ function drawFloor() {
 
 function draw() {
   ctx.clearRect(0,0,W,H);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(50, 0, W - 100, H); ctx.clip();
+  applyCameraTransform();
   drawFloor();
   drawMat();
   if (jack && !jack.offMat) drawJack();
   for (const b of bowls) drawBowl(b);
   if (state==='aim' && mouse.down && aimActive) drawAim();
+  ctx.restore();
   drawSidePanels();
 }
 
