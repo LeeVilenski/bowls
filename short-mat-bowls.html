@@ -252,7 +252,7 @@ const MAX_SPD  = 8;
 // ── Perspective projection ────────────────────────────────────────
 // The mat renders as a trapezoid: wide at the near/delivery end, narrow at far end.
 // P.nHW/fHW = near/far half-widths (screen px). P.gamma compresses far-end Y depth.
-const P = { cx:220, nHW:265, fHW:110, nY:812, fY:80, gamma:1.5 };
+const P = { cx:220, nHW:265, fHW:110, nY:812, fY:10, gamma:1.5 };
 
 // perspT: 0 = far end, 1 = near (delivery) end, from current deliverer's perspective
 function matToPerspT(my) {
