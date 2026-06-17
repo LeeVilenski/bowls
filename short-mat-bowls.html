@@ -538,7 +538,7 @@ function simPath(sx, sy, angle, speed, bias, bMult) {
   let vx = Math.cos(angle)*speed, vy = Math.sin(angle)*speed;
   const path = [{x, y}];
 
-  for (let i = 0; i < 700; i++) {
+  for (let i = 0; i < 1500; i++) {
     const spd = Math.hypot(vx, vy);
     if (spd < 0.22) break;
     const nx = vx/spd, ny = vy/spd;
