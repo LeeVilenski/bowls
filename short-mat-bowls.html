@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Short Mat Bowls</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,38 +13,51 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 14px;
+  padding: 8px;
   min-height: 100vh;
   user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
 }
-h1 { font-size: 18px; color: #60a5fa; letter-spacing: 3px; margin-bottom: 8px; text-transform: uppercase; }
-#canvas { display: block; border-radius: 6px; cursor: crosshair; max-width: 100%; }
-#hud { display: flex; align-items: stretch; gap: 10px; margin-top: 10px; width: 440px; max-width: 100%; }
-.sbox { background: #1e293b; border-radius: 8px; padding: 8px 14px; text-align: center; min-width: 80px; }
+h1 { font-size: 16px; color: #60a5fa; letter-spacing: 3px; margin-bottom: 6px; text-transform: uppercase; }
+#canvas {
+  display: block;
+  border-radius: 6px;
+  cursor: crosshair;
+  touch-action: none;
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+}
+#wrap { width: 100%; max-width: 440px; }
+#hud { display: flex; align-items: stretch; gap: 8px; margin-top: 8px; }
+.sbox { background: #1e293b; border-radius: 8px; padding: 6px 12px; text-align: center; min-width: 70px; }
 .sbox .lbl { font-size: 11px; opacity: 0.55; margin-bottom: 2px; }
-.sbox .val { font-size: 26px; font-weight: 700; }
+.sbox .val { font-size: 24px; font-weight: 700; }
 .p1 .val { color: #60a5fa; }
 .p2 .val { color: #f87171; }
 #msgBox {
   flex: 1; background: #1e293b; border-radius: 8px;
-  padding: 8px 12px; display: flex; align-items: center;
-  justify-content: center; font-size: 13px; text-align: center; line-height: 1.4;
+  padding: 8px 10px; display: flex; align-items: center;
+  justify-content: center; font-size: 12px; text-align: center; line-height: 1.4;
 }
-#controls { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+#controls { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 button {
-  padding: 8px 14px; border: none; border-radius: 6px; font-size: 13px;
+  padding: 10px 14px; border: none; border-radius: 6px; font-size: 13px;
   font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
 }
-button:hover { opacity: .85; transform: scale(1.04); }
+button:active { opacity: .75; transform: scale(0.97); }
 #btnMode { background: #7c3aed; color: #fff; }
 #btnBias { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
 #btnNew  { background: #1d4ed8; color: #fff; }
 #biasRow {
   margin-top: 8px; display: flex; align-items: center; gap: 10px;
-  background: #1e293b; border-radius: 8px; padding: 8px 16px; width: 440px; max-width: 100%;
+  background: #1e293b; border-radius: 8px; padding: 8px 14px;
 }
 #biasRow label { font-size: 12px; opacity: 0.75; white-space: nowrap; }
-#biasSlider { flex: 1; accent-color: #60a5fa; cursor: pointer; }
+#biasSlider { flex: 1; accent-color: #60a5fa; cursor: pointer; min-height: 20px; }
 #biasValLabel { color: #60a5fa; font-weight: 700; font-size: 13px; min-width: 30px; }
 </style>
 </head>
