@@ -377,7 +377,11 @@ function stepCollisions() {
       if (b.offMat) continue;
       collide(a, b, RB, RB, 0.75);
     }
-    if (jack && !jack.offMat) collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
+    if (jack && !jack.offMat && !jack.offSide) {
+      const jvxBefore = jack.vx, jvyBefore = jack.vy;
+      collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
+      if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) lastJackHitter = a.player;
+    }
   }
 }
 
