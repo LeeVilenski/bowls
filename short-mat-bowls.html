@@ -748,16 +748,19 @@ function drawMat() {
   {
     const my1=Math.min(dmY1,dmY2), my2=Math.max(dmY1,dmY2);
     const mw=Math.round(356/1830*MAT.w);
-    const brd=Math.round(mw/5); // border ~1/5 of mat width
+    // Border is 30% of mat width each side; inner black area = 40% of width
+    const brdX = mw * 0.30;
+    const matH = my2 - my1;
+    const brdY = matH * 0.18;
     // Outer gray fill
     const tl=m2s(cx-mw/2,my1), tr=m2s(cx+mw/2,my1);
     const br=m2s(cx+mw/2,my2), bl=m2s(cx-mw/2,my2);
-    ctx.fillStyle='rgba(150,150,150,0.85)';
+    ctx.fillStyle='rgba(150,150,150,0.90)';
     ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y);
     ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y); ctx.closePath(); ctx.fill();
-    // Inner black surface inset by border width
-    const itl=m2s(cx-mw/2+brd,my1+brd), itr=m2s(cx+mw/2-brd,my1+brd);
-    const ibr=m2s(cx+mw/2-brd,my2-brd), ibl=m2s(cx-mw/2+brd,my2-brd);
+    // Inner black surface
+    const itl=m2s(cx-mw/2+brdX,my1+brdY), itr=m2s(cx+mw/2-brdX,my1+brdY);
+    const ibr=m2s(cx+mw/2-brdX,my2-brdY), ibl=m2s(cx-mw/2+brdX,my2-brdY);
     ctx.fillStyle='rgba(20,20,20,0.95)';
     ctx.beginPath(); ctx.moveTo(itl.x,itl.y); ctx.lineTo(itr.x,itr.y);
     ctx.lineTo(ibr.x,ibr.y); ctx.lineTo(ibl.x,ibl.y); ctx.closePath(); ctx.fill();
