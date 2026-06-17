@@ -675,76 +675,77 @@ function drawMat() {
 }
 
 function drawJack() {
-  ctx.beginPath(); ctx.arc(jack.x+1,jack.y+2,RJ,0,Math.PI*2);
+  const sp=m2s(jack.x,jack.y), r=perspR(jack.y,RJ);
+  ctx.beginPath(); ctx.arc(sp.x+1,sp.y+1,r,0,Math.PI*2);
   ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
-  const g=ctx.createRadialGradient(jack.x-2,jack.y-2,1,jack.x,jack.y,RJ);
+  const g=ctx.createRadialGradient(sp.x-r*0.3,sp.y-r*0.3,1,sp.x,sp.y,r);
   g.addColorStop(0,'#fffde0'); g.addColorStop(1,'#ca8a04');
-  ctx.beginPath(); ctx.arc(jack.x,jack.y,RJ,0,Math.PI*2);
+  ctx.beginPath(); ctx.arc(sp.x,sp.y,r,0,Math.PI*2);
   ctx.fillStyle=g; ctx.fill();
   ctx.strokeStyle=C.jackS; ctx.lineWidth=1.5; ctx.stroke();
 }
 
 function drawBowl(b) {
   if (b.offMat) return;
-  const c  = b.player===1 ? C.p1 : C.p2;
-  const cd = b.player===1 ? C.p1d: C.p2d;
+  const sp=m2s(b.x,b.y), r=perspR(b.y,RB);
+  const c=b.player===1?C.p1:C.p2, cd=b.player===1?C.p1d:C.p2d;
 
-  ctx.beginPath(); ctx.arc(b.x+2,b.y+3,RB,0,Math.PI*2);
+  ctx.beginPath(); ctx.arc(sp.x+2,sp.y+2,r,0,Math.PI*2);
   ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
 
-  const g=ctx.createRadialGradient(b.x-4,b.y-4,2,b.x,b.y,RB);
+  const g=ctx.createRadialGradient(sp.x-r*0.3,sp.y-r*0.3,2,sp.x,sp.y,r);
   g.addColorStop(0,c); g.addColorStop(1,cd);
-  ctx.beginPath(); ctx.arc(b.x,b.y,RB,0,Math.PI*2);
+  ctx.beginPath(); ctx.arc(sp.x,sp.y,r,0,Math.PI*2);
   ctx.fillStyle=g; ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=1; ctx.stroke();
 
   // Bias dot
-  const dotX = b.x+(b.bias==='right'?5:-5);
-  ctx.beginPath(); ctx.arc(dotX,b.y-4,3,0,Math.PI*2);
+  const dotX=sp.x+(b.bias==='right'?r*0.38:-r*0.38);
+  ctx.beginPath(); ctx.arc(dotX,sp.y-r*0.3,Math.max(2,r*0.22),0,Math.PI*2);
   ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fill();
 
-  // Player label
-  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 9px Segoe UI';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(b.player, b.x, b.y+2);
-  ctx.textBaseline='alphabetic';
+  if (r>=7) {
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.font=`bold ${Math.max(6,Math.round(r*0.7))}px Segoe UI`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(b.player,sp.x,sp.y+1); ctx.textBaseline='alphabetic';
+  }
 }
 
 function drawAim() {
-  const bs = bowlStart();
-  const dx = mouse.x-bs.x, dy = mouse.y-bs.y;
-  const dist = Math.hypot(dx,dy);
-  if (dist < 8) return;
-  const angle = Math.atan2(dy,dx);
-  const power = Math.min(dist, 230);
-  const speed = (power/230)*MAX_SPD;
-  const pct   = power/230;
+  const bsm=bowlStart(), bss=m2s(bsm.x,bsm.y);
+  const mm=s2m(mouse.x,mouse.y); if (!mm) return;
+  const dx=mm.x-bsm.x, dy=mm.y-bsm.y;
+  const distScreen=Math.hypot(mouse.x-bss.x, mouse.y-bss.y);
+  if (distScreen<8) return;
+  const angle=Math.atan2(dy,dx);
+  const power=Math.min(distScreen,230), pct=power/230;
+  const speed=(power/230)*MAX_SPD;
 
-  const path = simPath(bs.x, bs.y, angle, speed, biasDir, biasMult);
-  if (path.length > 1) {
-    ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
-    for (const p of path) ctx.lineTo(p.x, p.y);
+  const path=simPath(bsm.x,bsm.y,angle,speed,biasDir,biasMult);
+  if (path.length>1) {
+    const ps0=m2s(path[0].x,path[0].y);
+    ctx.beginPath(); ctx.moveTo(ps0.x,ps0.y);
+    for (const pt of path) { const sp=m2s(pt.x,pt.y); ctx.lineTo(sp.x,sp.y); }
     ctx.strokeStyle='rgba(255,225,50,0.45)'; ctx.lineWidth=2;
     ctx.setLineDash([5,4]); ctx.stroke(); ctx.setLineDash([]);
-    const ep = path[path.length-1];
-    ctx.beginPath(); ctx.arc(ep.x,ep.y,RB,0,Math.PI*2);
-    ctx.fillStyle = playerForTurn(turnIdx)===1 ? 'rgba(59,130,246,0.4)' : 'rgba(239,68,68,0.4)';
+    const ep=path[path.length-1], eps=m2s(ep.x,ep.y), er=perspR(ep.y,RB);
+    ctx.beginPath(); ctx.arc(eps.x,eps.y,er,0,Math.PI*2);
+    ctx.fillStyle=playerForTurn(turnIdx)===1?'rgba(59,130,246,0.4)':'rgba(239,68,68,0.4)';
     ctx.fill();
   }
 
-  // Direction stub
-  ctx.beginPath(); ctx.moveTo(bs.x,bs.y);
-  ctx.lineTo(bs.x+Math.cos(angle)*45, bs.y+Math.sin(angle)*45);
+  // Direction stub projected into mat space
+  const stub=m2s(bsm.x+dx*0.15, bsm.y+dy*0.15);
+  ctx.beginPath(); ctx.moveTo(bss.x,bss.y); ctx.lineTo(stub.x,stub.y);
   ctx.strokeStyle='rgba(255,230,50,0.8)'; ctx.lineWidth=2; ctx.stroke();
 
-  // Power arc
+  // Power arc at bowl-start screen position
   ctx.beginPath();
-  ctx.arc(bs.x,bs.y,24,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);
+  ctx.arc(bss.x,bss.y,24,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);
   ctx.strokeStyle=`hsl(${120*(1-pct)},100%,55%)`; ctx.lineWidth=4; ctx.stroke();
-
   ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='10px Segoe UI';
-  ctx.textAlign='center';
-  ctx.fillText(Math.round(pct*100)+'%', bs.x, bs.y-30);
+  ctx.textAlign='center'; ctx.fillText(Math.round(pct*100)+'%',bss.x,bss.y-30);
 }
 
 function drawSidePanels() {
