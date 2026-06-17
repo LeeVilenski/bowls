@@ -1068,7 +1068,9 @@ function drawSidePanels() {
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===2).length > i;
     ctx.beginPath(); ctx.arc(W-SC,66+i*28,9,0,Math.PI*2);
-    ctx.fillStyle = bowled ? 'rgba(239,68,68,0.25)' : C.p2; ctx.fill();
+    ctx.globalAlpha = bowled ? 0.25 : 1;
+    ctx.fillStyle = C.p2; ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p2d; ctx.lineWidth=1.5; ctx.stroke();
   }
 
