@@ -632,7 +632,7 @@ function deliverBowl(player, angle, speed) {
   state = 'moving';
 }
 
-const BPP = 4, ENDS = 6;
+const BPP = 4; let ENDS = 6;
 
 function onAllStopped() {
   if (jack && jack.offSide) { handleJackOffSide(); return; }
