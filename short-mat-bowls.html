@@ -464,14 +464,17 @@ function stepObj(obj, bias) {
     return;
   }
 
-  // End boards — jack stays in ditch; bowls die
+  // End boards — jack and touchers clamp to fender; other bowls die
   if (obj.y - r < MAT.y || obj.y + r > MAT.y + MAT.h) {
+    obj.y = obj.y - r < MAT.y ? MAT.y + r : MAT.y + MAT.h - r;
+    obj.vx = obj.vy = 0; obj.stopped = true;
     if (obj === jack) {
-      // Clamp jack to just inside the fender (stays live for scoring)
-      obj.y = obj.y - r < MAT.y ? MAT.y + r : MAT.y + MAT.h - r;
-      obj.vx = obj.vy = 0; obj.stopped = true;
+      obj.inDitch = true;
+      msg('Jack in the ditch! Only touchers count.');
+    } else if (obj.toucher) {
+      obj.inDitch = true;
     } else {
-      obj.offMat = true; obj.stopped = true;
+      obj.offMat = true;
     }
     return;
   }
