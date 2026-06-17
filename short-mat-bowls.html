@@ -973,25 +973,9 @@ function drawMat() {
   const bJackN=MAT.y+(1-L.JACK_N)*MAT.h, bJackF=MAT.y+(1-L.JACK_F)*MAT.h;
   const bMatE =MAT.y+(1-L.MAT_LEN)*MAT.h;
 
-  // Ditch zones — rubber/wood surface, distinct from green playing area
-  function fillDitch(my1, my2) {
-    const tl=m2s(MAT.x,my1), tr=m2s(MAT.x+MAT.w,my1);
-    const br=m2s(MAT.x+MAT.w,my2), bl=m2s(MAT.x,my2);
-    ctx.fillStyle='#3a2a1a';
-    ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y);
-    ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y); ctx.closePath(); ctx.fill();
-    // Subtle grain lines across the ditch
-    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
-    const steps = 4;
-    for (let i=1; i<steps; i++) {
-      const t = i/steps;
-      const ly1 = my1 + (my2-my1)*t;
-      const l=m2s(MAT.x, ly1), r=m2s(MAT.x+MAT.w, ly1);
-      ctx.beginPath(); ctx.moveTo(l.x,l.y); ctx.lineTo(r.x,r.y); ctx.stroke();
-    }
-  }
-  fillDitch(MAT.y, tDitch);
-  fillDitch(bDitch, MAT.y+MAT.h);
+  // Ditch zones — same green baize as the mat, very slightly darker to hint at the zone
+  fillStrip(MAT.y,  tDitch, 'rgba(0,0,0,0.10)');
+  fillStrip(bDitch, MAT.y+MAT.h, 'rgba(0,0,0,0.10)');
 
   // Ditch lines
   hLineM(tDitch, C.line, 1.5);
