@@ -594,11 +594,12 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
-  updateHUD(); startEnd();
+  resetCam(); updateHUD(); startEnd();
 }
 
 function startEnd() {
   bowls=[]; jack=null; turnIdx=0; lastJackHitter=null;
+  resetCam();
   state='place-jack';
   if (jackOwner === 2 && mode === 'vs-ai') {
     aiPlaceJack();
