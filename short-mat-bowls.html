@@ -1293,9 +1293,8 @@ function drawSidePanels() {
   // Right — P2/AI
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
   const lbl2 = mode==='vs-ai'?'AI':'P2';
-  const sc2 = document.getElementById('sc2')?.textContent || '0';
   ctx.fillStyle=C.p2; ctx.font='bold 22px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(sc2,W-SC,32);
+  ctx.fillText(scores[1],W-SC,32);
   ctx.font='bold 10px Segoe UI'; ctx.fillStyle=C.p2;
   ctx.fillText(lbl2,W-SC,46);
   for (let i=0;i<BPP;i++) {
