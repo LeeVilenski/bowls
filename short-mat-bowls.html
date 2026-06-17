@@ -588,7 +588,7 @@ function aiPickShot() {
 function scoreEnd() {
   if (!jack || jack.offMat) return null;
   const dists = bowls
-    .filter(b => !b.offMat && (!jack.inDitch || b.toucher))
+    .filter(b => !b.offMat)
     .map(b => ({ p: b.player, d: Math.hypot(b.x-jack.x, b.y-jack.y) }))
     .sort((a,b) => a.d - b.d);
   if (!dists.length) return null;
