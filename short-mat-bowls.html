@@ -106,6 +106,52 @@ const L = {
 // In pixels: 3/72*300 ≈ 13px wide, 15/480*760 ≈ 24px along mat
 const RB = 13, RJ = 7;
 const MAX_SPD  = 22;
+
+// ── Perspective projection ────────────────────────────────────────
+// The mat renders as a trapezoid: wide at the near/delivery end, narrow at far end.
+// P.nHW/fHW = near/far half-widths (screen px). P.gamma compresses far-end Y depth.
+const P = { cx:220, nHW:160, fHW:50, nY:810, fY:82, gamma:1.5 };
+
+// perspT: 0 = far end, 1 = near (delivery) end, from current deliverer's perspective
+function matToPerspT(my) {
+  return delivDir === 1
+    ? (my - MAT.y) / MAT.h        // delivDir=1: bottom is near (t→1)
+    : 1 - (my - MAT.y) / MAT.h;   // delivDir=-1: top is near (t→1)
+}
+
+// mat coords → screen coords
+function m2s(mx, my) {
+  const t  = matToPerspT(my);
+  const tc = Math.max(0, Math.min(1, t));
+  const hw = P.fHW + (P.nHW - P.fHW) * tc;
+  const sx = P.cx + (mx - MAT.x - MAT.w / 2) * hw / (MAT.w / 2);
+  const nY = delivDir === 1 ? P.nY : P.fY;
+  const fY = delivDir === 1 ? P.fY : P.nY;
+  const ts = Math.pow(Math.max(0, Math.min(1, t)), P.gamma);
+  const sy = fY + (nY - fY) * ts;
+  return { x: sx, y: sy };
+}
+
+// screen coords → mat coords (inverse perspective)
+function s2m(sx, sy) {
+  const nY = delivDir === 1 ? P.nY : P.fY;
+  const fY = delivDir === 1 ? P.fY : P.nY;
+  const ts = (sy - fY) / (nY - fY);
+  if (ts < -0.05 || ts > 1.05) return null;
+  const tc = Math.max(0, Math.min(1, ts));
+  const t  = Math.pow(tc, 1 / P.gamma);
+  const hw = P.fHW + (P.nHW - P.fHW) * t;
+  const mx = MAT.x + MAT.w / 2 + (sx - P.cx) * (MAT.w / 2) / hw;
+  const my = delivDir === 1 ? MAT.y + t * MAT.h : MAT.y + (1 - t) * MAT.h;
+  return { x: mx, y: my };
+}
+
+// Scale a radius by perspective depth
+function perspR(my, r) {
+  const tc = Math.max(0, Math.min(1, matToPerspT(my)));
+  const hw = P.fHW + (P.nHW - P.fHW) * tc;
+  return Math.max(3.5, r * hw / (MAT.w / 2));
+}
 const FRICTION = 0.9865;
 const BIAS_K   = 0.018;
 
