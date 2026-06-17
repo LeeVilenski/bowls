@@ -909,29 +909,53 @@ function drawMat() {
               Math.floor(i/50)%2===0 ? C.mat : C.matAlt);
   }
 
-  // ── End boards ──────────────────────────────────────────────────
-  const bH=14;
-  // Far board (above y=MAT.y in mat coords)
-  const fbL=m2s(MAT.x-4,MAT.y), fbR=m2s(MAT.x+MAT.w+4,MAT.y);
-  ctx.fillStyle=C.boardShadow; ctx.fillRect(fbL.x+2,fbL.y-bH+3,fbR.x-fbL.x,bH);
-  ctx.fillStyle=C.board;       ctx.fillRect(fbL.x,  fbL.y-bH,  fbR.x-fbL.x,bH);
-  ctx.strokeStyle='rgba(160,140,110,0.5)'; ctx.lineWidth=1;
-  for (let gx=fbL.x+5; gx<fbR.x-2; gx+=12) {
-    ctx.beginPath(); ctx.moveTo(gx,fbL.y-bH+2); ctx.lineTo(gx,fbL.y-2); ctx.stroke();
-  }
-  ctx.strokeStyle='rgba(80,60,30,0.4)'; ctx.lineWidth=1.5;
-  ctx.strokeRect(fbL.x,fbL.y-bH,fbR.x-fbL.x,bH);
+  // ── Fenders (3D wooden end rails) ───────────────────────────────
+  function drawFender(matY, facingDown) {
+    const L4 = m2s(MAT.x-6, matY), R4 = m2s(MAT.x+MAT.w+6, matY);
+    const fw = R4.x - L4.x;
+    const faceH = 18, topH = 5, shadow = 3;
 
-  // Near board (below y=MAT.y+MAT.h in mat coords)
-  const nbL=m2s(MAT.x-4,MAT.y+MAT.h), nbR=m2s(MAT.x+MAT.w+4,MAT.y+MAT.h);
-  ctx.fillStyle=C.boardShadow; ctx.fillRect(nbL.x+2,nbL.y+3,nbR.x-nbL.x,bH);
-  ctx.fillStyle=C.board;       ctx.fillRect(nbL.x,  nbL.y,  nbR.x-nbL.x,bH);
-  ctx.strokeStyle='rgba(160,140,110,0.5)'; ctx.lineWidth=1;
-  for (let gx=nbL.x+8; gx<nbR.x-4; gx+=18) {
-    ctx.beginPath(); ctx.moveTo(gx,nbL.y+2); ctx.lineTo(gx,nbL.y+bH-2); ctx.stroke();
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    if (facingDown) ctx.fillRect(L4.x+shadow, L4.y+shadow, fw, faceH+topH);
+    else            ctx.fillRect(L4.x+shadow, L4.y-faceH-topH+shadow, fw, faceH+topH);
+
+    const fy = facingDown ? L4.y : L4.y - faceH - topH;
+
+    // Top surface (lighter wood — the horizontal top of the rail)
+    ctx.fillStyle = C.board;
+    ctx.fillRect(L4.x, fy, fw, topH);
+    // Highlight on top edge
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(L4.x, fy, fw, 2);
+
+    // Front face (darker — vertical face players/bowls see)
+    const grad = ctx.createLinearGradient(0, fy+topH, 0, fy+topH+faceH);
+    grad.addColorStop(0, C.boardShadow);
+    grad.addColorStop(1, '#7a4a18');
+    ctx.fillStyle = grad;
+    ctx.fillRect(L4.x, fy+topH, fw, faceH);
+
+    // Wood grain on front face
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1;
+    for (let gx = L4.x+8; gx < R4.x-4; gx += 14) {
+      ctx.beginPath();
+      ctx.moveTo(gx, fy+topH+2); ctx.lineTo(gx, fy+topH+faceH-2);
+      ctx.stroke();
+    }
+
+    // Inner edge shadow (where fender meets ditch surface)
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    if (facingDown) ctx.fillRect(L4.x, fy+topH+faceH-2, fw, 3);
+    else            ctx.fillRect(L4.x, fy+topH, fw, 3);
+
+    // Outer border
+    ctx.strokeStyle = 'rgba(60,35,10,0.6)'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(L4.x, fy, fw, faceH+topH);
   }
-  ctx.strokeStyle='rgba(80,60,30,0.4)'; ctx.lineWidth=1.5;
-  ctx.strokeRect(nbL.x,nbL.y,nbR.x-nbL.x,bH);
+
+  drawFender(MAT.y,         false); // far fender — face points up (toward top of screen)
+  drawFender(MAT.y+MAT.h,   true);  // near fender — face points down
 
   // ── Mat border (projected trapezoid outline) ────────────────────
   const mc=[m2s(MAT.x,MAT.y), m2s(MAT.x+MAT.w,MAT.y),
