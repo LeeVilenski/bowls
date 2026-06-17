@@ -462,14 +462,17 @@ function stepObj(obj, bias) {
   if (spd < 0.22) {
     obj.stopped = true; obj.vx = obj.vy = 0;
     const farDitchY = yFromFar(L.DITCH);
-    const inFarDitch = delivDir === 1 ? obj.y < farDitchY : obj.y > farDitchY;
+    const farDeadY  = yFromFar(L.DEAD);
+    const inFarDitch    = delivDir === 1 ? obj.y < farDitchY : obj.y > farDitchY;
+    const inFarDeadArea = delivDir === 1
+      ? (obj.y >= farDitchY && obj.y < farDeadY)
+      : (obj.y <= farDitchY && obj.y > farDeadY);
     if (obj === jack) {
       if (inFarDitch) { obj.inDitch = true; msg('Jack in the ditch! Only touchers count.'); }
     } else {
-      const overshot = inFarDitch;
-      if (isInNearDitchZone(obj) || isShortBowl(obj)) {
+      if (isInNearDitchZone(obj) || isShortBowl(obj) || inFarDeadArea) {
         obj.offMat = true;
-      } else if (overshot) {
+      } else if (inFarDitch) {
         if (obj.toucher) obj.inDitch = true;
         else obj.offMat = true;
       }
