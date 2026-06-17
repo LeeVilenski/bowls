@@ -2,64 +2,98 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bowls">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>Short Mat Bowls</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; }
+html { height: 100%; }
 body {
+  height: 100dvh;
   background: #0a0f1e;
   color: #e2e8f0;
   font-family: 'Segoe UI', sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px;
+  overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
   overscroll-behavior: none;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
-h1 { font-size: 13px; color: #60a5fa; letter-spacing: 2px; margin-bottom: 3px; text-transform: uppercase; }
+
+/* Canvas fills available height, width follows aspect ratio */
+#canvas-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+  min-height: 0;
+}
 #canvas {
   display: block;
-  border-radius: 6px;
-  cursor: crosshair;
   touch-action: none;
-  /* Scale to fill available width; height follows aspect ratio */
-  width: 100%;
-  max-width: 440px;
-  height: auto;
+  cursor: crosshair;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
 }
-#wrap { width: 100%; max-width: 440px; }
-#hud { display: flex; align-items: stretch; gap: 8px; margin-top: 8px; }
-.sbox { background: #1e293b; border-radius: 8px; padding: 6px 12px; text-align: center; min-width: 70px; }
-.sbox .lbl { font-size: 11px; opacity: 0.55; margin-bottom: 2px; }
-.sbox .val { font-size: 24px; font-weight: 700; }
+
+/* Compact bottom bar */
+#bar {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #111827;
+  border-top: 1px solid #1e293b;
+}
+.sbox { text-align: center; min-width: 48px; }
+.sbox .lbl { font-size: 10px; opacity: 0.5; line-height: 1; }
+.sbox .val { font-size: 22px; font-weight: 700; line-height: 1.1; }
 .p1 .val { color: #60a5fa; }
 .p2 .val { color: #f87171; }
 #msgBox {
-  flex: 1; background: #1e293b; border-radius: 8px;
-  padding: 8px 10px; display: flex; align-items: center;
-  justify-content: center; font-size: 12px; text-align: center; line-height: 1.4;
+  flex: 1; font-size: 11px; text-align: center; line-height: 1.3;
+  padding: 0 4px; opacity: 0.9;
 }
-#controls { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+#btnGroup { display: flex; gap: 4px; }
 button {
-  padding: 10px 14px; border: none; border-radius: 6px; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s;
-  -webkit-tap-highlight-color: transparent;
-  min-height: 44px;
+  padding: 7px 10px; border: none; border-radius: 6px; font-size: 11px;
+  font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  min-height: 36px; white-space: nowrap;
 }
-button:active { opacity: .75; transform: scale(0.97); }
+button:active { opacity: .7; }
 #btnMode { background: #7c3aed; color: #fff; }
 #btnBias { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
 #btnNew  { background: #1d4ed8; color: #fff; }
+
+/* Bias slider row */
 #biasRow {
-  margin-top: 8px; display: flex; align-items: center; gap: 10px;
-  background: #1e293b; border-radius: 8px; padding: 8px 14px;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 6px;
+  background: #111827;
 }
-#biasRow label { font-size: 12px; opacity: 0.75; white-space: nowrap; }
-#biasSlider { flex: 1; accent-color: #60a5fa; cursor: pointer; min-height: 20px; }
-#biasValLabel { color: #60a5fa; font-weight: 700; font-size: 13px; min-width: 30px; }
+#biasRow label { font-size: 11px; opacity: 0.6; white-space: nowrap; }
+#biasSlider { flex: 1; accent-color: #60a5fa; }
+#biasValLabel { color: #60a5fa; font-weight: 700; font-size: 12px; min-width: 28px; }
 </style>
 </head>
 <body>
