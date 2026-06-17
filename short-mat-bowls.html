@@ -899,7 +899,7 @@ function draw() {
   drawMat();
   if (jack && !jack.offMat) drawJack();
   for (const b of bowls) drawBowl(b);
-  if (state==='aim' && mouse.down && aimActive) drawAim();
+  if (state==='aim') drawAim();
   ctx.restore();
   drawSidePanels();
 }
