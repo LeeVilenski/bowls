@@ -1567,9 +1567,8 @@ function applyAndStart() {
   sl.value = biasMult;
   document.getElementById('biasValLabel').textContent = biasMult.toFixed(1) + '×';
 
-  // Sync mode button + HUD label
-  document.getElementById('btnMode').textContent = mode === 'vs-ai' ? 'vs AI' : '2P';
-  document.getElementById('lbl2').textContent    = mode === 'vs-ai' ? 'AI' : 'P2';
+  // Sync HUD label
+  document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
 
   document.getElementById('splash').classList.add('hidden');
   startGame();
