@@ -864,10 +864,7 @@ function draw() {
 }
 
 function drawMat() {
-  const SP = 50; // side panel width — clip mat so it never bleeds under the panels
   ctx.save();
-  ctx.beginPath(); ctx.rect(SP, 0, W - SP*2, H); ctx.clip();
-
   const cx = MAT.x + MAT.w / 2;
 
   // Helpers — project mat-space geometry to screen
