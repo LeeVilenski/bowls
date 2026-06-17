@@ -430,14 +430,18 @@ function stepObj(obj, bias) {
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.22) {
     obj.stopped = true; obj.vx = obj.vy = 0;
-    if (obj !== jack) {
-      // Dead: didn't reach the delivery-end dead line (too short)
-      // Dead: too short (didn't reach near dead line) or landed in near ditch zone
-      // Dead: overshot into far ditch zone (past the far ditch line, close to far fender)
-      // NOTE: the area between the far ditch line and far dead line is the VALID jack zone
-      const farDitchY = yFromFar(L.DITCH);
-      const overshot = delivDir === 1 ? obj.y < farDitchY : obj.y > farDitchY;
-      if (isInNearDitchZone(obj) || isShortBowl(obj) || overshot) obj.offMat = true;
+    const farDitchY = yFromFar(L.DITCH);
+    const inFarDitch = delivDir === 1 ? obj.y < farDitchY : obj.y > farDitchY;
+    if (obj === jack) {
+      if (inFarDitch) { obj.inDitch = true; msg('Jack in the ditch! Only touchers count.'); }
+    } else {
+      const overshot = inFarDitch;
+      if (isInNearDitchZone(obj) || isShortBowl(obj)) {
+        obj.offMat = true;
+      } else if (overshot) {
+        if (obj.toucher) obj.inDitch = true;
+        else obj.offMat = true;
+      }
     }
     return;
   }
