@@ -1129,6 +1129,15 @@ function drawBowl(b) {
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(b.player,sp.x,sp.y+0.5); ctx.textBaseline='alphabetic';
   }
+
+  // Chalk mark for touchers
+  if (b.toucher) {
+    ctx.font = `bold ${Math.max(7,Math.round(r*0.7))}px Segoe UI`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillText('T', sp.x + rx + 5, sp.y - r*0.3);
+    ctx.textBaseline = 'alphabetic';
+  }
 }
 
 function drawAim() {
