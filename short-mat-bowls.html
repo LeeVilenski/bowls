@@ -97,24 +97,23 @@ button:active { opacity: .7; }
 </style>
 </head>
 <body>
-<h1>Short Mat Bowls</h1>
-<canvas id="canvas" width="440" height="840"></canvas>
-<div id="wrap">
-  <div id="hud">
-    <div class="sbox p1"><div class="lbl" id="lbl1">Player 1</div><div class="val" id="sc1">0</div></div>
-    <div id="msgBox">Press <strong>New Game</strong> to start</div>
-    <div class="sbox p2"><div class="lbl" id="lbl2">AI</div><div class="val" id="sc2">0</div></div>
+<div id="canvas-wrap">
+  <canvas id="canvas" width="440" height="840"></canvas>
+</div>
+<div id="bar">
+  <div class="sbox p1"><div class="lbl" id="lbl1">P1</div><div class="val" id="sc1">0</div></div>
+  <div id="msgBox">Press <strong>New Game</strong></div>
+  <div id="btnGroup">
+    <button id="btnBias">↗ R</button>
+    <button id="btnNew">New</button>
+    <button id="btnMode">vs AI</button>
   </div>
-  <div id="controls">
-    <button id="btnMode">Mode: vs AI</button>
-    <button id="btnBias">Bias: Right ↗</button>
-    <button id="btnNew">New Game</button>
-  </div>
-  <div id="biasRow">
-    <label>Bias strength:</label>
-    <input type="range" id="biasSlider" min="0" max="2.5" step="0.1" value="1">
-    <span id="biasValLabel">1.0×</span>
-  </div>
+  <div class="sbox p2"><div class="lbl" id="lbl2">AI</div><div class="val" id="sc2">0</div></div>
+</div>
+<div id="biasRow">
+  <label>Bias:</label>
+  <input type="range" id="biasSlider" min="0" max="2.5" step="0.1" value="1">
+  <span id="biasValLabel">1.0×</span>
 </div>
 
 <script>
