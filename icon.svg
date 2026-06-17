@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0a0f1e" rx="90"/>
+  <!-- Mat -->
+  <rect x="156" y="48" width="200" height="416" fill="#1a6b35" rx="10"/>
+  <!-- End boards -->
+  <rect x="148" y="36" width="216" height="18" fill="#f0ead8" rx="4"/>
+  <rect x="148" y="458" width="216" height="18" fill="#f0ead8" rx="4"/>
+  <!-- Jack (yellow) -->
+  <circle cx="256" cy="120" r="22" fill="#fde047"/>
+  <!-- P1 bowl (dark, blue stickers) -->
+  <ellipse cx="232" cy="390" rx="34" ry="28" fill="#141414"/>
+  <ellipse cx="210" cy="390" rx="10" ry="14" fill="#3b82f6"/>
+  <ellipse cx="254" cy="390" rx="10" ry="14" fill="#3b82f6"/>
+  <!-- P2 bowl (dark, red stickers) -->
+  <ellipse cx="282" cy="344" rx="34" ry="28" fill="#141414"/>
+  <ellipse cx="260" cy="344" rx="10" ry="14" fill="#ef4444"/>
+  <ellipse cx="304" cy="344" rx="10" ry="14" fill="#ef4444"/>
+</svg>

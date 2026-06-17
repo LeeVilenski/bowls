@@ -1,0 +1,14 @@
+{
+  "name": "Short Mat Bowls",
+  "short_name": "Bowls",
+  "description": "Short mat bowls simulation — play against AI or a friend",
+  "start_url": "./short-mat-bowls.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0a0f1e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
