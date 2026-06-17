@@ -809,25 +809,26 @@ function drawAim() {
 }
 
 function drawSidePanels() {
+  const SP=50, SC=25; // panel width, panel centre x
   // Left — P1
-  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,68,H);
+  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,SP,H);
   ctx.fillStyle=C.p1; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText('P1',34,55);
+  ctx.fillText('P1',SC,50);
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===1).length > i;
-    ctx.beginPath(); ctx.arc(34,72+i*30,10,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(SC,66+i*28,9,0,Math.PI*2);
     ctx.fillStyle = bowled ? 'rgba(59,130,246,0.25)' : C.p1; ctx.fill();
     ctx.strokeStyle=C.p1d; ctx.lineWidth=1.5; ctx.stroke();
   }
 
   // Right — P2/AI
-  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-68,0,68,H);
+  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
   const lbl2 = mode==='vs-ai'?'AI':'P2';
   ctx.fillStyle=C.p2; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(lbl2,W-34,55);
+  ctx.fillText(lbl2,W-SC,50);
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===2).length > i;
-    ctx.beginPath(); ctx.arc(W-34,72+i*30,10,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(W-SC,66+i*28,9,0,Math.PI*2);
     ctx.fillStyle = bowled ? 'rgba(239,68,68,0.25)' : C.p2; ctx.fill();
     ctx.strokeStyle=C.p2d; ctx.lineWidth=1.5; ctx.stroke();
   }
@@ -835,7 +836,7 @@ function drawSidePanels() {
   // Active player dot
   if (state==='aim'||state==='ai-turn') {
     const cur=playerForTurn(turnIdx);
-    const ax=cur===1?34:W-34;
+    const ax=cur===1?SC:W-SC;
     ctx.fillStyle='#fbbf24';
     ctx.beginPath(); ctx.arc(ax,45,6,0,Math.PI*2); ctx.fill();
   }
