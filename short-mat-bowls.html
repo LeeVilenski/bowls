@@ -854,11 +854,14 @@ canvas.addEventListener('mousemove', e => { const p=getPos(e); mouse.x=p.x; mous
 
 canvas.addEventListener('mouseup', () => {
   if (state==='aim' && aimActive && mouse.down) {
-    const bs=bowlStart();
-    const dx=mouse.x-bs.x, dy=mouse.y-bs.y;
-    const dist=Math.hypot(dx,dy);
-    if (dist>10) {
-      deliverBowl(playerForTurn(turnIdx), Math.atan2(dy,dx), Math.min(dist,230)/230*MAX_SPD);
+    const bsm=bowlStart(), bss=m2s(bsm.x,bsm.y);
+    const mm=s2m(mouse.x,mouse.y);
+    if (mm) {
+      const dx=mm.x-bsm.x, dy=mm.y-bsm.y;
+      const distScreen=Math.hypot(mouse.x-bss.x, mouse.y-bss.y);
+      if (distScreen>10) {
+        deliverBowl(playerForTurn(turnIdx), Math.atan2(dy,dx), Math.min(distScreen,230)/230*MAX_SPD);
+      }
     }
   }
   aimActive=false; mouse.down=false;
