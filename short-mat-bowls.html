@@ -289,7 +289,7 @@ function playerForTurn(t) {
 }
 
 function allStopped() {
-  if (jack && !jack.stopped && !jack.offMat) return false;
+  if (jack && !jack.stopped && !jack.offMat && !jack.offSide) return false;
   return bowls.every(b => b.stopped || b.offMat);
 }
 
