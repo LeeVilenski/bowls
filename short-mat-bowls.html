@@ -1226,20 +1226,6 @@ function drawAim() {
     : MAX_SPD * 0.6;
   const pct = previewSpeed / MAX_SPD;
 
-  // Trajectory preview
-  const path = simPath(bsm.x, bsm.y, angle, previewSpeed, biasDir, biasMult);
-  if (path.length > 1) {
-    const ps0 = m2s(path[0].x, path[0].y);
-    ctx.beginPath(); ctx.moveTo(ps0.x, ps0.y);
-    for (const pt of path) { const sp = m2s(pt.x, pt.y); ctx.lineTo(sp.x, sp.y); }
-    ctx.strokeStyle = 'rgba(255,225,50,0.35)'; ctx.lineWidth = 2;
-    ctx.setLineDash([5,4]); ctx.stroke(); ctx.setLineDash([]);
-    const ep = path[path.length-1], eps = m2s(ep.x, ep.y), er = perspR(ep.y, RB);
-    ctx.beginPath(); ctx.arc(eps.x, eps.y, er, 0, Math.PI*2);
-    ctx.fillStyle = playerForTurn(turnIdx)===1 ? 'rgba(59,130,246,0.35)' : 'rgba(239,68,68,0.35)';
-    ctx.fill();
-  }
-
   // Direction arrow — shaft + arrowhead projected into mat space
   const adx = Math.cos(angle), ady = Math.sin(angle);
   const tip = m2s(bsm.x + adx * 55, bsm.y + ady * 55);
