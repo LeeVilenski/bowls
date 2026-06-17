@@ -1538,11 +1538,6 @@ function applyAndStart() {
   const col2 = BOWL_COLOURS[splashCfg.p2idx];
   C.p2 = col2.main; C.p2d = col2.dark;
 
-  // Sync in-game bias slider
-  const sl = document.getElementById('biasSlider');
-  sl.value = biasMult;
-  document.getElementById('biasValLabel').textContent = biasMult.toFixed(1) + '×';
-
   // Sync HUD label
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
 
