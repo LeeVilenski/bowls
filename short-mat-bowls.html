@@ -968,22 +968,26 @@ canvas.addEventListener('touchend',   e=>{e.preventDefault();canvas.dispatchEven
 // Buttons
 document.getElementById('btnMode').addEventListener('click',()=>{
   mode=mode==='vs-ai'?'vs-player':'vs-ai';
-  document.getElementById('btnMode').textContent=`Mode: ${mode==='vs-ai'?'vs AI':'2 Players'}`;
-  document.getElementById('lbl2').textContent=mode==='vs-ai'?'AI':'Player 2';
+  document.getElementById('btnMode').textContent=mode==='vs-ai'?'vs AI':'2P';
+  document.getElementById('lbl2').textContent=mode==='vs-ai'?'AI':'P2';
 });
 
 document.getElementById('btnBias').addEventListener('click',()=>{
   biasDir=biasDir==='right'?'left':'right';
-  document.getElementById('btnBias').textContent=`Bias: ${biasDir==='right'?'Right ↗':'Left ↖'}`;
+  document.getElementById('btnBias').textContent=biasDir==='right'?'↗ R':'↖ L';
 });
 
 document.getElementById('btnNew').addEventListener('click',startGame);
 
-// Bias strength slider
 document.getElementById('biasSlider').addEventListener('input', e => {
   biasMult = parseFloat(e.target.value);
   document.getElementById('biasValLabel').textContent = biasMult.toFixed(1) + '×';
 });
+
+// Service worker (PWA offline support)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
 
 requestAnimationFrame(loop);
 </script>
