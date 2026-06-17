@@ -463,14 +463,14 @@ function stepObj(obj, bias) {
     obj.stopped = true; obj.vx = obj.vy = 0;
     const farDitchY = yFromFar(L.DITCH);
     const farDeadY  = yFromFar(L.DEAD);
-    const inFarDitch    = delivDir === 1 ? obj.y < farDitchY : obj.y > farDitchY;
-    const inFarDeadArea = delivDir === 1
-      ? (obj.y >= farDitchY && obj.y < farDeadY)
-      : (obj.y <= farDitchY && obj.y > farDeadY);
+    const inFarDitch = delivDir === 1 ? obj.y < farDitchY : obj.y > farDitchY;
+    // Bowl must reach the far dead area (where the jack lives) to count.
+    // Anything stopping before the far dead line — short or mid-mat — is dead.
+    const didNotReachScoring = delivDir === 1 ? obj.y > farDeadY : obj.y < farDeadY;
     if (obj === jack) {
       if (inFarDitch) { obj.inDitch = true; msg('Jack in the ditch! Only touchers count.'); }
     } else {
-      if (isInNearDitchZone(obj) || isShortBowl(obj) || inFarDeadArea) {
+      if (didNotReachScoring) {
         obj.offMat = true;
       } else if (inFarDitch) {
         if (obj.toucher) obj.inDitch = true;
