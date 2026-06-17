@@ -1219,12 +1219,13 @@ function drawDistances() {
 // ── Main loop ─────────────────────────────────────────────────────
 function loop() {
   if (state==='moving') {
-    for (let s=0;s<3;s++) {
-      for (const b of bowls) stepObj(b, b.bias);
-      stepObj(jack, null);
-      stepCollisions();
-    }
+    for (const b of bowls) stepObj(b, b.bias);
+    stepObj(jack, null);
+    stepCollisions();
     if (allStopped()) onAllStopped();
+  }
+  if (state==='moving' || state==='camera-return') {
+    updateCamera();
   }
   draw();
   requestAnimationFrame(loop);
