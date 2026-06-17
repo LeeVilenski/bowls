@@ -230,6 +230,8 @@ let jackOwner = 1;
 let turnIdx   = 0;
 let delivDir  = 1;   // 1 = bowl from bottom; -1 = from top
 let aiTimer   = null;
+let jackOffCounts  = [0, 0]; // per-player count of knocking jack off the side (resets each game)
+let lastJackHitter = null;   // player who last struck the jack
 
 let mouse    = { x: 0, y: 0, down: false };
 let aimActive = false;
