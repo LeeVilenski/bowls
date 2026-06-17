@@ -1358,53 +1358,77 @@ function getPos(e) {
   return {x:(cx-r.left)*sx, y:(cy-r.top)*sy};
 }
 
-canvas.addEventListener('mousedown', e => {
-  const p=getPos(e);
-  mouse={x:p.x,y:p.y,down:true};
+function handlePointerDown(p) {
+  mouse = { x: p.x, y: p.y, down: true };
 
-  if (state==='place-jack') {
-    // Convert screen click → mat coords, then snap to jack line
-    const mm=s2m(p.x,p.y);
+  if (state === 'place-jack') {
+    const mm = s2m(p.x, p.y);
     if (mm) {
-      const jx=jackLineX();
-      const lo=Math.min(jackYMin(),jackYMax()), hi=Math.max(jackYMin(),jackYMax());
-      if (Math.abs(mm.x-jx)<MAT.w*0.3 && mm.y>=lo-20 && mm.y<=hi+20) {
-        const jy=Math.max(lo,Math.min(hi,mm.y));
-        jack={x:jx,y:jy,vx:0,vy:0,stopped:true,offMat:false};
+      const jx = jackLineX();
+      const lo = Math.min(jackYMin(), jackYMax()), hi = Math.max(jackYMin(), jackYMax());
+      if (Math.abs(mm.x - jx) < MAT.w * 0.3 && mm.y >= lo - 20 && mm.y <= hi + 20) {
+        const jy = Math.max(lo, Math.min(hi, mm.y));
+        jack = { x: jx, y: jy, vx: 0, vy: 0, stopped: true, offMat: false, inDitch: false };
         beginTurns();
       } else {
         msg('Click along the glowing jack line (the vertical mark at the centre of the far end)!');
       }
     }
-  } else if (state==='aim') {
-    aimActive=true;
-  } else if (state==='end-result') {
+  } else if (state === 'aim') {
+    // Begin gesture — could be direction-setting or power swipe
+    if (aimAngle === null) aimAngle = defaultAimAngle();
+    aimBaseAngle  = aimAngle;
+    aimDragStartX = p.x;
+    swipeSamples  = [{ x: p.x, y: p.y, t: Date.now() }];
+    aimLiveSpeed  = 0;
+  } else if (state === 'end-result') {
     advanceEnd();
-  } else if (state==='jack-off-side') {
+  } else if (state === 'jack-off-side') {
     startEnd();
   }
-});
+}
 
-canvas.addEventListener('mousemove', e => { const p=getPos(e); mouse.x=p.x; mouse.y=p.y; });
+function handlePointerMove(p) {
+  mouse.x = p.x; mouse.y = p.y;
+  if (state !== 'aim' || !mouse.down) return;
 
-canvas.addEventListener('mouseup', () => {
-  if (state==='aim' && aimActive && mouse.down) {
-    const bsm=bowlStart(), bss=m2s(bsm.x,bsm.y);
-    const mm=s2m(mouse.x,mouse.y);
-    if (mm) {
-      const dx=mm.x-bsm.x, dy=mm.y-bsm.y;
-      const distScreen=Math.hypot(mouse.x-bss.x, mouse.y-bss.y);
-      if (distScreen>10) {
-        deliverBowl(playerForTurn(turnIdx), Math.atan2(dy,dx), Math.min(distScreen,230)/230*MAX_SPD);
-      }
-    }
+  swipeSamples.push({ x: p.x, y: p.y, t: Date.now() });
+  if (swipeSamples.length > 40) swipeSamples.shift();
+
+  const vel = calcSwipeVelocity();
+  const upSpeed = -vel.vy; // negative screen-y = moving up
+  aimLiveSpeed = upSpeed > 0 ? upSpeed : 0;
+
+  // If mostly horizontal drag → adjust aim direction
+  const totalDX = p.x - aimDragStartX;
+  const totalDY = p.y - swipeSamples[0].y;
+  if (Math.abs(totalDX) > Math.abs(totalDY) * 1.2) {
+    aimAngle = aimBaseAngle + totalDX * 0.007;
   }
-  aimActive=false; mouse.down=false;
-});
+}
 
-canvas.addEventListener('touchstart', e=>{e.preventDefault();canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}));},{passive:false});
-canvas.addEventListener('touchmove',  e=>{e.preventDefault();canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}));},{passive:false});
-canvas.addEventListener('touchend',   e=>{e.preventDefault();canvas.dispatchEvent(new MouseEvent('mouseup',{}));},{passive:false});
+function handlePointerUp() {
+  if (state === 'aim' && mouse.down) {
+    const vel = calcSwipeVelocity();
+    const upSpeed = -vel.vy;
+    if (upSpeed >= MIN_SWIPE_SPEED) {
+      const pct = Math.min(1, (upSpeed - MIN_SWIPE_SPEED) / (MAX_SWIPE_SPEED - MIN_SWIPE_SPEED));
+      deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), pct * MAX_SPD);
+      resetAim();
+    }
+    // else: no delivery — angle is kept, player swipes again
+  }
+  aimLiveSpeed = 0;
+  mouse.down = false;
+}
+
+canvas.addEventListener('mousedown',  e => handlePointerDown(getPos(e)));
+canvas.addEventListener('mousemove',  e => { if (mouse.down) handlePointerMove(getPos(e)); });
+canvas.addEventListener('mouseup',    () => handlePointerUp());
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); handlePointerDown(getPos(e)); }, { passive: false });
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); handlePointerMove(getPos(e)); }, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp(); },            { passive: false });
 
 // Buttons
 document.getElementById('btnMode').addEventListener('click',()=>{
