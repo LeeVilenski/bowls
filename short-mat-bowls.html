@@ -334,12 +334,27 @@ function stepObj(obj, bias) {
   const r = obj === jack ? RJ : RB;
 
   // Side walls
-  if (obj.x - r < MAT.x)         { obj.offMat = true; obj.stopped = true; return; }
-  if (obj.x + r > MAT.x + MAT.w) { obj.offMat = true; obj.stopped = true; return; }
+  if (obj.x - r < MAT.x || obj.x + r > MAT.x + MAT.w) {
+    if (obj === jack) {
+      // Jack off the side — clamp visually, mark as offSide for end restart logic
+      obj.x = Math.max(MAT.x + r, Math.min(MAT.x + MAT.w - r, obj.x));
+      obj.vx = obj.vy = 0; obj.stopped = true; obj.offSide = true;
+    } else {
+      obj.offMat = true; obj.stopped = true;
+    }
+    return;
+  }
 
-  // End boards — hitting either end board kills the object
+  // End boards — jack stays in ditch; bowls die
   if (obj.y - r < MAT.y || obj.y + r > MAT.y + MAT.h) {
-    obj.offMat = true; obj.stopped = true; return;
+    if (obj === jack) {
+      // Clamp jack to just inside the fender (stays live for scoring)
+      obj.y = obj.y - r < MAT.y ? MAT.y + r : MAT.y + MAT.h - r;
+      obj.vx = obj.vy = 0; obj.stopped = true;
+    } else {
+      obj.offMat = true; obj.stopped = true;
+    }
+    return;
   }
 
   // Centre block — hitting the block kills the bowl / jack
