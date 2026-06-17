@@ -1187,7 +1187,7 @@ document.getElementById('btnBias').addEventListener('click',()=>{
   document.getElementById('btnBias').textContent=biasDir==='right'?'↗ R':'↖ L';
 });
 
-document.getElementById('btnNew').addEventListener('click',startGame);
+document.getElementById('btnNew').addEventListener('click', showSplash);
 
 document.getElementById('biasSlider').addEventListener('input', e => {
   biasMult = parseFloat(e.target.value);
