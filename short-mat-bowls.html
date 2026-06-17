@@ -183,6 +183,37 @@ button:active { opacity: .7; }
   <span id="biasValLabel">1.0×</span>
 </div>
 
+<div id="splash">
+  <div id="spl-inner">
+    <div class="spl-title">Short Mat <em>Bowls</em></div>
+
+    <div class="spl-card">
+      <div class="spl-head">Game</div>
+      <div class="spl-row"><span class="spl-lbl">Ends</span><div class="seg" id="sEnds"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Mode</span><div class="seg" id="sMode"></div></div>
+    </div>
+
+    <div class="spl-card">
+      <div class="spl-head">Bowls</div>
+      <div class="spl-row">
+        <span class="spl-lbl">Size</span>
+        <input type="range" id="sSizeSlider" min="0" max="5" step="1" value="3">
+        <span class="rval" id="sSizeLbl">3</span>
+      </div>
+      <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="sBias"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Player 1</span><div class="swatches" id="sP1"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Player 2</span><div class="swatches" id="sP2"></div></div>
+    </div>
+
+    <div class="spl-card">
+      <div class="spl-head">Background</div>
+      <div class="bg-grid" id="sBg"></div>
+    </div>
+
+    <button id="btnStart">Start Game</button>
+  </div>
+</div>
+
 <script>
 // ── Canvas & core layout ─────────────────────────────────────────
 const canvas = document.getElementById('canvas');
