@@ -6,6 +6,7 @@
 <title>Short Mat Bowls</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
 body {
   background: #0a0f1e;
   color: #e2e8f0;
@@ -13,18 +14,18 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px;
-  min-height: 100vh;
+  padding: 4px;
   user-select: none;
   -webkit-user-select: none;
   overscroll-behavior: none;
 }
-h1 { font-size: 16px; color: #60a5fa; letter-spacing: 3px; margin-bottom: 6px; text-transform: uppercase; }
+h1 { font-size: 13px; color: #60a5fa; letter-spacing: 2px; margin-bottom: 3px; text-transform: uppercase; }
 #canvas {
   display: block;
   border-radius: 6px;
   cursor: crosshair;
   touch-action: none;
+  /* Scale to fill available width; height follows aspect ratio */
   width: 100%;
   max-width: 440px;
   height: auto;
