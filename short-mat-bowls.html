@@ -348,6 +348,37 @@ let lastJackHitter = null;   // player who last struck the jack
 let mouse    = { x: 0, y: 0, down: false };
 let aimActive = false;
 
+// ── Swipe control state ───────────────────────────────────────────
+let aimAngle     = null;   // null = recalculate default toward jack
+let aimBaseAngle = 0;      // aimAngle when current drag started
+let aimDragStartX = 0;
+let swipeSamples = [];     // [{x,y,t}] recent pointer positions
+let aimLiveSpeed = 0;      // upward px/s during active swipe (for power ring)
+
+const MIN_SWIPE_SPEED = 200;  // px/s minimum to count as a deliver
+const MAX_SWIPE_SPEED = 2200; // px/s = full power
+
+function defaultAimAngle() {
+  const bs = bowlStart();
+  if (jack && !jack.offMat) return Math.atan2(jack.y - bs.y, jack.x - bs.x);
+  return delivDir === 1 ? -Math.PI / 2 : Math.PI / 2;
+}
+
+function calcSwipeVelocity() {
+  if (swipeSamples.length < 2) return { vx: 0, vy: 0 };
+  const last = swipeSamples[swipeSamples.length - 1];
+  const recent = swipeSamples.filter(s => last.t - s.t <= 100);
+  if (recent.length < 2) return { vx: 0, vy: 0 };
+  const dt = (recent[recent.length-1].t - recent[0].t) / 1000;
+  if (dt <= 0) return { vx: 0, vy: 0 };
+  return {
+    vx: (recent[recent.length-1].x - recent[0].x) / dt,
+    vy: (recent[recent.length-1].y - recent[0].y) / dt,
+  };
+}
+
+function resetAim() { aimAngle = null; swipeSamples = []; aimLiveSpeed = 0; }
+
 // ── Position helpers ──────────────────────────────────────────────
 // All helpers respect the current delivDir (1=bowl from bottom, -1=from top)
 
