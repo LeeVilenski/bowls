@@ -938,6 +938,8 @@ function drawMat() {
   const topP=m2s(cx,MAT.y);
   ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.font='11px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(`End ${endNum} of ${ENDS}`, topP.x, topP.y-20);
+
+  ctx.restore(); // end mat clip region
 }
 
 function drawJack() {
