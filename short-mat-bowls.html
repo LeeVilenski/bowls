@@ -532,9 +532,12 @@ function simPath(sx, sy, angle, speed, bias, bMult) {
     const spd = Math.hypot(vx, vy);
     if (spd < 0.22) break;
     const nx = vx/spd, ny = vy/spd;
-    const sign = bias === 'right' ? 1 : -1;
-    vx += -ny * sign * BIAS_K * bMult * spd;
-    vy +=  nx * sign * BIAS_K * bMult * spd;
+    const movingForward = delivDir === 1 ? vy < 0 : vy > 0;
+    if (movingForward && bias) {
+      const sign = bias === 'right' ? 1 : -1;
+      vx += -ny * sign * BIAS_K * bMult * spd;
+      vy +=  nx * sign * BIAS_K * bMult * spd;
+    }
     vx *= FRICTION; vy *= FRICTION;
     x += vx; y += vy;
     if (x < MAT.x || x > MAT.x+MAT.w || y < MAT.y || y > MAT.y+MAT.h) break;
@@ -591,11 +594,12 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
-  updateHUD(); startEnd();
+  resetCam(); updateHUD(); startEnd();
 }
 
 function startEnd() {
   bowls=[]; jack=null; turnIdx=0; lastJackHitter=null;
+  resetCam();
   state='place-jack';
   if (jackOwner === 2 && mode === 'vs-ai') {
     aiPlaceJack();
@@ -644,15 +648,116 @@ function deliverBowl(player, angle, speed) {
   bowls.push({x:bs.x, y:bs.y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
               player, bias:biasDir, stopped:false, offMat:false});
   state = 'moving';
+  cam.phase = 'tracking';
+  cam.pendingNext = false;
 }
 
 const BPP = 4; let ENDS = 6;
 
+// ── Camera follow ─────────────────────────────────────────────────
+let cam = {
+  phase: 'idle',   // 'idle' | 'tracking' | 'hold' | 'return'
+  x: W/2, y: H/2,
+  zoom: 1,
+  tx: W/2, ty: H/2,
+  tz: 1,
+  holdFrames: 0,
+  pendingNext: false
+};
+
+function resetCam() {
+  cam.phase = 'idle';
+  cam.x = W/2; cam.y = H/2; cam.zoom = 1;
+  cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
+  cam.holdFrames = 0; cam.pendingNext = false;
+}
+
+function updateCamera() {
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  if (cam.phase === 'tracking') {
+    // Find the moving bowl (most recently delivered)
+    const moving = [...bowls].reverse().find(b => !b.stopped && !b.offMat);
+    if (moving) {
+      const s = m2s(moving.x, moving.y);
+      // Target: centre camera on bowl with look-ahead toward far end
+      const lookAhead = -60; // pixels toward far end (up the screen)
+      cam.tx = s.x;
+      cam.ty = s.y + lookAhead;
+      // Zoom in as bowl travels further from delivery end
+      const progress = 1 - (moving.y - MAT.y) / MAT.h; // 0 at near, 1 at far
+      cam.tz = 1 + progress * 0.8; // up to 1.8x zoom
+    } else {
+      // Bowl stopped — transition to hold
+      cam.phase = 'hold';
+      cam.holdFrames = 100;
+      if (jack && !jack.offMat) {
+        const js = m2s(jack.x, jack.y);
+        cam.tx = js.x; cam.ty = js.y;
+      }
+      cam.tz = 1.6;
+    }
+    cam.x = lerp(cam.x, cam.tx, 0.08);
+    cam.y = lerp(cam.y, cam.ty, 0.08);
+    cam.zoom = lerp(cam.zoom, cam.tz, 0.06);
+
+  } else if (cam.phase === 'hold') {
+    cam.x = lerp(cam.x, cam.tx, 0.1);
+    cam.y = lerp(cam.y, cam.ty, 0.1);
+    cam.zoom = lerp(cam.zoom, cam.tz, 0.08);
+    cam.holdFrames--;
+    if (cam.holdFrames <= 0) {
+      cam.phase = 'return';
+      cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
+    }
+
+  } else if (cam.phase === 'return') {
+    cam.x = lerp(cam.x, W/2, 0.07);
+    cam.y = lerp(cam.y, H/2, 0.07);
+    cam.zoom = lerp(cam.zoom, 1, 0.07);
+    const settled = Math.abs(cam.zoom - 1) < 0.01 &&
+                    Math.abs(cam.x - W/2) < 2 &&
+                    Math.abs(cam.y - H/2) < 2;
+    if (settled) {
+      cam.x = W/2; cam.y = H/2; cam.zoom = 1;
+      cam.phase = 'idle';
+      if (cam.pendingNext) {
+        cam.pendingNext = false;
+        _doOnAllStopped();
+      }
+    }
+  }
+}
+
+function applyCameraTransform() {
+  if (cam.phase === 'idle') return;
+  ctx.translate(W/2, H/2);
+  ctx.scale(cam.zoom, cam.zoom);
+  ctx.translate(-cam.x, -cam.y);
+}
+
+function _doOnAllStopped() {
+  turnIdx++;
+  if (turnIdx >= BPP * 2) { finishEnd(); return; }
+  promptPlayer(playerForTurn(turnIdx));
+}
+
 function onAllStopped() {
   if (jack && jack.offSide) { handleJackOffSide(); return; }
-  turnIdx++;
-  if (turnIdx >= BPP*2) { finishEnd(); return; }
-  promptPlayer(playerForTurn(turnIdx));
+  // Trigger hold + return before next turn
+  if (cam.phase === 'tracking' || cam.phase === 'hold') {
+    cam.phase = 'hold';
+    cam.holdFrames = 100;
+    if (jack && !jack.offMat) {
+      const js = m2s(jack.x, jack.y);
+      cam.tx = js.x; cam.ty = js.y;
+    }
+    cam.tz = 1.6;
+    cam.pendingNext = true;
+    state = 'camera-return';
+    return;
+  }
+  _doOnAllStopped();
 }
 
 function handleJackOffSide() {
@@ -746,15 +851,20 @@ function drawFloor() {
 
 function draw() {
   ctx.clearRect(0,0,W,H);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(50, 0, W - 100, H); ctx.clip();
+  applyCameraTransform();
   drawFloor();
   drawMat();
   if (jack && !jack.offMat) drawJack();
   for (const b of bowls) drawBowl(b);
   if (state==='aim' && mouse.down && aimActive) drawAim();
+  ctx.restore();
   drawSidePanels();
 }
 
 function drawMat() {
+  ctx.save();
   const cx = MAT.x + MAT.w / 2;
 
   // Helpers — project mat-space geometry to screen
@@ -931,6 +1041,8 @@ function drawMat() {
   const topP=m2s(cx,MAT.y);
   ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.font='11px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(`End ${endNum} of ${ENDS}`, topP.x, topP.y-20);
+
+  ctx.restore(); // end mat clip region
 }
 
 function drawJack() {
@@ -1107,12 +1219,13 @@ function drawDistances() {
 // ── Main loop ─────────────────────────────────────────────────────
 function loop() {
   if (state==='moving') {
-    for (let s=0;s<3;s++) {
-      for (const b of bowls) stepObj(b, b.bias);
-      stepObj(jack, null);
-      stepCollisions();
-    }
+    for (const b of bowls) stepObj(b, b.bias);
+    stepObj(jack, null);
+    stepCollisions();
     if (allStopped()) onAllStopped();
+  }
+  if (state==='moving' || state==='camera-return') {
+    updateCamera();
   }
   draw();
   requestAnimationFrame(loop);
