@@ -909,9 +909,10 @@ function drawMat() {
               Math.floor(i/50)%2===0 ? C.mat : C.matAlt);
   }
 
-  // ── Wood Fenders — staple/U-shape: back board + two arms to dead line ──
-  const tDead_f = MAT.y + L.DEAD * MAT.h;
-  const bDead_f = MAT.y + (1 - L.DEAD) * MAT.h;
+  // ── Wood Fenders — staple/U-shape: back board + two arms to ditch line ──
+  // Fender + ditch line form a complete rectangle enclosing the ditch area
+  const tDitch_f = MAT.y + L.DITCH * MAT.h;
+  const bDitch_f = MAT.y + (1 - L.DITCH) * MAT.h;
 
   function drawFenderBoard(L4, R4, above) {
     const fw = R4.x - L4.x;
