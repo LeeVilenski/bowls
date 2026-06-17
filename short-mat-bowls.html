@@ -921,38 +921,36 @@ function drawMat() {
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillRect(L4.x + 3, fy + 3, fw, bh);
 
-    // Main board face — warm pine/oak gradient
-    const grad = ctx.createLinearGradient(L4.x, fy, R4.x, fy);
-    grad.addColorStop(0,   '#b8864e');
-    grad.addColorStop(0.18,'#d4a86a');
-    grad.addColorStop(0.45,'#c49a58');
-    grad.addColorStop(0.72,'#d4a86a');
-    grad.addColorStop(1,   '#b8864e');
+    // Main board face — off-white painted wood, like in the diagram
+    const grad = ctx.createLinearGradient(0, fy, 0, fy + bh);
+    grad.addColorStop(0,   '#e8e4da');
+    grad.addColorStop(0.4, '#f0ece2');
+    grad.addColorStop(1,   '#d4cfc4');
     ctx.fillStyle = grad;
     ctx.fillRect(L4.x, fy, fw, bh);
 
-    // Horizontal grain lines
-    ctx.strokeStyle = 'rgba(90,50,10,0.18)'; ctx.lineWidth = 1;
-    for (let dy = 4; dy < bh - 2; dy += 5) {
-      ctx.beginPath(); ctx.moveTo(L4.x + 2, fy + dy); ctx.lineTo(R4.x - 2, fy + dy); ctx.stroke();
+    // Subtle wood grain — vertical lines across the board
+    ctx.strokeStyle = 'rgba(160,150,130,0.25)'; ctx.lineWidth = 1;
+    for (let gx = L4.x + 10; gx < R4.x - 4; gx += 16) {
+      ctx.beginPath(); ctx.moveTo(gx, fy + 2); ctx.lineTo(gx, fy + bh - 2); ctx.stroke();
     }
 
-    // Top highlight edge
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    // Top highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.fillRect(L4.x, fy, fw, 2);
 
-    // Bottom shadow edge
-    ctx.fillStyle = 'rgba(0,0,0,0.30)';
-    ctx.fillRect(L4.x, fy + bh - 3, fw, 3);
+    // Bottom shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.20)';
+    ctx.fillRect(L4.x, fy + bh - 2, fw, 2);
 
     // Outer border
-    ctx.strokeStyle = 'rgba(80,45,10,0.7)'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(100,90,70,0.6)'; ctx.lineWidth = 1.5;
     ctx.strokeRect(L4.x, fy, fw, bh);
 
-    // Inner edge (mat side) — thin darker strip to show the board sits against the mat
-    ctx.fillStyle = 'rgba(0,0,0,0.20)';
-    if (above) ctx.fillRect(L4.x, fy + bh - 2, fw, 2);
-    else       ctx.fillRect(L4.x, fy, fw, 2);
+    // Inner shadow (mat-side edge)
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    if (above) ctx.fillRect(L4.x, fy + bh - 3, fw, 3);
+    else       ctx.fillRect(L4.x, fy, fw, 3);
   }
 
   drawFender(MAT.y,       true);  // far fender — board sits above the mat top edge
