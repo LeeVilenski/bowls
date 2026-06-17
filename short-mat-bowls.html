@@ -1199,6 +1199,106 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
+// ── Splash screen ─────────────────────────────────────────────────
+function buildSplash() {
+  function seg(containerId, options, getVal, setVal) {
+    const el = document.getElementById(containerId);
+    options.forEach(([label, val]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (val === getVal()) b.classList.add('sel');
+      b.onclick = () => {
+        setVal(val);
+        el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+      };
+      el.appendChild(b);
+    });
+  }
+
+  seg('sEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>splashCfg.ends, v=>splashCfg.ends=v);
+  seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player']], ()=>splashCfg.mode, v=>splashCfg.mode=v);
+  seg('sBias', [['Gentle',0.5],['Standard',1.0],['Strong',1.8],['Fierce',2.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
+
+  const szSlider = document.getElementById('sSizeSlider');
+  const szLbl    = document.getElementById('sSizeLbl');
+  szSlider.value = splashCfg.size;
+  szLbl.textContent = splashCfg.size;
+  szSlider.oninput = () => { splashCfg.size = +szSlider.value; szLbl.textContent = splashCfg.size; };
+
+  function buildSwatches(id, getIdx, setIdx) {
+    const el = document.getElementById(id);
+    BOWL_COLOURS.forEach((col, i) => {
+      const sw = document.createElement('div');
+      sw.className = 'sw' + (i === getIdx() ? ' sel' : '');
+      sw.style.background = col.main;
+      sw.title = col.name;
+      sw.onclick = () => {
+        setIdx(i);
+        el.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+      };
+      el.appendChild(sw);
+    });
+  }
+  buildSwatches('sP1', ()=>splashCfg.p1idx, i=>splashCfg.p1idx=i);
+  buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
+
+  const BG_OPTS = [
+    ['hardwood',     'Hardwood',      'bg-hardwood'],
+    ['green-carpet', 'Green Carpet',  'bg-green-carpet'],
+    ['blue-carpet',  'Blue Carpet',   'bg-blue-carpet'],
+    ['red-carpet',   'Red Carpet',    'bg-red-carpet'],
+  ];
+  const bgEl = document.getElementById('sBg');
+  BG_OPTS.forEach(([val, label, cls]) => {
+    const d = document.createElement('div');
+    d.className = 'bg-opt ' + cls + (val === splashCfg.bg ? ' sel' : '');
+    d.textContent = label;
+    d.onclick = () => {
+      splashCfg.bg = val;
+      bgEl.querySelectorAll('.bg-opt').forEach(x => x.classList.remove('sel'));
+      d.classList.add('sel');
+    };
+    bgEl.appendChild(d);
+  });
+
+  document.getElementById('btnStart').onclick = applyAndStart;
+}
+
+function applyAndStart() {
+  ENDS     = splashCfg.ends;
+  mode     = splashCfg.mode;
+  RB       = 10 + splashCfg.size;          // size 0→10px … size 5→15px
+  biasMult = splashCfg.biasVal;
+  bgStyle  = splashCfg.bg;
+
+  const col = BOWL_COLOURS[splashCfg.p1idx];
+  C.p1 = col.main; C.p1d = col.dark;
+  const col2 = BOWL_COLOURS[splashCfg.p2idx];
+  C.p2 = col2.main; C.p2d = col2.dark;
+
+  // Sync in-game bias slider
+  const sl = document.getElementById('biasSlider');
+  sl.value = biasMult;
+  document.getElementById('biasValLabel').textContent = biasMult.toFixed(1) + '×';
+
+  // Sync mode button + HUD label
+  document.getElementById('btnMode').textContent = mode === 'vs-ai' ? 'vs AI' : '2P';
+  document.getElementById('lbl2').textContent    = mode === 'vs-ai' ? 'AI' : 'P2';
+
+  document.getElementById('splash').classList.add('hidden');
+  startGame();
+}
+
+function showSplash() {
+  clearTimeout(aiTimer);
+  state = 'idle';
+  document.getElementById('splash').classList.remove('hidden');
+}
+
+buildSplash();
+showSplash();
+
 requestAnimationFrame(loop);
 </script>
 </body>
