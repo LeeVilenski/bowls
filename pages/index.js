@@ -111,14 +111,14 @@ function enrichXpGain(xpGain,muscleGroups){
 const C={bg:"#f4f5f7",surface:"#ffffff",border:"#e5e7eb",text:"#111827",textSecondary:"#374151",textMuted:"#6b7280",textFaint:"#9ca3af",orange:"#ea580c",orangeLight:"#fff7ed",orangeBorder:"#fed7aa",blue:"#2563eb",blueLight:"#eff6ff",blueBorder:"#bfdbfe",green:"#16a34a",greenLight:"#f0fdf4",greenBorder:"#bbf7d0",red:"#dc2626",redLight:"#fef2f2",redBorder:"#fecaca"};
 const S={
   page:{fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:C.bg,minHeight:"100vh",color:C.text,maxWidth:520,margin:"0 auto"},
-  header:{background:C.surface,padding:"24px 20px 0",borderBottom:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"},
-  body:{padding:"20px 16px 80px"},
-  card:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:16,marginBottom:12,boxShadow:"0 1px 2px rgba(0,0,0,0.04)"},
+  header:{background:C.surface,padding:"14px 16px 0",borderBottom:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"},
+  body:{padding:"14px 12px 80px"},
+  card:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px",marginBottom:10,boxShadow:"0 1px 2px rgba(0,0,0,0.04)"},
   sectionLabel:{fontSize:11,color:C.textMuted,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:12,fontWeight:"600"},
   navBtn:(a)=>({flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:a?`2px solid ${C.blue}`:"2px solid transparent",color:a?C.blue:C.textMuted,fontSize:10,letterSpacing:"0.05em",textTransform:"uppercase",cursor:"pointer",fontFamily:"inherit",fontWeight:a?"600":"400"}),
   btn:(v="primary")=>({padding:"10px 18px",borderRadius:8,cursor:"pointer",fontSize:13,fontFamily:"inherit",fontWeight:"600",border:"none",...(v==="primary"?{background:C.blue,color:"#fff"}:{}),...(v==="ghost"?{background:"none",color:C.textMuted,border:`1px solid ${C.border}`}:{}),...(v==="danger"?{background:"none",color:C.red,border:`1px solid ${C.redBorder}`}:{}),...(v==="sm"?{padding:"6px 12px",fontSize:12,background:C.blue,color:"#fff",border:"none"}:{})}),
   input:{width:"100%",background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 12px",color:C.text,fontSize:14,boxSizing:"border-box",fontFamily:"inherit",outline:"none"},
-  statCard:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 12px",textAlign:"center",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"},
+  statCard:{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 8px",textAlign:"center",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"},
 };
 
 // labels[i] / formatValue(displayValues[i]) drive the hover/tap tooltip;
@@ -428,8 +428,8 @@ function RunsTab({runs}){
 
   const statCard=(value,label,color=C.textSecondary)=>(
     <div style={S.statCard}>
-      <div style={{fontSize:18,fontWeight:"700",color}}>{value}</div>
-      <div style={{fontSize:11,color:C.textMuted,marginTop:4,fontWeight:"500"}}>{label}</div>
+      <div style={{fontSize:16,fontWeight:"700",color}}>{value}</div>
+      <div style={{fontSize:10,color:C.textMuted,marginTop:2,fontWeight:"500"}}>{label}</div>
     </div>
   );
 
@@ -979,8 +979,8 @@ function ExercisePills({notes,onEdit,allExercises}){
   const entries=Object.entries(notes.exercises||{}).filter(([,v])=>v&&(typeof v==="object"?v.sets?.some(s=>s.reps):true));
   return(
     <div>
-      {entries.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>{entries.map(([k,v])=>{const ex=allExercises.find(e=>e.id===k);return ex?<div key={k} style={{background:C.blueLight,border:`1px solid ${C.blueBorder}`,borderRadius:20,padding:"3px 10px",fontSize:12,color:C.blue,fontWeight:"500",display:"inline-flex",gap:4}}><span style={{color:"#1d4ed8"}}>{ex.label}</span><span style={{fontWeight:"700"}}>{summariseSets(v)}</span></div>:null;})}</div>}
-      {notes.sessionNotes&&<div style={{fontSize:13,color:C.textMuted,fontStyle:"italic",marginBottom:6}}>{notes.sessionNotes}</div>}
+      {entries.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:4}}>{entries.map(([k,v])=>{const ex=allExercises.find(e=>e.id===k);return ex?<div key={k} style={{background:C.blueLight,border:`1px solid ${C.blueBorder}`,borderRadius:20,padding:"2px 8px",fontSize:11,color:C.blue,fontWeight:"500",display:"inline-flex",gap:3}}><span style={{color:"#1d4ed8"}}>{ex.label}</span><span style={{fontWeight:"700"}}>{summariseSets(v)}</span></div>:null;})}</div>}
+      {notes.sessionNotes&&<div style={{fontSize:12,color:C.textMuted,fontStyle:"italic",marginBottom:4}}>{notes.sessionNotes}</div>}
       <button onClick={onEdit} style={{background:"none",border:"none",color:C.textFaint,fontSize:12,cursor:"pointer",padding:0,fontFamily:"inherit"}}>edit</button>
     </div>
   );
@@ -1758,8 +1758,8 @@ export default function App(){
   const maxMonthStrengthSec=Math.max(...monthlyStrength.map(m=>m.durationSec),1);
   const statCard=(value,label,color=C.textSecondary)=>(
     <div style={S.statCard}>
-      <div style={{fontSize:18,fontWeight:"700",color}}>{value}</div>
-      <div style={{fontSize:11,color:C.textMuted,marginTop:4,fontWeight:"500"}}>{label}</div>
+      <div style={{fontSize:16,fontWeight:"700",color}}>{value}</div>
+      <div style={{fontSize:10,color:C.textMuted,marginTop:2,fontWeight:"500"}}>{label}</div>
     </div>
   );
 
@@ -1779,30 +1779,22 @@ export default function App(){
     <Head><title>Strength Tracker</title><meta name="viewport" content="width=device-width, initial-scale=1"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/></Head>
     <div style={S.page}>
       <div style={S.header}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div>
-            <div style={{fontSize:11,color:C.textFaint,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4,fontWeight:"500"}}>Strava · Live</div>
-            <div style={{fontSize:24,fontWeight:"700",color:C.text,letterSpacing:"-0.02em"}}>Strength Tracker</div>
-            {firstName&&<div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
-              {profileUrl&&<img src={profileUrl} alt="" style={{width:20,height:20,borderRadius:"50%"}}/>}
-              <div style={{fontSize:12,color:C.textMuted,fontWeight:"500"}}>Hey {firstName}</div>
-            </div>}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {profileUrl&&<img src={profileUrl} alt="" style={{width:28,height:28,borderRadius:"50%"}}/>}
+            <div>
+              <div style={{fontSize:18,fontWeight:"700",color:C.text,letterSpacing:"-0.02em"}}>Strength Tracker</div>
+              <div style={{fontSize:11,color:C.textFaint,fontWeight:"500"}}>{firstName?`Hey ${firstName} · `:""}<span style={{color:C.orange,fontWeight:"600"}}>{totalRunKm.toFixed(0)}km</span> · {runs.length} runs</div>
+            </div>
           </div>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-            <div style={{textAlign:"right",background:C.orangeLight,border:`1px solid ${C.orangeBorder}`,borderRadius:10,padding:"8px 14px"}}>
-              <div style={{fontSize:22,color:C.orange,fontWeight:"700",lineHeight:1}}>{totalRunKm.toFixed(0)}km</div>
-              <div style={{fontSize:11,color:"#c2410c",marginTop:2}}>{runs.length} runs total</div>
-            </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
-              <button onClick={forceSync} disabled={syncing} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",fontSize:11,color:C.textMuted,cursor:"pointer",fontFamily:"inherit",opacity:syncing?0.6:1,whiteSpace:"nowrap"}}>
-                {syncing?"Syncing…":"⟳ Sync Strava"}
-              </button>
-              <a href="/api/auth/logout" style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",fontSize:11,color:C.textMuted,cursor:"pointer",fontFamily:"inherit",textDecoration:"none",textAlign:"center",whiteSpace:"nowrap"}}>Sign out</a>
-              <button onClick={deleteAccount} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",fontSize:11,color:C.textFaint,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Delete my data</button>
-            </div>
+          <div style={{display:"flex",gap:4,alignItems:"center"}}>
+            <button onClick={forceSync} disabled={syncing} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 8px",fontSize:10,color:C.textMuted,cursor:"pointer",fontFamily:"inherit",opacity:syncing?0.6:1,whiteSpace:"nowrap"}}>
+              {syncing?"Syncing…":"⟳ Sync"}
+            </button>
+            <a href="/api/auth/logout" style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 8px",fontSize:10,color:C.textMuted,cursor:"pointer",fontFamily:"inherit",textDecoration:"none",whiteSpace:"nowrap"}}>Out</a>
           </div>
         </div>
-        <div style={{display:"flex",marginTop:20}}>
+        <div style={{display:"flex",marginTop:12}}>
           {["dashboard","muscles","progress","strength","runs"].map(v=>(
             <button key={v} onClick={()=>setView(v)} style={S.navBtn(view===v)}>{v}</button>
           ))}
@@ -1822,9 +1814,9 @@ export default function App(){
           <PastChallengesSection monthlyChallenges={monthlyChallenges} currentMonthKey={monthKey} notes={notes} strength={[...strength,...manualSessions]} expanded={showPastChallenges} onToggle={()=>setShowPastChallenges(!showPastChallenges)}/>
 
           {/* Top stat row */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-            {[{label:"Strength sessions",value:allStrength.length,color:C.blue},{label:"Last session",value:daysSince===null?"Never":daysSince===0?"Today":`${daysSince}d ago`,color:daysSince===null||daysSince>14?C.red:daysSince>7?"#d97706":C.green},{label:"Run:strength",value:`${ratio}:1`,color:ratio>10?C.red:ratio>5?"#d97706":C.green}].map(s=>(
-              <div key={s.label} style={S.statCard}><div style={{fontSize:s.value.toString().length>5?13:22,fontWeight:"700",color:s.color,paddingTop:2}}>{s.value}</div><div style={{fontSize:11,color:C.textMuted,marginTop:4,fontWeight:"500"}}>{s.label}</div></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+            {[{label:"Strength",value:allStrength.length,color:C.blue},{label:"Last session",value:daysSince===null?"Never":daysSince===0?"Today":`${daysSince}d ago`,color:daysSince===null||daysSince>14?C.red:daysSince>7?"#d97706":C.green},{label:"Run:strength",value:`${ratio}:1`,color:ratio>10?C.red:ratio>5?"#d97706":C.green}].map(s=>(
+              <div key={s.label} style={S.statCard}><div style={{fontSize:s.value.toString().length>5?12:18,fontWeight:"700",color:s.color,paddingTop:1}}>{s.value}</div><div style={{fontSize:10,color:C.textMuted,marginTop:2,fontWeight:"500"}}>{s.label}</div></div>
             ))}
           </div>
 
@@ -1934,30 +1926,28 @@ export default function App(){
 
         {view==="strength"&&(<>
           {allStrength.length>0&&(<>
-            <div style={S.sectionLabel}>{currentYear} so far</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-              {statCard(ytdStrength.length,"YTD sessions",C.blue)}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+              {statCard(ytdStrength.length,`${currentYear} sessions`,C.blue)}
               {statCard(fmtDuration(ytdStrengthSec),"YTD time")}
               {statCard(fmtDuration(ytdAvgStrengthSec),"Avg session")}
             </div>
 
-            <div style={S.sectionLabel}>All time</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-              {statCard(allStrength.length,"Total sessions",C.blue)}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+              {statCard(allStrength.length,"All-time total",C.blue)}
               {statCard(fmtDuration(totalStrengthSec),"Total time")}
               {statCard(fmtDuration(avgStrengthSec),"Avg session")}
             </div>
 
             {monthlyStrength.length>0&&(<>
               <div style={S.sectionLabel}>By month</div>
-              <div style={S.card}>
+              <div style={{...S.card,padding:12}}>
                 {monthlyStrength.map((m,idx)=>(
-                  <div key={m.key} style={{marginBottom:idx<monthlyStrength.length-1?10:0}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3,gap:8}}>
-                      <span style={{fontSize:13,color:C.text,fontWeight:"500",whiteSpace:"nowrap"}}>{monthLabel(m.key)}</span>
-                      <span style={{fontSize:12,color:C.textMuted,whiteSpace:"nowrap"}}>{m.count} session{m.count===1?"":"s"} · {fmtDuration(m.durationSec)}</span>
+                  <div key={m.key} style={{marginBottom:idx<monthlyStrength.length-1?8:0}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:2,gap:6}}>
+                      <span style={{fontSize:12,color:C.text,fontWeight:"500",whiteSpace:"nowrap"}}>{monthLabel(m.key)}</span>
+                      <span style={{fontSize:11,color:C.textMuted,whiteSpace:"nowrap"}}>{m.count} session{m.count===1?"":"s"} · {fmtDuration(m.durationSec)}</span>
                     </div>
-                    <div style={{height:6,background:C.bg,borderRadius:3,overflow:"hidden"}}>
+                    <div style={{height:5,background:C.bg,borderRadius:3,overflow:"hidden"}}>
                       <div style={{height:"100%",width:`${Math.max(2,(m.durationSec/maxMonthStrengthSec)*100)}%`,background:C.blue,borderRadius:3}}/>
                     </div>
                   </div>
@@ -1990,23 +1980,24 @@ export default function App(){
           {sortedStrength.map(s=>{
             const actNotes=notes[s.id];
             return(<div key={s.id} style={{...S.card, border:s.isManual?`1px solid ${C.blueBorder}`:S.card.border}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <div style={{flex:1,minWidth:0}}><EditableTitle value={s.name} onSave={(newName)=>renameSession(s,newName)}/></div>
                     {s.isManual&&<span style={{fontSize:10,background:C.blueLight,color:C.blue,border:`1px solid ${C.blueBorder}`,borderRadius:20,padding:"1px 7px",fontWeight:"600",flexShrink:0}}>Manual</span>}
                   </div>
-                  <div style={{fontSize:12,color:C.textMuted,marginTop:3}}>{dayLabel(s.date)}{(!s.isManual||s.stravaActivityId)&&<a href={`https://www.strava.com/activities/${s.isManual?s.stravaActivityId:s.id}`} target="_blank" rel="noopener noreferrer" style={{marginLeft:8,color:C.textFaint,textDecoration:"none"}}>↗ Strava</a>}</div>
+                  <div style={{fontSize:12,color:C.textMuted,marginTop:2,display:"flex",alignItems:"center",flexWrap:"wrap",gap:"0 8px"}}>{dayLabel(s.date)}{(!s.isManual||s.stravaActivityId)&&<a href={`https://www.strava.com/activities/${s.isManual?s.stravaActivityId:s.id}`} target="_blank" rel="noopener noreferrer" style={{color:C.textFaint,textDecoration:"none"}}>↗ Strava</a>}{(s.avg_hr||s.max_hr)&&<span style={{display:"inline-flex",alignItems:"center",gap:6}}>{s.avg_hr&&<span style={{color:hrColor(s.avg_hr),fontWeight:"600",fontSize:12}}>♥ {Math.round(s.avg_hr)}</span>}{s.max_hr&&<span style={{color:hrColor(s.max_hr),fontWeight:"500",fontSize:11}}>peak {Math.round(s.max_hr)}</span>}</span>}</div>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0}}>
-                  <div style={{fontSize:16,color:C.blue,fontWeight:"600"}}>{fmtDuration(s.duration)}</div>
-                  {s.calories>0&&<div style={{fontSize:12,color:C.textFaint}}>{s.calories}kcal</div>}
-                  {s.isManual&&!s.stravaActivityId&&<button onClick={()=>pushManualSessionToStrava(s)} disabled={pushingToStrava===s.id} style={{background:"none",border:`1px solid ${C.blueBorder}`,borderRadius:6,padding:"2px 8px",color:C.blue,fontSize:11,cursor:pushingToStrava===s.id?"default":"pointer",fontFamily:"inherit",marginTop:4,display:"block",marginLeft:"auto"}}>{pushingToStrava===s.id?"Pushing…":"Push to Strava"}</button>}
-                  {s.isManual&&<button onClick={()=>deleteManualSession(s.id)} style={{background:"none",border:"none",color:C.textFaint,fontSize:11,cursor:"pointer",padding:0,fontFamily:"inherit",marginTop:4}}>delete</button>}
-                  {!s.isManual&&<button onClick={()=>removeCachedActivity(s.id)} style={{background:"none",border:"none",color:C.textFaint,fontSize:11,cursor:"pointer",padding:0,fontFamily:"inherit",marginTop:4}}>remove</button>}
+                  <div style={{fontSize:14,color:C.blue,fontWeight:"600"}}>{fmtDuration(s.duration)}</div>
+                  {s.calories>0&&<div style={{fontSize:11,color:C.textFaint}}>{s.calories}kcal</div>}
+                  <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:2}}>
+                    {s.isManual&&!s.stravaActivityId&&<button onClick={()=>pushManualSessionToStrava(s)} disabled={pushingToStrava===s.id} style={{background:"none",border:`1px solid ${C.blueBorder}`,borderRadius:6,padding:"2px 8px",color:C.blue,fontSize:10,cursor:pushingToStrava===s.id?"default":"pointer",fontFamily:"inherit"}}>{pushingToStrava===s.id?"Pushing…":"Push to Strava"}</button>}
+                    {s.isManual&&<button onClick={()=>deleteManualSession(s.id)} style={{background:"none",border:"none",color:C.textFaint,fontSize:11,cursor:"pointer",padding:0,fontFamily:"inherit"}}>delete</button>}
+                    {!s.isManual&&<button onClick={()=>removeCachedActivity(s.id)} style={{background:"none",border:"none",color:C.textFaint,fontSize:11,cursor:"pointer",padding:0,fontFamily:"inherit"}}>remove</button>}
+                  </div>
                 </div>
               </div>
-              {(s.avg_hr||s.max_hr)&&<div style={{display:"flex",gap:20,marginBottom:12,background:C.bg,borderRadius:8,padding:"10px 14px"}}>{s.avg_hr&&<div><div style={{fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:"500"}}>Avg HR</div><div style={{fontSize:24,color:hrColor(s.avg_hr),fontWeight:"700"}}>{Math.round(s.avg_hr)}</div></div>}{s.max_hr&&<div><div style={{fontSize:11,color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:"500"}}>Max HR</div><div style={{fontSize:24,color:hrColor(s.max_hr),fontWeight:"700"}}>{Math.round(s.max_hr)}</div></div>}</div>}
               {enriching===s.id?<EnrichForm form={enrichForm} setForm={setEnrichForm} onSave={()=>saveNotesFixed(s.id)} onCancel={()=>setEnriching(null)} saving={saving} notes={notes} activityId={s.id} allExercises={allExercises}/>:actNotes?<ExercisePills notes={actNotes} onEdit={()=>openEnrich(s)} allExercises={allExercises}/>:<button onClick={()=>openEnrich(s)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"5px 12px",color:C.textMuted,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>+ add exercise breakdown</button>}
             </div>);
           })}
@@ -2014,6 +2005,9 @@ export default function App(){
 
         {view==="runs"&&<RunsTab runs={runs}/>}
 
+        <div style={{textAlign:"center",paddingTop:16,paddingBottom:8}}>
+          <button onClick={deleteAccount} style={{background:"none",border:"none",color:C.textFaint,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Delete my data</button>
+        </div>
       </div>
     </div>
     <ToastStack pbs={pbs} runPb={runPb} xpGain={xpGain} challengeDone={challengeDone} stravaError={stravaError} allExercises={allExercises} muscleGroups={allMuscleGroups} onDismissPbs={()=>setPbs([])} onDismissRunPb={()=>setRunPb(null)} onDismissXp={()=>setXpGain(null)} onDismissChallenge={()=>setChallengeDone(null)} onDismissStrava={()=>setStravaError(null)}/>
