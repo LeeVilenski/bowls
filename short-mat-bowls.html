@@ -1369,8 +1369,25 @@ function getPos(e) {
   return {x:(cx-r.left)*sx, y:(cy-r.top)*sy};
 }
 
+function hitPanelBtn(p, cx) {
+  return p.x >= cx - PANEL_BTN.w/2 && p.x <= cx + PANEL_BTN.w/2 &&
+         p.y >= PANEL_BTN.y && p.y <= PANEL_BTN.y + PANEL_BTN.h;
+}
+
 function handlePointerDown(p) {
   mouse = { x: p.x, y: p.y, down: true };
+
+  // Canvas-drawn panel buttons
+  const SP=38, SC=19;
+  if (hitPanelBtn(p, SC)) {
+    mode = mode==='vs-ai'?'vs-player':'vs-ai';
+    document.getElementById('lbl2').textContent = mode==='vs-ai'?'AI':'P2';
+    mouse.down = false; return;
+  }
+  if (hitPanelBtn(p, W-SC)) {
+    showSplash();
+    mouse.down = false; return;
+  }
 
   if (state === 'place-jack') {
     const mm = s2m(p.x, p.y);
