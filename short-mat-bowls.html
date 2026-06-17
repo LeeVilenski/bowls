@@ -328,7 +328,8 @@ function stepCollisions() {
   }
 }
 
-function collide(a, b, ra, rb, rest) {
+// ma/mb are relative masses (bowl=1, jack=JACK_MASS)
+function collide(a, b, ra, rb, rest, ma=1, mb=1) {
   const dx = b.x-a.x, dy = b.y-a.y;
   const dist = Math.hypot(dx, dy);
   const minD = ra + rb;
@@ -336,14 +337,17 @@ function collide(a, b, ra, rb, rest) {
   const nx = dx/dist, ny = dy/dist;
   const rel = (a.vx-b.vx)*nx + (a.vy-b.vy)*ny;
   if (rel > 0) {
-    const imp = rel * rest;
-    a.vx -= imp*nx; a.vy -= imp*ny;
-    b.vx += imp*nx; b.vy += imp*ny;
+    const imp = 2 * rel * rest / (1/ma + 1/mb);
+    a.vx -= imp/ma*nx; a.vy -= imp/ma*ny;
+    b.vx += imp/mb*nx; b.vy += imp/mb*ny;
     a.stopped = false; b.stopped = false;
   }
-  const ov = (minD-dist)/2;
-  a.x -= nx*ov; a.y -= ny*ov;
-  b.x += nx*ov; b.y += ny*ov;
+  // Mass-weighted separation so heavier object barely budges
+  const ov = minD - dist;
+  a.x -= nx * ov * mb/(ma+mb);
+  a.y -= ny * ov * mb/(ma+mb);
+  b.x += nx * ov * ma/(ma+mb);
+  b.y += ny * ov * ma/(ma+mb);
 }
 
 // ── Trajectory simulation (preview & AI) ─────────────────────────
