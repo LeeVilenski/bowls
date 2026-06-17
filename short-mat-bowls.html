@@ -495,7 +495,10 @@ function stepCollisions() {
     if (jack && !jack.offMat && !jack.offSide) {
       const jvxBefore = jack.vx, jvyBefore = jack.vy;
       collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
-      if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) lastJackHitter = a.player;
+      if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) {
+        lastJackHitter = a.player;
+        a.toucher = true;
+      }
     }
   }
 }
