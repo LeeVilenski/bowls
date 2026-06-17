@@ -1459,12 +1459,6 @@ canvas.addEventListener('touchmove',  e => { e.preventDefault(); handlePointerMo
 canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp(); },            { passive: false });
 
 // Buttons
-document.getElementById('btnMode').addEventListener('click',()=>{
-  mode=mode==='vs-ai'?'vs-player':'vs-ai';
-  document.getElementById('btnMode').textContent=mode==='vs-ai'?'vs AI':'2P';
-  document.getElementById('lbl2').textContent=mode==='vs-ai'?'AI':'P2';
-});
-
 document.getElementById('btnBias').addEventListener('click',()=>{
   biasDir=biasDir==='right'?'left':'right';
   document.getElementById('btnBias').textContent=biasDir==='right'?'↗ R':'↖ L';
