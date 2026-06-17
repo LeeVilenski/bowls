@@ -317,6 +317,20 @@ const C = {
 // ── Game state ────────────────────────────────────────────────────
 let mode     = 'vs-ai';
 let state    = 'idle';
+let bgStyle  = 'hardwood';
+
+const BOWL_COLOURS = [
+  { name:'Blue',   main:'#3b82f6', dark:'#1d4ed8' },
+  { name:'Red',    main:'#ef4444', dark:'#b91c1c' },
+  { name:'Black',  main:'#6b7280', dark:'#374151' },
+  { name:'Gold',   main:'#f59e0b', dark:'#92400e' },
+  { name:'Green',  main:'#22c55e', dark:'#15803d' },
+  { name:'White',  main:'#e2e8f0', dark:'#94a3b8' },
+  { name:'Purple', main:'#a855f7', dark:'#6b21a8' },
+  { name:'Orange', main:'#f97316', dark:'#c2410c' },
+];
+
+let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:1.0, p1idx:0, p2idx:1, bg:'hardwood' };
 let biasDir  = 'right';
 let biasMult = 1.0;
 
