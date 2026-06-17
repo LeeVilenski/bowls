@@ -710,22 +710,35 @@ function gameOver() {
 
 // ── Drawing ───────────────────────────────────────────────────────
 function drawFloor() {
-  // Hardwood floor — warm oak planks
-  const plankH = 42, baseColors = ['#8B5C20','#7A5018','#96622A','#8A5A1E'];
-  for (let y = 0; y < H; y += plankH) {
-    const ci = Math.floor(y / plankH) % baseColors.length;
-    ctx.fillStyle = baseColors[ci];
-    ctx.fillRect(0, y, W, plankH);
-    // Subtle grain lines within each plank
-    ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
-    for (let g = 6; g < plankH; g += 10) {
-      ctx.beginPath(); ctx.moveTo(0, y+g); ctx.lineTo(W, y+g); ctx.stroke();
+  if (bgStyle === 'hardwood') {
+    const plankH = 42, cols = ['#8B5C20','#7A5018','#96622A','#8A5A1E'];
+    for (let y = 0; y < H; y += plankH) {
+      ctx.fillStyle = cols[Math.floor(y/plankH) % cols.length];
+      ctx.fillRect(0, y, W, plankH);
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+      for (let g = 6; g < plankH; g += 10) {
+        ctx.beginPath(); ctx.moveTo(0,y+g); ctx.lineTo(W,y+g); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.30)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
     }
-    // Plank gap
-    ctx.strokeStyle = 'rgba(0,0,0,0.30)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  } else {
+    const CC = {
+      'green-carpet':  ['#1a5c2a','#1d6430'],
+      'blue-carpet':   ['#12305e','#163568'],
+      'red-carpet':    ['#5c1414','#681818'],
+    };
+    const [c1, c2] = CC[bgStyle] || CC['green-carpet'];
+    for (let y = 0; y < H; y += 18) {
+      ctx.fillStyle = Math.floor(y/18)%2===0 ? c1 : c2;
+      ctx.fillRect(0, y, W, 18);
+    }
+    // Diagonal pile sheen
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+    for (let x = -H; x < W+H; x += 9) {
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke();
+    }
   }
-  // Slight warm vignette overlay so edges feel like a room
   const vig = ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.85);
   vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.35)');
   ctx.fillStyle = vig; ctx.fillRect(0,0,W,H);
