@@ -1370,9 +1370,19 @@ document.getElementById('biasSlider').addEventListener('input', e => {
   document.getElementById('biasValLabel').textContent = biasMult.toFixed(1) + '×';
 });
 
-// Service worker (PWA offline support)
+// Service worker (PWA offline support) — updateViaCache:none bypasses browser HTTP
+// cache when checking for SW updates, so new deploys activate on next page load
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const sw = reg.installing;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'activated') window.location.reload();
+        });
+      });
+    })
+    .catch(() => {});
 }
 
 // ── Splash screen ─────────────────────────────────────────────────
