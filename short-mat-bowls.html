@@ -785,19 +785,20 @@ function drawSidePanels() {
 }
 
 function drawDistances() {
-  const dists = bowls
-    .filter(b=>!b.offMat)
-    .map(b=>({b, d:Math.hypot(b.x-jack.x, b.y-jack.y)}))
+  const dists=bowls.filter(b=>!b.offMat)
+    .map(b=>({b,d:Math.hypot(b.x-jack.x,b.y-jack.y)}))
     .sort((a,b)=>a.d-b.d);
+  const js=m2s(jack.x,jack.y);
   for (const e of dists.slice(0,6)) {
-    ctx.beginPath(); ctx.moveTo(e.b.x,e.b.y); ctx.lineTo(jack.x,jack.y);
+    const bs=m2s(e.b.x,e.b.y);
+    ctx.beginPath(); ctx.moveTo(bs.x,bs.y); ctx.lineTo(js.x,js.y);
     ctx.strokeStyle=e.b.player===1?'rgba(96,165,250,0.22)':'rgba(248,113,113,0.22)';
     ctx.lineWidth=1; ctx.stroke();
   }
   if (dists.length) {
-    const lb=dists[0].b;
+    const lb=dists[0].b, lbs=m2s(lb.x,lb.y), lr=perspR(lb.y,RB);
     ctx.fillStyle='#fbbf24'; ctx.font='12px serif';
-    ctx.textAlign='center'; ctx.fillText('★',lb.x,lb.y-18);
+    ctx.textAlign='center'; ctx.fillText('★',lbs.x,lbs.y-lr-4);
   }
 }
 
