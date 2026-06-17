@@ -721,19 +721,24 @@ function drawMat() {
     vLineM(cx, lo, hi, 'rgba(255,220,50,0.5)', 4);
   }
 
-  // Delivery mat — yellow, near (delivery) end only; not placed at jack end
+  // Delivery mat — black with wide gray border, near (delivery) end only
   const [dmY1, dmY2] = delivDir === 1 ? [bMatE, MAT.y+MAT.h] : [MAT.y, tMatE];
   {
     const my1=Math.min(dmY1,dmY2), my2=Math.max(dmY1,dmY2);
     const mw=Math.round(356/1830*MAT.w);
+    const brd=Math.round(mw/5); // border ~1/5 of mat width
+    // Outer gray fill
     const tl=m2s(cx-mw/2,my1), tr=m2s(cx+mw/2,my1);
     const br=m2s(cx+mw/2,my2), bl=m2s(cx-mw/2,my2);
-    ctx.fillStyle='rgba(20,20,20,0.92)';
-    ctx.strokeStyle='rgba(140,140,140,0.9)'; ctx.lineWidth=1.5;
-    ctx.beginPath();
-    ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y);
-    ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='rgba(150,150,150,0.85)';
+    ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y);
+    ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y); ctx.closePath(); ctx.fill();
+    // Inner black surface inset by border width
+    const itl=m2s(cx-mw/2+brd,my1+brd), itr=m2s(cx+mw/2-brd,my1+brd);
+    const ibr=m2s(cx+mw/2-brd,my2-brd), ibl=m2s(cx-mw/2+brd,my2-brd);
+    ctx.fillStyle='rgba(20,20,20,0.95)';
+    ctx.beginPath(); ctx.moveTo(itl.x,itl.y); ctx.lineTo(itr.x,itr.y);
+    ctx.lineTo(ibr.x,ibr.y); ctx.lineTo(ibl.x,ibl.y); ctx.closePath(); ctx.fill();
   }
 
   // Centre block (projected quad)
