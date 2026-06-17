@@ -1445,11 +1445,6 @@ document.getElementById('btnBias').addEventListener('click',()=>{
   document.getElementById('btnBias').textContent=biasDir==='right'?'↗ R':'↖ L';
 });
 
-document.getElementById('biasSlider').addEventListener('input', e => {
-  biasMult = parseFloat(e.target.value);
-  document.getElementById('biasValLabel').textContent = biasMult.toFixed(1) + '×';
-});
-
 // Service worker (PWA offline support) — updateViaCache:none bypasses browser HTTP
 // cache when checking for SW updates, so new deploys activate on next page load
 if ('serviceWorker' in navigator) {
