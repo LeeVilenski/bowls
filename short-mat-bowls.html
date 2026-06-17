@@ -1217,39 +1217,62 @@ function drawBowl(b) {
 }
 
 function drawAim() {
-  const bsm=bowlStart(), bss=m2s(bsm.x,bsm.y);
-  const mm=s2m(mouse.x,mouse.y); if (!mm) return;
-  const dx=mm.x-bsm.x, dy=mm.y-bsm.y;
-  const distScreen=Math.hypot(mouse.x-bss.x, mouse.y-bss.y);
-  if (distScreen<8) return;
-  const angle=Math.atan2(dy,dx);
-  const power=Math.min(distScreen,230), pct=power/230;
-  const speed=(power/230)*MAX_SPD;
+  const bsm = bowlStart(), bss = m2s(bsm.x, bsm.y);
+  const angle = aimAngle ?? defaultAimAngle();
 
-  const path=simPath(bsm.x,bsm.y,angle,speed,biasDir,biasMult);
-  if (path.length>1) {
-    const ps0=m2s(path[0].x,path[0].y);
-    ctx.beginPath(); ctx.moveTo(ps0.x,ps0.y);
-    for (const pt of path) { const sp=m2s(pt.x,pt.y); ctx.lineTo(sp.x,sp.y); }
-    ctx.strokeStyle='rgba(255,225,50,0.45)'; ctx.lineWidth=2;
+  // Use live swipe speed if player is actively swiping up, else show 60% preview
+  const previewSpeed = aimLiveSpeed > 0
+    ? Math.min(1, (aimLiveSpeed - MIN_SWIPE_SPEED) / (MAX_SWIPE_SPEED - MIN_SWIPE_SPEED)) * MAX_SPD
+    : MAX_SPD * 0.6;
+  const pct = previewSpeed / MAX_SPD;
+
+  // Trajectory preview
+  const path = simPath(bsm.x, bsm.y, angle, previewSpeed, biasDir, biasMult);
+  if (path.length > 1) {
+    const ps0 = m2s(path[0].x, path[0].y);
+    ctx.beginPath(); ctx.moveTo(ps0.x, ps0.y);
+    for (const pt of path) { const sp = m2s(pt.x, pt.y); ctx.lineTo(sp.x, sp.y); }
+    ctx.strokeStyle = 'rgba(255,225,50,0.35)'; ctx.lineWidth = 2;
     ctx.setLineDash([5,4]); ctx.stroke(); ctx.setLineDash([]);
-    const ep=path[path.length-1], eps=m2s(ep.x,ep.y), er=perspR(ep.y,RB);
-    ctx.beginPath(); ctx.arc(eps.x,eps.y,er,0,Math.PI*2);
-    ctx.fillStyle=playerForTurn(turnIdx)===1?'rgba(59,130,246,0.4)':'rgba(239,68,68,0.4)';
+    const ep = path[path.length-1], eps = m2s(ep.x, ep.y), er = perspR(ep.y, RB);
+    ctx.beginPath(); ctx.arc(eps.x, eps.y, er, 0, Math.PI*2);
+    ctx.fillStyle = playerForTurn(turnIdx)===1 ? 'rgba(59,130,246,0.35)' : 'rgba(239,68,68,0.35)';
     ctx.fill();
   }
 
-  // Direction stub projected into mat space
-  const stub=m2s(bsm.x+dx*0.15, bsm.y+dy*0.15);
-  ctx.beginPath(); ctx.moveTo(bss.x,bss.y); ctx.lineTo(stub.x,stub.y);
-  ctx.strokeStyle='rgba(255,230,50,0.8)'; ctx.lineWidth=2; ctx.stroke();
-
-  // Power arc at bowl-start screen position
+  // Direction arrow — shaft + arrowhead projected into mat space
+  const adx = Math.cos(angle), ady = Math.sin(angle);
+  const tip = m2s(bsm.x + adx * 55, bsm.y + ady * 55);
+  const mid = m2s(bsm.x + adx * 30, bsm.y + ady * 30);
+  ctx.beginPath(); ctx.moveTo(bss.x, bss.y); ctx.lineTo(tip.x, tip.y);
+  ctx.strokeStyle = 'rgba(255,230,50,0.9)'; ctx.lineWidth = 2.5; ctx.stroke();
+  // Arrowhead
+  const headAngle = Math.atan2(tip.y - mid.y, tip.x - mid.x);
+  const hs = 10;
   ctx.beginPath();
-  ctx.arc(bss.x,bss.y,24,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);
-  ctx.strokeStyle=`hsl(${120*(1-pct)},100%,55%)`; ctx.lineWidth=4; ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='10px Segoe UI';
-  ctx.textAlign='center'; ctx.fillText(Math.round(pct*100)+'%',bss.x,bss.y-30);
+  ctx.moveTo(tip.x, tip.y);
+  ctx.lineTo(tip.x - hs * Math.cos(headAngle - 0.4), tip.y - hs * Math.sin(headAngle - 0.4));
+  ctx.lineTo(tip.x - hs * Math.cos(headAngle + 0.4), tip.y - hs * Math.sin(headAngle + 0.4));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,230,50,0.9)'; ctx.fill();
+
+  // Power ring — only visible when swiping
+  if (aimLiveSpeed > MIN_SWIPE_SPEED) {
+    ctx.beginPath();
+    ctx.arc(bss.x, bss.y, 28, -Math.PI/2, -Math.PI/2 + Math.PI*2*pct);
+    ctx.strokeStyle = `hsl(${Math.round(120*(1-pct))},100%,55%)`;
+    ctx.lineWidth = 5; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = 'bold 10px Segoe UI';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(Math.round(pct*100)+'%', bss.x, bss.y); ctx.textBaseline = 'alphabetic';
+  }
+
+  // "Swipe up" hint when no swipe is in progress
+  if (aimLiveSpeed === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('↑ swipe up to deliver', bss.x, bss.y + 48);
+  }
 }
 
 function drawSidePanels() {
