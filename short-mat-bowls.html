@@ -651,11 +651,110 @@ function deliverBowl(player, angle, speed) {
 
 const BPP = 4; let ENDS = 6;
 
+// ── Camera follow ─────────────────────────────────────────────────
+let cam = {
+  phase: 'idle',   // 'idle' | 'tracking' | 'hold' | 'return'
+  x: W/2, y: H/2,
+  zoom: 1,
+  tx: W/2, ty: H/2,
+  tz: 1,
+  holdFrames: 0,
+  pendingNext: false
+};
+
+function resetCam() {
+  cam.phase = 'idle';
+  cam.x = W/2; cam.y = H/2; cam.zoom = 1;
+  cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
+  cam.holdFrames = 0; cam.pendingNext = false;
+}
+
+function updateCamera() {
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  if (cam.phase === 'tracking') {
+    // Find the moving bowl (most recently delivered)
+    const moving = [...bowls].reverse().find(b => !b.stopped && !b.offMat);
+    if (moving) {
+      const s = m2s(moving.x, moving.y);
+      // Target: centre camera on bowl with look-ahead toward far end
+      const lookAhead = -60; // pixels toward far end (up the screen)
+      cam.tx = s.x;
+      cam.ty = s.y + lookAhead;
+      // Zoom in as bowl travels further from delivery end
+      const progress = 1 - (moving.y - MAT.y) / MAT.h; // 0 at near, 1 at far
+      cam.tz = 1 + progress * 0.8; // up to 1.8x zoom
+    } else {
+      // Bowl stopped — transition to hold
+      cam.phase = 'hold';
+      cam.holdFrames = 100;
+      if (jack && !jack.offMat) {
+        const js = m2s(jack.x, jack.y);
+        cam.tx = js.x; cam.ty = js.y;
+      }
+      cam.tz = 1.6;
+    }
+    cam.x = lerp(cam.x, cam.tx, 0.08);
+    cam.y = lerp(cam.y, cam.ty, 0.08);
+    cam.zoom = lerp(cam.zoom, cam.tz, 0.06);
+
+  } else if (cam.phase === 'hold') {
+    cam.x = lerp(cam.x, cam.tx, 0.1);
+    cam.y = lerp(cam.y, cam.ty, 0.1);
+    cam.zoom = lerp(cam.zoom, cam.tz, 0.08);
+    cam.holdFrames--;
+    if (cam.holdFrames <= 0) {
+      cam.phase = 'return';
+      cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
+    }
+
+  } else if (cam.phase === 'return') {
+    cam.x = lerp(cam.x, W/2, 0.07);
+    cam.y = lerp(cam.y, H/2, 0.07);
+    cam.zoom = lerp(cam.zoom, 1, 0.07);
+    const settled = Math.abs(cam.zoom - 1) < 0.01 &&
+                    Math.abs(cam.x - W/2) < 2 &&
+                    Math.abs(cam.y - H/2) < 2;
+    if (settled) {
+      cam.x = W/2; cam.y = H/2; cam.zoom = 1;
+      cam.phase = 'idle';
+      if (cam.pendingNext) {
+        cam.pendingNext = false;
+        _doOnAllStopped();
+      }
+    }
+  }
+}
+
+function applyCameraTransform() {
+  if (cam.phase === 'idle') return;
+  ctx.translate(W/2, H/2);
+  ctx.scale(cam.zoom, cam.zoom);
+  ctx.translate(-cam.x, -cam.y);
+}
+
+function _doOnAllStopped() {
+  turnIdx++;
+  if (turnIdx >= BPP * 2) { finishEnd(); return; }
+  promptPlayer(playerForTurn(turnIdx));
+}
+
 function onAllStopped() {
   if (jack && jack.offSide) { handleJackOffSide(); return; }
-  turnIdx++;
-  if (turnIdx >= BPP*2) { finishEnd(); return; }
-  promptPlayer(playerForTurn(turnIdx));
+  // Trigger hold + return before next turn
+  if (cam.phase === 'tracking' || cam.phase === 'hold') {
+    cam.phase = 'hold';
+    cam.holdFrames = 100;
+    if (jack && !jack.offMat) {
+      const js = m2s(jack.x, jack.y);
+      cam.tx = js.x; cam.ty = js.y;
+    }
+    cam.tz = 1.6;
+    cam.pendingNext = true;
+    state = 'camera-return';
+    return;
+  }
+  _doOnAllStopped();
 }
 
 function handleJackOffSide() {
