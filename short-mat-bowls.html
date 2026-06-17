@@ -909,52 +909,73 @@ function drawMat() {
               Math.floor(i/50)%2===0 ? C.mat : C.matAlt);
   }
 
-  // ── Wood Fenders — tan/beige boards at each end, outside the green mat ──
-  function drawFender(matY, above) {
-    // Project the mat-edge corners out slightly beyond the mat width
-    const L4 = m2s(MAT.x - 8, matY), R4 = m2s(MAT.x + MAT.w + 8, matY);
+  // ── Wood Fenders — staple/U-shape: back board + two arms to dead line ──
+  const tDead_f = MAT.y + L.DEAD * MAT.h;
+  const bDead_f = MAT.y + (1 - L.DEAD) * MAT.h;
+
+  function drawFenderBoard(L4, R4, above) {
     const fw = R4.x - L4.x;
-    const bh = 22; // board height in screen px
+    const bh = 11;
     const fy = above ? L4.y - bh : L4.y;
+    const FEND_COL  = '#eeece4';
+    const FEND_DARK = 'rgba(100,90,70,0.6)';
 
-    // Drop shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillRect(L4.x + 3, fy + 3, fw, bh);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(L4.x + 2, fy + 2, fw, bh);
 
-    // Main board face — off-white painted wood, like in the diagram
     const grad = ctx.createLinearGradient(0, fy, 0, fy + bh);
-    grad.addColorStop(0,   '#e8e4da');
-    grad.addColorStop(0.4, '#f0ece2');
-    grad.addColorStop(1,   '#d4cfc4');
+    grad.addColorStop(0,   '#f0ece2'); grad.addColorStop(1, '#d8d4ca');
     ctx.fillStyle = grad;
     ctx.fillRect(L4.x, fy, fw, bh);
 
-    // Subtle wood grain — vertical lines across the board
-    ctx.strokeStyle = 'rgba(160,150,130,0.25)'; ctx.lineWidth = 1;
-    for (let gx = L4.x + 10; gx < R4.x - 4; gx += 16) {
+    ctx.strokeStyle = 'rgba(160,150,130,0.2)'; ctx.lineWidth = 1;
+    for (let gx = L4.x + 12; gx < R4.x - 4; gx += 16) {
       ctx.beginPath(); ctx.moveTo(gx, fy + 2); ctx.lineTo(gx, fy + bh - 2); ctx.stroke();
     }
-
-    // Top highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.fillRect(L4.x, fy, fw, 2);
-
-    // Bottom shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.20)';
-    ctx.fillRect(L4.x, fy + bh - 2, fw, 2);
-
-    // Outer border
-    ctx.strokeStyle = 'rgba(100,90,70,0.6)'; ctx.lineWidth = 1.5;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(L4.x, fy, fw, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';       ctx.fillRect(L4.x, fy + bh - 2, fw, 2);
+    ctx.strokeStyle = FEND_DARK; ctx.lineWidth = 1.5;
     ctx.strokeRect(L4.x, fy, fw, bh);
-
-    // Inner shadow (mat-side edge)
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    if (above) ctx.fillRect(L4.x, fy + bh - 3, fw, 3);
-    else       ctx.fillRect(L4.x, fy, fw, 3);
   }
 
-  drawFender(MAT.y,       true);  // far fender — board sits above the mat top edge
-  drawFender(MAT.y+MAT.h, false); // near fender — board sits below the mat bottom edge
+  function drawFenderArm(mx, matY, deadY, above) {
+    const top    = m2s(mx - 4, Math.min(matY, deadY));
+    const bottom = m2s(mx + 4, Math.max(matY, deadY));
+    // Draw as a projected quad following perspective
+    const tl = m2s(mx - 4, Math.min(matY, deadY));
+    const tr = m2s(mx + 4, Math.min(matY, deadY));
+    const br = m2s(mx + 4, Math.max(matY, deadY));
+    const bl = m2s(mx - 4, Math.max(matY, deadY));
+
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.moveTo(tl.x+2,tl.y+2); ctx.lineTo(tr.x+2,tr.y+2);
+    ctx.lineTo(br.x+2,br.y+2); ctx.lineTo(bl.x+2,bl.y+2); ctx.closePath(); ctx.fill();
+
+    const grad = ctx.createLinearGradient(tl.x, 0, tr.x, 0);
+    grad.addColorStop(0, '#d8d4ca'); grad.addColorStop(0.5, '#f0ece2'); grad.addColorStop(1, '#d8d4ca');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y);
+    ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y); ctx.closePath(); ctx.fill();
+
+    ctx.strokeStyle = 'rgba(100,90,70,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(tr.x,tr.y);
+    ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y); ctx.closePath(); ctx.stroke();
+  }
+
+  // Far fender (top) — back board above MAT.y, arms down to far dead line
+  {
+    const L4 = m2s(MAT.x - 8, MAT.y), R4 = m2s(MAT.x + MAT.w + 8, MAT.y);
+    drawFenderArm(MAT.x - 4, MAT.y, tDead_f, true);
+    drawFenderArm(MAT.x + MAT.w + 4, MAT.y, tDead_f, true);
+    drawFenderBoard(L4, R4, true);
+  }
+  // Near fender (bottom) — back board below MAT.y+MAT.h, arms up to near dead line
+  {
+    const L4 = m2s(MAT.x - 8, MAT.y + MAT.h), R4 = m2s(MAT.x + MAT.w + 8, MAT.y + MAT.h);
+    drawFenderArm(MAT.x - 4, MAT.y + MAT.h, bDead_f, false);
+    drawFenderArm(MAT.x + MAT.w + 4, MAT.y + MAT.h, bDead_f, false);
+    drawFenderBoard(L4, R4, false);
+  }
 
   // ── Mat border (projected trapezoid outline) ────────────────────
   const mc=[m2s(MAT.x,MAT.y), m2s(MAT.x+MAT.w,MAT.y),
