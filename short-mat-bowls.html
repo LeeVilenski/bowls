@@ -1217,7 +1217,7 @@ function drawAim() {
   ctx.fillStyle = 'rgba(255,230,50,0.9)'; ctx.fill();
 
   // Power ring — only visible when swiping
-  if (aimLiveSpeed > MIN_SWIPE_SPEED) {
+  if (aimLiveSpeed > 0) {
     ctx.beginPath();
     ctx.arc(bss.x, bss.y, 28, -Math.PI/2, -Math.PI/2 + Math.PI*2*pct);
     ctx.strokeStyle = `hsl(${Math.round(120*(1-pct))},100%,55%)`;
