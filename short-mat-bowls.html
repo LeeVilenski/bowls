@@ -1451,6 +1451,12 @@ document.getElementById('btnBias').addEventListener('click',()=>{
   document.getElementById('btnBias').textContent=biasDir==='right'?'↗ R':'↖ L';
 });
 
+document.getElementById('btnFire').addEventListener('click',()=>{
+  if (state !== 'aim') return;
+  deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), FIRE_SPD);
+  resetAim();
+});
+
 // Service worker (PWA offline support) — updateViaCache:none bypasses browser HTTP
 // cache when checking for SW updates, so new deploys activate on next page load
 if ('serviceWorker' in navigator) {
