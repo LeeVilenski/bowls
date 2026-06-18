@@ -1108,10 +1108,6 @@ function drawMat() {
   ctx.beginPath(); ctx.moveTo(gBR.x,gBR.y); ctx.lineTo(gR.x,gR.y); ctx.stroke();
   ctx.setLineDash([]);
 
-  // End counter above far board
-  const topP=m2s(cx,MAT.y);
-  ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.font='11px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(`End ${endNum} of ${ENDS}`, topP.x, topP.y-20);
 
   ctx.restore(); // end mat clip region
 }
