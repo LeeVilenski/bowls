@@ -332,11 +332,12 @@ let aimActive = false;
 let aimAngle     = null;   // null = recalculate default toward jack
 let aimBaseAngle = 0;      // aimAngle when current drag started
 let aimDragStartX = 0;
-let swipeSamples = [];     // [{x,y,t}] recent pointer positions
-let aimLiveSpeed = 0;      // upward px/s during active swipe (for power ring)
+let swipeStartY  = 0;      // canvas y when touch began
+let swipeStartX  = 0;      // canvas x when touch began (for aim direction)
+let aimLiveSpeed = 0;      // 0-1 fraction of current upward swipe distance (drives power ring)
 
-const MIN_SWIPE_SPEED = 200;   // canvas px/s minimum to count as a deliver
-const MAX_SWIPE_SPEED = 1000;  // canvas px/s = full power (accounts for deceleration at swipe top)
+const MIN_SWIPE_PX = 30;   // canvas px upward before shot registers
+const MAX_SWIPE_PX = 450;  // canvas px upward = full power
 
 function defaultAimAngle() {
   const bs = bowlStart();
