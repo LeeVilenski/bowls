@@ -1372,10 +1372,19 @@ function drawDistances() {
 // ── Main loop ─────────────────────────────────────────────────────
 function loop() {
   if (state==='moving') {
-    for (const b of bowls) stepObj(b, b.bias);
-    stepObj(jack, null);
-    stepCollisions();
-    if (allStopped()) onAllStopped();
+    const steps = ffModeActive ? 3 : 1;
+    for (let s = 0; s < steps; s++) {
+      for (const b of bowls) stepObj(b, b.bias);
+      stepObj(jack, null);
+      stepCollisions();
+      if (allStopped()) { onAllStopped(); break; }
+    }
+  }
+  // Animate rest-tilt for stopped bowls (bowl settling onto its side)
+  for (const b of bowls) {
+    if (b.stopped && !b.offMat) {
+      b.restProgress = Math.min(1, (b.restProgress || 0) + 0.04);
+    }
   }
   if (state==='moving' || state==='camera-return') {
     updateCamera();
