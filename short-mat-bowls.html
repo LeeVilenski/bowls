@@ -357,7 +357,8 @@ function calcSwipeVelocity() {
   };
 }
 
-function resetAim() { aimAngle = null; swipeSamples = []; aimLiveSpeed = 0; }
+let fireModeActive = false;
+function resetAim() { aimAngle = null; swipeSamples = []; aimLiveSpeed = 0; fireModeActive = false; syncFireBtn(); }
 
 // ── Position helpers ──────────────────────────────────────────────
 // All helpers respect the current delivDir (1=bowl from bottom, -1=from top)
