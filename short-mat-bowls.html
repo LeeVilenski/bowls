@@ -893,11 +893,7 @@ function draw() {
   drawMat();
   if (jack && !jack.offMat) drawJack();
   for (const b of bowls) drawBowl(b);
-  if (jack && !jack.offMat && bowls.some(b=>!b.offMat)) drawDistances();
   if (state==='aim') drawAim();
-  const topP=m2s(MAT.x+MAT.w/2,MAT.y);
-  ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.font='11px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(`End ${endNum} of ${ENDS}`, topP.x, topP.y-20);
   ctx.restore();
   drawSidePanels();
 }
