@@ -856,13 +856,7 @@ function drawFloor() {
 function draw() {
   ctx.clearRect(0,0,W,H);
   ctx.save();
-  // Clip to the projected mat trapezoid so nothing outside the playing surface shows
-  const _mc = [m2s(MAT.x,MAT.y), m2s(MAT.x+MAT.w,MAT.y),
-               m2s(MAT.x+MAT.w,MAT.y+MAT.h), m2s(MAT.x,MAT.y+MAT.h)];
-  ctx.beginPath();
-  ctx.moveTo(_mc[0].x, _mc[0].y);
-  for (const c of _mc.slice(1)) ctx.lineTo(c.x, c.y);
-  ctx.closePath(); ctx.clip();
+  ctx.beginPath(); ctx.rect(38, 0, W - 76, H); ctx.clip();
   applyCameraTransform();
   drawFloor();
   drawMat();
