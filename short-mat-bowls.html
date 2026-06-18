@@ -456,7 +456,8 @@ function stepObj(obj, bias) {
   }
 
   if (bias) applyBias(obj, bias);
-  obj.vx *= FRICTION; obj.vy *= FRICTION;
+  const fr = (obj === jack) ? JACK_FRICTION : FRICTION;
+  obj.vx *= fr; obj.vy *= fr;
   obj.x  += obj.vx;  obj.y  += obj.vy;
 
   const r = obj === jack ? RJ : RB;
