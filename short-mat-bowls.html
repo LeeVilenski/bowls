@@ -1614,6 +1614,25 @@ function syncFireBtn() {
   btn.style.color = fireModeActive ? '#fff' : '';
 }
 
+document.getElementById('btnFF').addEventListener('click', () => {
+  if (state !== 'moving') return;
+  ffModeActive = !ffModeActive;
+  syncFFBtn();
+});
+
+function syncFFBtn() {
+  const btn = document.getElementById('btnFF');
+  btn.disabled = (state !== 'moving');
+  btn.textContent = '⏩ 3×';
+  btn.classList.toggle('active', ffModeActive);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') {
+    if (state === 'moving') { ffModeActive = !ffModeActive; syncFFBtn(); }
+  }
+});
+
 // Service worker (PWA offline support) — updateViaCache:none bypasses browser HTTP
 // cache when checking for SW updates, so new deploys activate on next page load
 if ('serviceWorker' in navigator) {
