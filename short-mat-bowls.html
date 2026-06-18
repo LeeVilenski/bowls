@@ -1243,29 +1243,29 @@ function drawBowl(b) {
     // Perpendicular to travel direction
     const pnx = -tny, pny = tnx;
 
-    const spacing = bRy * 0.38;
-    // rotAngle drives the scroll — one full cycle per circumference distance
+    // Lines run PARALLEL to direction of travel, spaced sideways, scroll left-right as bowl spins
+    const spacing = bRx * 0.38;
     const scroll = (rotA * spacing / Math.PI) % spacing;
 
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
     ctx.clip();
-    ctx.strokeStyle = `rgba(75,75,75,${gripAlpha})`;
-    ctx.lineWidth = Math.max(0.7, r * 0.07);
+    ctx.strokeStyle = `rgba(50,50,50,${gripAlpha})`;
+    ctx.lineWidth = Math.max(0.8, r * 0.08);
 
     for (let i = -4; i <= 4; i++) {
+      // d = offset along the perpendicular (sideways) axis
       const d = i * spacing + scroll;
-      // Only draw lines whose centre falls within the bowl radius
-      if (Math.abs(d) > bRy * 1.1) continue;
-      const cx = sp.x + tnx * d;
-      const cy = sp.y + tny * d;
-      // Half-chord length at this depth through the ellipse
-      const normD = d / bRy;
-      const halfLen = bRx * Math.sqrt(Math.max(0, 1 - normD * normD)) * 0.95;
+      if (Math.abs(d) > bRx * 1.1) continue;
+      const cx = sp.x + pnx * d;
+      const cy = sp.y + pny * d;
+      // Half-chord length along the travel direction at this lateral offset
+      const normD = d / bRx;
+      const halfLen = bRy * Math.sqrt(Math.max(0, 1 - normD * normD)) * 0.95;
       ctx.beginPath();
-      ctx.moveTo(cx - pnx * halfLen, cy - pny * halfLen);
-      ctx.lineTo(cx + pnx * halfLen, cy + pny * halfLen);
+      ctx.moveTo(cx - tnx * halfLen, cy - tny * halfLen);
+      ctx.lineTo(cx + tnx * halfLen, cy + tny * halfLen);
       ctx.stroke();
     }
     ctx.restore();
