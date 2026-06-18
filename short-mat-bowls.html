@@ -474,17 +474,22 @@ function stepObj(obj, bias) {
     return;
   }
 
-  // End boards — jack and touchers clamp to fender; other bowls die
+  // End boards
   if (obj.y - r < MAT.y || obj.y + r > MAT.y + MAT.h) {
     obj.y = obj.y - r < MAT.y ? MAT.y + r : MAT.y + MAT.h - r;
-    obj.vx = obj.vy = 0; obj.stopped = true;
     if (obj === jack) {
-      obj.inDitch = true;
-      msg('Jack in the ditch! Only touchers count.');
+      // Soft wall — reflect with restitution so jack rolls along fender
+      obj.vy = -obj.vy * 0.45;
+      obj.vx *= 0.80;
+      if (!obj.inDitch) {
+        obj.inDitch = true;
+        msg('Jack in the ditch! Only touchers count.');
+      }
     } else if (obj.toucher) {
+      obj.vx = obj.vy = 0; obj.stopped = true;
       obj.inDitch = true;
     } else {
-      obj.offMat = true;
+      obj.offMat = true; obj.stopped = true;
     }
     return;
   }
