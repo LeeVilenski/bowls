@@ -1197,11 +1197,8 @@ function drawAim() {
   const bsm = bowlStart(), bss = m2s(bsm.x, bsm.y);
   const angle = aimAngle ?? defaultAimAngle();
 
-  // Use live swipe speed if player is actively swiping up, else show 60% preview
-  const previewSpeed = aimLiveSpeed > 0
-    ? Math.min(1, (aimLiveSpeed - MIN_SWIPE_SPEED) / (MAX_SWIPE_SPEED - MIN_SWIPE_SPEED)) * MAX_SPD
-    : MAX_SPD * 0.6;
-  const pct = previewSpeed / MAX_SPD;
+  // aimLiveSpeed is already a 0-1 distance fraction; show 50% when idle
+  const pct = aimLiveSpeed > 0 ? aimLiveSpeed : 0.5;
 
   // Direction arrow — shaft + arrowhead projected into mat space
   const adx = Math.cos(angle), ady = Math.sin(angle);
