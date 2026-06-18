@@ -312,7 +312,9 @@ const BOWL_COLOURS = [
 ];
 
 let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:0.15, p1idx:0, p2idx:1, bg:'hardwood' };
-let biasDir  = 'right';
+let biasDirs = ['right', 'right']; // per-player bias direction, remembered across turns
+function curBiasDir()          { return biasDirs[playerForTurn(turnIdx) - 1]; }
+function setBiasDir(p, dir)    { biasDirs[p - 1] = dir; }
 let biasMult = 0.15;
 
 let bowls    = [];
