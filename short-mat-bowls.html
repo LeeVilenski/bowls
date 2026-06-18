@@ -1095,15 +1095,17 @@ function drawMat() {
   ctx.fillStyle='rgba(0,0,0,0.3)';
   ctx.beginPath(); ctx.moveTo(btl.x+2,btl.y+2); ctx.lineTo(btr.x+2,btr.y+2);
   ctx.lineTo(bbr.x+2,bbr.y+2); ctx.lineTo(bbl.x+2,bbl.y+2); ctx.closePath(); ctx.fill();
-  ctx.fillStyle=C.fen;
+  const bGrad = ctx.createLinearGradient(0, btl.y, 0, bbr.y);
+  bGrad.addColorStop(0, '#f0ece2'); bGrad.addColorStop(1, '#d8d4ca');
+  ctx.fillStyle=bGrad;
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bbr.x,bbr.y); ctx.lineTo(bbl.x,bbl.y); ctx.closePath(); ctx.fill();
   // Top-edge highlight strip
   const bth1=m2s(bx1,by1+5), bth2=m2s(bx2,by1+5);
-  ctx.fillStyle=C.fenTop;
+  ctx.fillStyle='rgba(255,255,255,0.3)';
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bth2.x,bth2.y); ctx.lineTo(bth1.x,bth1.y); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle=C.fenTop; ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(100,90,70,0.6)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bbr.x,bbr.y); ctx.lineTo(bbl.x,bbl.y); ctx.closePath(); ctx.stroke();
   const bm=m2s(cx,(by1+by2)/2);
