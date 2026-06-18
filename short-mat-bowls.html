@@ -1098,9 +1098,6 @@ function drawMat() {
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bbr.x,bbr.y); ctx.lineTo(bbl.x,bbl.y); ctx.closePath(); ctx.stroke();
   const bm=m2s(cx,(by1+by2)/2);
-  ctx.fillStyle='#fde68a'; ctx.font='bold 7px Segoe UI';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('BLOCK',bm.x,bm.y); ctx.textBaseline='alphabetic';
 
   // Gap hints either side of block
   const gY=FENDER.y+FENDER.h/2;
