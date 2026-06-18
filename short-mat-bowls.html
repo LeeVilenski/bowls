@@ -1450,8 +1450,9 @@ canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp
 
 // Buttons
 document.getElementById('btnBias').addEventListener('click',()=>{
-  biasDir=biasDir==='right'?'left':'right';
-  document.getElementById('btnBias').textContent=biasDir==='right'?'↗ R':'↖ L';
+  const p = playerForTurn(turnIdx);
+  setBiasDir(p, curBiasDir() === 'right' ? 'left' : 'right');
+  document.getElementById('btnBias').textContent = curBiasDir() === 'right' ? '↗ R' : '↖ L';
 });
 
 document.getElementById('btnFire').addEventListener('click',()=>{
