@@ -1145,6 +1145,20 @@ function drawMat() {
 
 function drawJack() {
   const sp=m2s(jack.x,jack.y), r=perspR(jack.y,RJ);
+
+  // Amber warning ring when jack is in the ditch (non-touchers can't score)
+  if (jack.inDitch) {
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, r + 4, 0, Math.PI*2);
+    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2.5;
+    ctx.setLineDash([3, 2]); ctx.stroke(); ctx.setLineDash([]);
+    // "DITCH" label above
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = `bold ${Math.max(8, Math.round(r * 1.1))}px Segoe UI`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('DITCH', sp.x, sp.y - r - 6);
+    ctx.textBaseline = 'alphabetic';
+  }
+
   // Shadow
   ctx.beginPath(); ctx.arc(sp.x+1,sp.y+2,r,0,Math.PI*2);
   ctx.fillStyle='rgba(0,0,0,0.30)'; ctx.fill();
@@ -1153,8 +1167,9 @@ function drawJack() {
   g.addColorStop(0,'#fef9c3'); g.addColorStop(0.5,'#fde047'); g.addColorStop(1,'#a16207');
   ctx.beginPath(); ctx.arc(sp.x,sp.y,r,0,Math.PI*2);
   ctx.fillStyle=g; ctx.fill();
-  // Rim
-  ctx.strokeStyle='#92400e'; ctx.lineWidth=1; ctx.stroke();
+  // Rim — turns amber when in ditch
+  ctx.strokeStyle = jack.inDitch ? '#f59e0b' : '#92400e';
+  ctx.lineWidth = jack.inDitch ? 2 : 1; ctx.stroke();
   // Specular glint
   ctx.beginPath(); ctx.ellipse(sp.x-r*0.28,sp.y-r*0.3,r*0.22,r*0.14,-Math.PI/4,0,Math.PI*2);
   ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fill();
