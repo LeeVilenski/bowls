@@ -624,7 +624,7 @@ function startGame() {
 function startEnd() {
   bowls=[]; jack=null; turnIdx=0; lastJackHitter=null;
   resetCam(); resetAim();
-  state='place-jack';
+  state='place-jack'; syncFireBtn();
   if (jackOwner === 2 && mode === 'vs-ai') {
     aiPlaceJack();
   } else {
