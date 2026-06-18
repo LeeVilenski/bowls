@@ -345,17 +345,9 @@ function defaultAimAngle() {
   return delivDir === 1 ? -Math.PI / 2 : Math.PI / 2;
 }
 
-function calcSwipeVelocity() {
-  if (swipeSamples.length < 2) return { vx: 0, vy: 0 };
-  const last = swipeSamples[swipeSamples.length - 1];
-  const recent = swipeSamples.filter(s => last.t - s.t <= 100);
-  if (recent.length < 2) return { vx: 0, vy: 0 };
-  const dt = (recent[recent.length-1].t - recent[0].t) / 1000;
-  if (dt <= 0) return { vx: 0, vy: 0 };
-  return {
-    vx: (recent[recent.length-1].x - recent[0].x) / dt,
-    vy: (recent[recent.length-1].y - recent[0].y) / dt,
-  };
+function swipeDistPct() {
+  const upDist = swipeStartY - mouse.y;
+  return Math.max(0, Math.min(1, (upDist - MIN_SWIPE_PX) / (MAX_SWIPE_PX - MIN_SWIPE_PX)));
 }
 
 let fireModeActive = false;
