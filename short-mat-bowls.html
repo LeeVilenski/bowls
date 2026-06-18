@@ -928,10 +928,19 @@ function drawMat() {
     ctx.fillText(text, p.x+dx, p.y+dy); ctx.textBaseline='alphabetic';
   }
 
-  // ── Alternating green stripes (trapezoid quads) ─────────────────
-  for (let i=0; i<MAT.h; i+=50) {
-    fillStrip(MAT.y+i, MAT.y+Math.min(i+50,MAT.h),
-              Math.floor(i/50)%2===0 ? C.mat : C.matAlt);
+  // ── Alternating green stripes — clipped to mat trapezoid ────────
+  {
+    const mc=[m2s(MAT.x,MAT.y),m2s(MAT.x+MAT.w,MAT.y),
+              m2s(MAT.x+MAT.w,MAT.y+MAT.h),m2s(MAT.x,MAT.y+MAT.h)];
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(mc[0].x,mc[0].y);
+    for (const c of mc.slice(1)) ctx.lineTo(c.x,c.y);
+    ctx.closePath(); ctx.clip();
+    for (let i=0; i<MAT.h; i+=50) {
+      fillStrip(MAT.y+i, MAT.y+Math.min(i+50,MAT.h),
+                Math.floor(i/50)%2===0 ? C.mat : C.matAlt);
+    }
+    ctx.restore();
   }
 
   // ── Wood Fenders — staple/U-shape: back board + two arms to ditch line ──
