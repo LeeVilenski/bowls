@@ -595,7 +595,7 @@ function aiPickShot() {
     const angle = base + da * Math.PI/180;
     for (const pct of [0.38, 0.50, 0.62, 0.74, 0.86]) {
       const spd = pct * MAX_SPD;
-      const path = simPath(bs.x, bs.y, angle, spd, biasDir, biasMult);
+      const path = simPath(bs.x, bs.y, angle, spd, biasDirs[1], biasMult);
       const end  = path[path.length-1];
       const d    = Math.hypot(end.x - jx, end.y - jy);
       if (d < bestDist) { bestDist = d; bestAngle = angle; bestPower = spd; }
