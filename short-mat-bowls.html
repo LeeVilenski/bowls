@@ -1563,7 +1563,7 @@ function applyAndStart() {
 
 function showSplash() {
   clearTimeout(aiTimer);
-  state = 'idle';
+  state = 'idle'; syncFireBtn();
   document.getElementById('splash').classList.remove('hidden');
 }
 
