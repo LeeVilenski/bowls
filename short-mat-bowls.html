@@ -464,6 +464,15 @@ function stepObj(obj, bias) {
     return;
   }
 
+  // Rolling animation & motion trail (bowls only)
+  if (obj !== jack) {
+    obj.rotAngle = (obj.rotAngle || 0) + spd / (RB * 0.9);
+    if (!obj.trail) obj.trail = [];
+    obj.trail.unshift({x: obj.x, y: obj.y});
+    if (obj.trail.length > 6) obj.trail.pop();
+    obj.restProgress = 0; // reset rest-tilt while moving
+  }
+
   if (bias) applyBias(obj, bias);
   const fr = (obj === jack) ? JACK_FRICTION : FRICTION;
   obj.vx *= fr; obj.vy *= fr;
