@@ -1424,7 +1424,7 @@ function handlePointerUp() {
     const upSpeed = -vel.vy;
     if (upSpeed >= MIN_SWIPE_SPEED) {
       const pct = Math.min(1, (upSpeed - MIN_SWIPE_SPEED) / (MAX_SWIPE_SPEED - MIN_SWIPE_SPEED));
-      deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), pct * MAX_SPD);
+      deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), MIN_SPD + pct * (MAX_SPD - MIN_SPD));
       resetAim();
     }
     // else: no delivery — angle is kept, player swipes again
