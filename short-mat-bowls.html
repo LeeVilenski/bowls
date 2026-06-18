@@ -447,7 +447,11 @@ function stepObj(obj, bias) {
     obj.stopped = true; obj.vx = obj.vy = 0;
     const farDitchY = yFromFar(L.DITCH);
     const farDeadY  = yFromFar(L.DEAD);
-    const inFarDitch = delivDir === 1 ? obj.y < farDitchY : obj.y > farDitchY;
+    const r_obj = obj === jack ? RJ : RB;
+    // Dead only when the ENTIRE ball has cleared the ditch line (not just the centre)
+    const inFarDitch = delivDir === 1
+      ? obj.y + r_obj < farDitchY
+      : obj.y - r_obj > farDitchY;
     // Bowl must reach the far dead area (where the jack lives) to count.
     // Anything stopping before the far dead line — short or mid-mat — is dead.
     const didNotReachScoring = delivDir === 1 ? obj.y > farDeadY : obj.y < farDeadY;
