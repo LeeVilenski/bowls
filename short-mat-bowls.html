@@ -1457,6 +1457,10 @@ document.getElementById('btnFire').addEventListener('click',()=>{
   resetAim();
 });
 
+function syncFireBtn() {
+  document.getElementById('btnFire').disabled = (state !== 'aim');
+}
+
 // Service worker (PWA offline support) — updateViaCache:none bypasses browser HTTP
 // cache when checking for SW updates, so new deploys activate on next page load
 if ('serviceWorker' in navigator) {
