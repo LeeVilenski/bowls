@@ -508,11 +508,18 @@ function stepCollisions() {
       collide(a, b, RB, RB, 0.75);
     }
     if (jack && !jack.offMat && !jack.offSide) {
-      const jvxBefore = jack.vx, jvyBefore = jack.vy;
-      collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
-      if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) {
-        lastJackHitter = a.player;
-        a.toucher = true;
+      if (jack.inDitch && !a.toucher) {
+        // Jack is in ditch and bowl is not a pre-existing toucher:
+        // contact kills the bowl immediately (like hitting the fender)
+        const dist = Math.hypot(jack.x - a.x, jack.y - a.y);
+        if (dist < RB + RJ) a.offMat = true;
+      } else {
+        const jvxBefore = jack.vx, jvyBefore = jack.vy;
+        collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
+        if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) {
+          lastJackHitter = a.player;
+          if (!jack.inDitch) a.toucher = true;  // toucher only awarded before jack enters ditch
+        }
       }
     }
   }
