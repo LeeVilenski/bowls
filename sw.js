@@ -1,4 +1,4 @@
-const CACHE = 'bowls-v2';
+const CACHE = 'bowls-v3';
 const ASSETS = ['./short-mat-bowls.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
