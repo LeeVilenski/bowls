@@ -1243,24 +1243,18 @@ function drawBowl(b) {
     // Perpendicular to travel direction
     const pnx = -tny, pny = tnx;
 
-    // Lines run PARALLEL to direction of travel, spaced sideways, scroll left-right as bowl spins
-    const spacing = bRx * 0.38;
-    const scroll = (rotA * spacing / Math.PI) % spacing;
-
+    // Two grip lines parallel to travel, fixed at 1/5 and 4/5 of bowl width
+    // (i.e. ±0.6 of bRx from centre along the perpendicular axis)
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
     ctx.clip();
-    ctx.strokeStyle = `rgba(50,50,50,${gripAlpha})`;
-    ctx.lineWidth = Math.max(0.8, r * 0.08);
+    ctx.strokeStyle = `rgba(40,40,40,${gripAlpha})`;
+    ctx.lineWidth = Math.max(0.9, r * 0.09);
 
-    for (let i = -4; i <= 4; i++) {
-      // d = offset along the perpendicular (sideways) axis
-      const d = i * spacing + scroll;
-      if (Math.abs(d) > bRx * 1.1) continue;
+    for (const d of [-bRx * 0.6, bRx * 0.6]) {
       const cx = sp.x + pnx * d;
       const cy = sp.y + pny * d;
-      // Half-chord length along the travel direction at this lateral offset
       const normD = d / bRx;
       const halfLen = bRy * Math.sqrt(Math.max(0, 1 - normD * normD)) * 0.95;
       ctx.beginPath();
