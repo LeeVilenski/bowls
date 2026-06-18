@@ -246,7 +246,7 @@ const FIRE_MULT = 2.5;   // fire mode: multiplier on MAX_SPD ceiling
 // ── Perspective projection ────────────────────────────────────────
 // The mat renders as a trapezoid: wide at the near/delivery end, narrow at far end.
 // P.nHW/fHW = near/far half-widths (screen px). P.gamma compresses far-end Y depth.
-const P = { cx:300, nHW:290, fHW:210, nY:812, fY:10, gamma:1.5 };
+const P = { cx:300, nHW:285, fHW:80, nY:1022, fY:18, gamma:1.7 };
 
 // perspT: 0 = far end, 1 = near (delivery) end, from current deliverer's perspective
 function matToPerspT(my) {
