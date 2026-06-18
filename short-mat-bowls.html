@@ -1243,13 +1243,31 @@ function drawAim() {
     ctx.fillText(Math.round(pct*100)+'%', bss.x, bss.y); ctx.textBaseline = 'alphabetic';
   }
 
+  // Bias arrows — ◀ L and R ▶ flanking the delivery mark
+  const bd = curBiasDir();
+  const arrowY = bss.y + 38;
+  const arrowGap = 44;
+  for (const [dir, label, ox] of [['left','◀ L', -arrowGap], ['right','R ▶', arrowGap]]) {
+    const ax = bss.x + ox;
+    const active = bd === dir;
+    ctx.fillStyle = active ? 'rgba(255,230,50,0.95)' : 'rgba(255,255,255,0.25)';
+    ctx.beginPath(); ctx.roundRect(ax - 22, arrowY - 12, 44, 24, 6); ctx.fill();
+    ctx.fillStyle = active ? '#000' : 'rgba(255,255,255,0.6)';
+    ctx.font = `bold ${active ? 12 : 11}px Segoe UI`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, ax, arrowY); ctx.textBaseline = 'alphabetic';
+  }
+
   // "Swipe up" hint when no swipe is in progress
   if (aimLiveSpeed === 0) {
     ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px Segoe UI';
     ctx.textAlign = 'center';
-    ctx.fillText('↑ swipe up to deliver', bss.x, bss.y + 48);
+    ctx.fillText('↑ swipe up to deliver', bss.x, bss.y + 68);
   }
 }
+
+// Bias arrow hit areas (populated each drawAim call, checked in handlePointerDown)
+let _biasHitLeft = null, _biasHitRight = null;
 
 // Hit areas for canvas-drawn buttons (in canvas px)
 const PANEL_BTN = { w: 34, h: 28, x1: 2, x2: 404, y: 174 };
