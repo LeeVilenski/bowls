@@ -1621,9 +1621,12 @@ document.getElementById('btnFF').addEventListener('click', () => {
 });
 
 function syncFFBtn() {
-  const btn = document.getElementById('btnFF');
-  btn.disabled = (state !== 'moving');
-  btn.textContent = '⏩ 3×';
+  const btn   = document.getElementById('btnFF');
+  const bias  = document.getElementById('btnBias');
+  const isMoving = (state === 'moving');
+  btn.disabled = !isMoving;
+  btn.style.display = isMoving ? '' : 'none';
+  bias.style.display = isMoving ? 'none' : '';
   btn.classList.toggle('active', ffModeActive);
 }
 
