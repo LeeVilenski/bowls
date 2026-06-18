@@ -1047,7 +1047,6 @@ function drawMat() {
     ctx.strokeStyle=col; ctx.lineWidth=isFarEnd?1.5:1;
     ctx.beginPath(); ctx.moveTo(sa.x-sw/2,sa.y); ctx.lineTo(sa.x+sw/2,sa.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(sb.x-sw/2,sb.y); ctx.lineTo(sb.x+sw/2,sb.y); ctx.stroke();
-    if (isFarEnd) labelM('JACK', cx+14, (y1+y2)/2, 0, 0, 'rgba(255,220,50,0.6)');
   });
 
   // Glow on active jack line when placing
