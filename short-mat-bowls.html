@@ -1232,21 +1232,43 @@ function drawBowl(b) {
     }
   }
 
-  // Grip dimples — orbit ring, fade out as bowl comes to rest
-  if (r >= 7 && rest < 0.85) {
-    const nDots = Math.min(14, Math.max(7, Math.round(r)));
-    const dr = Math.max(0.6, r * 0.085);
-    const dimpleAlpha = 0.55 * (1 - rest);
-    for (let i = 0; i < nDots; i++) {
-      const a = rotA + (i / nDots) * Math.PI * 2;
-      const dx = Math.cos(a) * bRx * 0.80;
-      const dy = Math.sin(a) * bRy * 0.78;
-      const vis = 0.4 + 0.6 * (0.5 + 0.5 * Math.cos(a));
+  // Grip lines — scroll across the face in the direction of travel, fade as bowl rests
+  if (r >= 6 && rest < 0.85) {
+    const gripAlpha = 0.50 * (1 - rest);
+    // Travel direction in screen space (default straight up if stationary)
+    const tvx = b.vx || 0, tvy = b.vy || 0;
+    const tspd = Math.hypot(tvx, tvy);
+    const tnx = tspd > 0.01 ? tvx / tspd : 0;
+    const tny = tspd > 0.01 ? tvy / tspd : -1;
+    // Perpendicular to travel direction
+    const pnx = -tny, pny = tnx;
+
+    const spacing = bRy * 0.38;
+    // rotAngle drives the scroll — one full cycle per circumference distance
+    const scroll = (rotA * spacing / Math.PI) % spacing;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.strokeStyle = `rgba(75,75,75,${gripAlpha})`;
+    ctx.lineWidth = Math.max(0.7, r * 0.07);
+
+    for (let i = -4; i <= 4; i++) {
+      const d = i * spacing + scroll;
+      // Only draw lines whose centre falls within the bowl radius
+      if (Math.abs(d) > bRy * 1.1) continue;
+      const cx = sp.x + tnx * d;
+      const cy = sp.y + tny * d;
+      // Half-chord length at this depth through the ellipse
+      const normD = d / bRy;
+      const halfLen = bRx * Math.sqrt(Math.max(0, 1 - normD * normD)) * 0.95;
       ctx.beginPath();
-      ctx.arc(sp.x + dx, sp.y + dy, dr, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(75,75,75,${dimpleAlpha * vis})`;
-      ctx.fill();
+      ctx.moveTo(cx - pnx * halfLen, cy - pny * halfLen);
+      ctx.lineTo(cx + pnx * halfLen, cy + pny * halfLen);
+      ctx.stroke();
     }
+    ctx.restore();
   }
 
   // ── Sticker disc ─────────────────────────────────────────────────
