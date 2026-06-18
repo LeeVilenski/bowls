@@ -1026,14 +1026,9 @@ function drawMat() {
   // Ditch lines
   hLineM(tDitch, C.line, 1.5);
   hLineM(bDitch, C.line, 1.5);
-  labelM('DITCH', MAT.x+4, tDitch, 0, -6, 'rgba(255,255,255,0.4)');
-  labelM('DITCH', MAT.x+4, bDitch, 0, -6, 'rgba(255,255,255,0.4)');
-
   // Dead lines
   hLineM(tDead, 'rgba(255,255,255,0.6)', 2);
   hLineM(bDead, 'rgba(255,255,255,0.6)', 2);
-  labelM('DEAD LINE', MAT.x+MAT.w, tDead, -58, -6, 'rgba(255,255,255,0.5)');
-  labelM('DEAD LINE', MAT.x+MAT.w, bDead, -58, -6, 'rgba(255,255,255,0.5)');
 
   // Delivery bracket lines — ±54px from centre, from ditch toward centre
   const delivLen=L.DELIV_LEN*MAT.h;
