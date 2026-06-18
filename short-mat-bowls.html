@@ -1455,12 +1455,16 @@ document.getElementById('btnBias').addEventListener('click',()=>{
 
 document.getElementById('btnFire').addEventListener('click',()=>{
   if (state !== 'aim') return;
-  deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), FIRE_SPD);
-  resetAim();
+  fireModeActive = !fireModeActive;
+  syncFireBtn();
 });
 
 function syncFireBtn() {
-  document.getElementById('btnFire').disabled = (state !== 'aim');
+  const btn = document.getElementById('btnFire');
+  btn.disabled = (state !== 'aim');
+  btn.textContent = fireModeActive ? 'Fire ●' : 'Fire';
+  btn.style.background = fireModeActive ? '#dc2626' : '';
+  btn.style.color = fireModeActive ? '#fff' : '';
 }
 
 // Service worker (PWA offline support) — updateViaCache:none bypasses browser HTTP
