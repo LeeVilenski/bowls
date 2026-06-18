@@ -1388,7 +1388,8 @@ function handlePointerDown(p) {
     if (aimAngle === null) aimAngle = defaultAimAngle();
     aimBaseAngle  = aimAngle;
     aimDragStartX = p.x;
-    swipeSamples  = [{ x: p.x, y: p.y, t: Date.now() }];
+    swipeStartY   = p.y;
+    swipeStartX   = p.x;
     aimLiveSpeed  = 0;
   } else if (state === 'end-result') {
     advanceEnd();
