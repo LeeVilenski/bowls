@@ -1158,68 +1158,163 @@ function drawJack() {
 
 function drawBowl(b) {
   if (b.offMat) return;
-  const sp=m2s(b.x,b.y), r=perspR(b.y,RB);
-  const pc=b.player===1?C.p1:C.p2;   // player colour for stickers
-  // Biased bowls are slightly discoid — wider than they are tall in top-down perspective
-  const rx=r*1.15, ry=r*0.88;
+  const sp = m2s(b.x, b.y);
+  const r  = perspR(b.y, RB);
+  const pc = b.player === 1 ? C.p1 : C.p2;
+  const rotA = b.rotAngle || 0;
+  const rest = b.restProgress || 0; // 0=rolling, 1=fully settled on side
+  const spd  = Math.hypot(b.vx || 0, b.vy || 0);
 
-  // Drop shadow
-  ctx.beginPath(); ctx.ellipse(sp.x+2,sp.y+3,rx,ry,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill();
-
-  // Main body — dark black like a real bias bowl
-  const g=ctx.createRadialGradient(sp.x-r*0.25,sp.y-r*0.3,r*0.05,sp.x+r*0.1,sp.y+r*0.1,r*1.3);
-  g.addColorStop(0,'#4a4a4a'); g.addColorStop(0.45,'#1c1c1c'); g.addColorStop(1,'#050505');
-  ctx.beginPath(); ctx.ellipse(sp.x,sp.y,rx,ry,0,0,Math.PI*2);
-  ctx.fillStyle=g; ctx.fill();
-
-  // Grip dimples — ring of small dots around the running-surface equator
-  if (r>=6) {
-    const nDots=Math.min(16,Math.max(6,Math.round(r*1.1)));
-    const dr=Math.max(0.8,r*0.10);
-    ctx.fillStyle='rgba(100,100,100,0.65)';
-    for (let i=0;i<nDots;i++) {
-      const a=i/nDots*Math.PI*2;
+  // ── Motion trail ────────────────────────────────────────────────
+  if (!b.stopped && b.trail && b.trail.length > 1 && spd > 1.5) {
+    for (let i = 0; i < b.trail.length; i++) {
+      const tp = m2s(b.trail[i].x, b.trail[i].y);
+      const tr = perspR(b.trail[i].y, RB);
+      const alpha = (i / b.trail.length) * 0.20;
       ctx.beginPath();
-      ctx.arc(sp.x+Math.cos(a)*rx*0.80, sp.y+Math.sin(a)*ry*0.80, dr, 0, Math.PI*2);
+      ctx.ellipse(tp.x, tp.y, tr * 1.05, tr * 0.82, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(20,20,20,${alpha})`;
       ctx.fill();
     }
   }
 
-  // Player-coloured sticker discs on each side face
-  const sx=rx*0.52, sw=Math.max(2,r*0.28), sh=Math.max(1.5,r*0.22);
-  // left sticker
-  ctx.beginPath(); ctx.ellipse(sp.x-sx,sp.y,sw*0.55,sh,0,0,Math.PI*2);
-  ctx.fillStyle=pc; ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=0.5; ctx.stroke();
-  // right sticker
-  ctx.beginPath(); ctx.ellipse(sp.x+sx,sp.y,sw*0.55,sh,0,0,Math.PI*2);
-  ctx.fillStyle=pc; ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=0.5; ctx.stroke();
+  // ── The bowl blends between two visual states ────────────────────
+  // Rolling state: sphere from above — running surface up, sticker orbits
+  // Resting state: bowl settled on side — large face visible, sticker prominent
 
-  // Specular highlight (top-left glint)
+  // Shadow scales with rest (bowl on side casts wider shadow)
+  const shRx = r * (1.05 + rest * 0.30);
+  const shRy = r * (0.72 - rest * 0.22);
   ctx.beginPath();
-  ctx.ellipse(sp.x-r*0.22,sp.y-r*0.28,r*0.28,r*0.16,-Math.PI/5,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.14)'; ctx.fill();
+  ctx.ellipse(sp.x + 2, sp.y + 3, shRx, shRy, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.fill();
 
-  // Bowl outline
-  ctx.beginPath(); ctx.ellipse(sp.x,sp.y,rx,ry,0,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1; ctx.stroke();
+  // Body radius grows as bowl tips onto its side (face becomes visible)
+  const bRx = r * (1.05 + rest * 0.22);
+  const bRy = r * (0.82 + rest * 0.18);
 
-  // Player number
-  if (r>=7) {
-    ctx.fillStyle='rgba(255,255,255,0.75)';
-    ctx.font=`bold ${Math.max(6,Math.round(r*0.62))}px Segoe UI`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(b.player,sp.x,sp.y+0.5); ctx.textBaseline='alphabetic';
+  // Sphere body — rich dark radial gradient
+  const gx = sp.x - bRx * 0.28, gy = sp.y - bRy * 0.32;
+  const g = ctx.createRadialGradient(gx, gy, bRx * 0.03, sp.x + bRx * 0.08, sp.y + bRy * 0.08, bRx * 1.35);
+  g.addColorStop(0,    '#585858');
+  g.addColorStop(0.28, '#282828');
+  g.addColorStop(0.60, '#0f0f0f');
+  g.addColorStop(1,    '#000000');
+  ctx.beginPath();
+  ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  // Equatorial running band — a subtle lighter ring visible on the sphere
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
+  ctx.clip();
+  const bandH = bRy * (0.28 - rest * 0.18);
+  const bandG = ctx.createLinearGradient(sp.x, sp.y - bandH, sp.x, sp.y + bandH);
+  bandG.addColorStop(0,   'rgba(90,90,90,0)');
+  bandG.addColorStop(0.5, `rgba(90,90,90,${0.30 - rest * 0.25})`);
+  bandG.addColorStop(1,   'rgba(90,90,90,0)');
+  ctx.fillStyle = bandG;
+  ctx.fillRect(sp.x - bRx * 1.2, sp.y - bandH, bRx * 2.4, bandH * 2);
+  ctx.restore();
+
+  // Grip rings — concentric, visible on the face when resting
+  if (r >= 7 && rest > 0.15) {
+    const ringAlpha = Math.min(0.55, rest * 0.7);
+    for (const frac of [0.42, 0.65, 0.86]) {
+      ctx.beginPath();
+      ctx.ellipse(sp.x, sp.y, bRx * frac, bRy * frac, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(80,80,80,${ringAlpha})`;
+      ctx.lineWidth = Math.max(0.5, r * 0.055);
+      ctx.stroke();
+    }
   }
 
-  // Chalk mark for touchers
+  // Grip dimples — orbit ring, fade out as bowl comes to rest
+  if (r >= 7 && rest < 0.85) {
+    const nDots = Math.min(14, Math.max(7, Math.round(r)));
+    const dr = Math.max(0.6, r * 0.085);
+    const dimpleAlpha = 0.55 * (1 - rest);
+    for (let i = 0; i < nDots; i++) {
+      const a = rotA + (i / nDots) * Math.PI * 2;
+      const dx = Math.cos(a) * bRx * 0.80;
+      const dy = Math.sin(a) * bRy * 0.78;
+      const vis = 0.4 + 0.6 * (0.5 + 0.5 * Math.cos(a));
+      ctx.beginPath();
+      ctx.arc(sp.x + dx, sp.y + dy, dr, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(75,75,75,${dimpleAlpha * vis})`;
+      ctx.fill();
+    }
+  }
+
+  // ── Sticker disc ─────────────────────────────────────────────────
+  // Rolling: sticker orbits the bowl in perspective (like a wheel spinning)
+  // Resting: sticker sits large and central on the visible face
+  const rollSX = sp.x + Math.sin(rotA) * bRx * 0.60;
+  const rollSY = sp.y - Math.cos(rotA) * bRy * 0.55;
+  const rollSR = r * (0.28 + 0.10 * Math.abs(Math.cos(rotA)));
+  const rollVis = Math.max(0, Math.cos(rotA));           // hide when on far side
+
+  const restSR = bRx * 0.50;
+
+  // Blend: rolling sticker fades out, resting sticker fades in
+  if (rollVis > 0.05 && rest < 0.92) {
+    const alpha = rollVis * (1 - rest);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.ellipse(rollSX, rollSY, rollSR * 1.1, rollSR * 0.85, 0, 0, Math.PI * 2);
+    ctx.fillStyle = pc;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (rest > 0.08) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, rest * 1.3);
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, restSR, restSR * (bRy / bRx), 0, 0, Math.PI * 2);
+    ctx.fillStyle = pc;
+    ctx.fill();
+    // Inner ring on resting sticker
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, restSR * 0.62, restSR * 0.62 * (bRy / bRx), 0, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Specular highlights ───────────────────────────────────────────
+  ctx.beginPath();
+  ctx.ellipse(sp.x - bRx * 0.26, sp.y - bRy * 0.30, bRx * 0.24, bRy * 0.16, -Math.PI / 5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.20)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(sp.x - bRx * 0.17, sp.y - bRy * 0.22, r * 0.08, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.fill();
+
+  // ── Player number ─────────────────────────────────────────────────
+  if (r >= 7) {
+    ctx.fillStyle = `rgba(255,255,255,${0.55 + rest * 0.25})`;
+    ctx.font = `bold ${Math.max(6, Math.round(r * 0.62))}px Segoe UI`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(b.player, sp.x, sp.y + 0.5);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // ── Toucher chalk mark ────────────────────────────────────────────
   if (b.toucher) {
-    ctx.font = `bold ${Math.max(7,Math.round(r*0.7))}px Segoe UI`;
+    ctx.font = `bold ${Math.max(7, Math.round(r * 0.7))}px Segoe UI`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillText('T', sp.x + rx + 5, sp.y - r*0.3);
+    ctx.fillText('T', sp.x + bRx + 5, sp.y - r * 0.3);
     ctx.textBaseline = 'alphabetic';
   }
 }
