@@ -335,8 +335,8 @@ let aimDragStartX = 0;
 let swipeSamples = [];     // [{x,y,t}] recent pointer positions
 let aimLiveSpeed = 0;      // upward px/s during active swipe (for power ring)
 
-const MIN_SWIPE_SPEED = 200;  // px/s minimum to count as a deliver
-const MAX_SWIPE_SPEED = 2200; // px/s = full power
+const MIN_SWIPE_SPEED = 200;   // canvas px/s minimum to count as a deliver
+const MAX_SWIPE_SPEED = 1000;  // canvas px/s = full power (accounts for deceleration at swipe top)
 
 function defaultAimAngle() {
   const bs = bowlStart();
