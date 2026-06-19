@@ -1554,9 +1554,13 @@ function drawSidePanels() {
     }
     if (bestP) {
       const sx = bestP === 1 ? SC : W - SC;
+      const sy = 160;
       ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 8px Segoe UI'; ctx.textAlign = 'center';
-      ctx.fillText('SHOT', sx, H - 20);
+      ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('●', sx, sy - 10);
+      ctx.font = 'bold 10px Segoe UI';
+      ctx.fillText('SHOT', sx, sy + 6);
+      ctx.textBaseline = 'alphabetic';
     }
   }
 }
