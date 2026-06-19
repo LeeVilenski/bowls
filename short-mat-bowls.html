@@ -1534,7 +1534,7 @@ function loop() {
       b.restProgress = Math.min(1, (b.restProgress || 0) + 0.04);
     }
   }
-  if (state==='moving' || state==='camera-return' || (state==='aim' && cam.phase==='show-head')) {
+  if (state==='moving' || state==='camera-return' || (state==='aim' && cam.phase!=='idle')) {
     updateCamera();
   }
   draw();
