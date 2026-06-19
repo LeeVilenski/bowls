@@ -1354,19 +1354,20 @@ function drawBowl(b) {
       ctx.restore();
     }
   } else if (design === 1) {
-    // Speckled: scattered dots in player colour
+    // Speckled: scattered lighter/darker flecks over coloured body
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
     ctx.clip();
     const seed = b.player * 1000 + bowls.indexOf(b);
-    for (let i = 0; i < 18; i++) {
-      const a1 = Math.sin(seed + i * 137.5) * 0.8;
-      const a2 = Math.cos(seed + i * 97.3) * 0.8;
+    for (let i = 0; i < 40; i++) {
+      const a1 = Math.sin(seed + i * 137.5) * 0.85;
+      const a2 = Math.cos(seed + i * 97.3) * 0.85;
+      const sz = r * (0.04 + Math.abs(Math.sin(seed + i * 53.7)) * 0.08);
+      const light = i % 3 === 0;
       ctx.beginPath();
-      ctx.arc(sp.x + a1 * bRx, sp.y + a2 * bRy, r * 0.08, 0, Math.PI * 2);
-      ctx.fillStyle = pc;
-      ctx.globalAlpha = 0.5 + rest * 0.4;
+      ctx.arc(sp.x + a1 * bRx, sp.y + a2 * bRy, sz, 0, Math.PI * 2);
+      ctx.fillStyle = light ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)';
       ctx.fill();
     }
     ctx.restore();
