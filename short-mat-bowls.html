@@ -1386,17 +1386,28 @@ function drawBowl(b) {
     }
     ctx.restore();
   } else if (design === 2) {
-    // Ringed: dark stripes around the equator over coloured body
+    // Ringed: dark stripes perpendicular to travel direction
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
     ctx.clip();
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    const stripeW = bRy * 0.12;
+    const tvx2 = b.vx || 0, tvy2 = b.vy || 0;
+    const tspd2 = Math.hypot(tvx2, tvy2);
+    const tnx2 = tspd2 > 0.01 ? tvx2 / tspd2 : 0;
+    const tny2 = tspd2 > 0.01 ? tvy2 / tspd2 : -1;
+    const pnx2 = -tny2, pny2 = tnx2;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.lineWidth = r * 0.18;
     for (const off of [-0.30, -0.10, 0.10, 0.30]) {
-      ctx.fillRect(sp.x - bRx, sp.y + bRy * off - stripeW/2, bRx * 2, stripeW);
+      const cx2 = sp.x + pnx2 * bRx * off;
+      const cy2 = sp.y + pny2 * bRy * off;
+      const normD = Math.abs(off);
+      const halfLen = bRy * Math.sqrt(Math.max(0, 1 - normD * normD)) * 0.95;
+      ctx.beginPath();
+      ctx.moveTo(cx2 - tnx2 * halfLen, cy2 - tny2 * halfLen);
+      ctx.lineTo(cx2 + tnx2 * halfLen, cy2 + tny2 * halfLen);
+      ctx.stroke();
     }
-    // Sticker rings on face
     if (rest > 0.08) {
       ctx.globalAlpha = Math.min(1, rest * 1.3);
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
