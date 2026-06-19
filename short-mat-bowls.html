@@ -885,6 +885,41 @@ function draw() {
   if (state==='aim') drawAim();
   ctx.restore();
   drawSidePanels();
+  drawOverlayUI();
+}
+
+function drawOverlayUI() {
+  const btnW = 52, btnH = 28, btnR = 6;
+  const btnY = H - 44;
+
+  // Fire mode button (left side, above delivery area) — only during aim
+  if (state === 'aim') {
+    const fx = 50, fy = btnY;
+    ctx.fillStyle = fireModeActive ? '#dc2626' : 'rgba(127,29,29,0.7)';
+    ctx.beginPath(); ctx.roundRect(fx - btnW/2, fy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.fillStyle = fireModeActive ? '#fff' : '#fca5a5';
+    ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(fireModeActive ? 'FIRE ●' : 'FIRE', fx, fy);
+  }
+
+  // FF button (right side) — only during moving
+  if (state === 'moving') {
+    const ffx = W - 50, ffy = btnY;
+    ctx.fillStyle = ffModeActive ? '#7c3aed' : 'rgba(30,58,95,0.7)';
+    ctx.beginPath(); ctx.roundRect(ffx - btnW/2, ffy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.fillStyle = ffModeActive ? '#fff' : '#93c5fd';
+    ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('⏩ 3×', ffx, ffy);
+  }
+
+  // Message text (bottom centre)
+  if (msgText) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(38, H - 18, W - 76, 18);
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = '10px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(msgText, W/2, H - 9, W - 84);
+  }
 }
 
 function drawMat() {
