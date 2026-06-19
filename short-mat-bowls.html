@@ -924,7 +924,7 @@ function drawOverlayUI() {
     ctx.fillStyle = fireModeActive ? '#dc2626' : 'rgba(127,29,29,0.7)';
     ctx.beginPath(); ctx.roundRect(fx - btnW/2, fy - btnH/2, btnW, btnH, btnR); ctx.fill();
     ctx.fillStyle = fireModeActive ? '#fff' : '#fca5a5';
-    ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(fireModeActive ? 'FIRE ●' : 'FIRE', fx, fy);
 
     // Show Head button (right side) — toggles zoom to jack area
@@ -933,7 +933,7 @@ function drawOverlayUI() {
     ctx.fillStyle = headActive ? '#0d9488' : 'rgba(13,94,88,0.7)';
     ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
     ctx.fillStyle = headActive ? '#fff' : '#5eead4';
-    ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(headActive ? '⬇ MAT' : '👁 HEAD', hx, hy);
   }
 
