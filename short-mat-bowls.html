@@ -1456,15 +1456,16 @@ function drawAim() {
 
   // Bias arrows — ◀ L and R ▶ flanking the delivery mark
   const bd = curBiasDir();
-  const arrowY = bss.y + 38;
-  const arrowGap = 44;
+  const arrowY = bss.y + 50;
+  const arrowGap = 80;
+  const abW = 60, abH = 36;
   for (const [dir, label, ox] of [['left','◀ L', -arrowGap], ['right','R ▶', arrowGap]]) {
     const ax = bss.x + ox;
     const active = bd === dir;
     ctx.fillStyle = active ? 'rgba(255,230,50,0.95)' : 'rgba(255,255,255,0.25)';
-    ctx.beginPath(); ctx.roundRect(ax - 22, arrowY - 12, 44, 24, 6); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(ax - abW/2, arrowY - abH/2, abW, abH, 8); ctx.fill();
     ctx.fillStyle = active ? '#000' : 'rgba(255,255,255,0.6)';
-    ctx.font = `bold ${active ? 12 : 11}px Segoe UI`;
+    ctx.font = `bold ${active ? 18 : 16}px Segoe UI`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(label, ax, arrowY); ctx.textBaseline = 'alphabetic';
   }
