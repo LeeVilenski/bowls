@@ -1694,10 +1694,10 @@ function handlePointerDown(p) {
   } else if (state === 'aim') {
     // Check bias arrow taps
     const bsm = bowlStart(), bss = m2s(bsm.x, bsm.y);
-    const arrowY = bss.y + 38, arrowGap = 44;
+    const arrowY = bss.y + 50, arrowGap = 80, abW = 60, abH = 36;
     for (const [dir, ox] of [['left', -arrowGap], ['right', arrowGap]]) {
       const ax = bss.x + ox;
-      if (p.x >= ax - 22 && p.x <= ax + 22 && p.y >= arrowY - 12 && p.y <= arrowY + 12) {
+      if (p.x >= ax - abW/2 && p.x <= ax + abW/2 && p.y >= arrowY - abH/2 && p.y <= arrowY + abH/2) {
         setBiasDir(playerForTurn(turnIdx), dir);
         mouse.down = false; return;
       }
