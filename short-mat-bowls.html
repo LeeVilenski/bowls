@@ -671,7 +671,7 @@ function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 function promptPlayer(p) {
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
-    msg(`End ${endNum}/${ENDS} — <span style="color:#f87171">AI</span> is aiming…`);
+    msg(`End ${endNum}/${ENDS} — <span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
     aiTimer = setTimeout(() => {
       if (state !== 'ai-turn') return;
       const shot = aiPickShot();
