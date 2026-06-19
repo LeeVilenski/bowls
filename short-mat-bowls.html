@@ -547,7 +547,7 @@ function stepCollisions() {
         collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
         if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) {
           lastJackHitter = a.player;
-          if (!jack.inDitch) a.toucher = true;  // toucher only awarded before jack enters ditch
+          if (!jack.inDitch && a.delivering) a.toucher = true;
         }
       }
     }
