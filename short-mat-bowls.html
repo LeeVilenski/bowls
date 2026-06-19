@@ -1770,7 +1770,17 @@ function buildSplash() {
   }
 
   seg('sEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>splashCfg.ends, v=>splashCfg.ends=v);
-  seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player']], ()=>splashCfg.mode, v=>splashCfg.mode=v);
+  seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player']], ()=>splashCfg.mode, v=>{
+    splashCfg.mode=v;
+    document.getElementById('aiPickWrap').style.display = v==='vs-ai'?'':'none';
+  });
+  const aiOpts = AI_PLAYERS.map((a,i)=>[a.name.split(' ')[0],i]);
+  seg('sAI', aiOpts, ()=>splashCfg.aiLevel, v=>{
+    splashCfg.aiLevel=v;
+    document.getElementById('aiBio').textContent = AI_PLAYERS[v].bio;
+  });
+  document.getElementById('aiBio').textContent = AI_PLAYERS[splashCfg.aiLevel].bio;
+  document.getElementById('aiPickWrap').style.display = splashCfg.mode==='vs-ai'?'':'none';
   seg('sBias', [['Subtle',0.1],['Gentle',0.2],['Standard',0.5],['Strong',1.0]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
 
   const szSlider = document.getElementById('sSizeSlider');
