@@ -1612,6 +1612,11 @@ function handlePointerDown(p) {
         mouse.down = false; return;
       }
     }
+    // Return camera to full view when player starts aiming gesture
+    if (cam.phase === 'show-head') {
+      cam.phase = 'return';
+      cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
+    }
     // Begin gesture — could be direction-setting or power swipe
     if (aimAngle === null) aimAngle = defaultAimAngle();
     aimBaseAngle  = aimAngle;
