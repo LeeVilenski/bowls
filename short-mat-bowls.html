@@ -1561,6 +1561,7 @@ function handlePointerDown(p) {
         const jy = Math.max(lo, Math.min(hi, mm.y));
         jack = { x: jx, y: jy, vx: 0, vy: 0, stopped: true, offMat: false, inDitch: false };
         beginTurns();
+        mouse.down = false; return;
       } else {
         msg('Click along the glowing jack line (the vertical mark at the centre of the far end)!');
       }
