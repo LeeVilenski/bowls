@@ -1544,6 +1544,23 @@ function hitPanelBtn(p, cx) {
 function handlePointerDown(p) {
   mouse = { x: p.x, y: p.y, down: true };
 
+  // Overlay button hit-tests
+  const btnW = 52, btnH = 28, btnY = H - 44;
+  if (state === 'aim') {
+    const fx = 50;
+    if (p.x >= fx - btnW/2 && p.x <= fx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
+      fireModeActive = !fireModeActive;
+      mouse.down = false; return;
+    }
+  }
+  if (state === 'moving') {
+    const ffx = W - 50;
+    if (p.x >= ffx - btnW/2 && p.x <= ffx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
+      ffModeActive = !ffModeActive;
+      mouse.down = false; return;
+    }
+  }
+
   // Canvas-drawn panel buttons
   const SP=38, SC=19;
   if (hitPanelBtn(p, SC)) {
