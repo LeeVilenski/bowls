@@ -744,6 +744,11 @@ function updateCamera() {
       cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
     }
 
+  } else if (cam.phase === 'show-head') {
+    cam.x = lerp(cam.x, cam.tx, 0.06);
+    cam.y = lerp(cam.y, cam.ty, 0.06);
+    cam.zoom = lerp(cam.zoom, cam.tz, 0.05);
+
   } else if (cam.phase === 'return') {
     cam.x = lerp(cam.x, W/2, 0.07);
     cam.y = lerp(cam.y, H/2, 0.07);
