@@ -1255,13 +1255,20 @@ function drawBowl(b) {
   const bRx = r * (1.05 + rest * 0.22);
   const bRy = r * (0.82 + rest * 0.18);
 
-  // Sphere body — rich dark radial gradient
+  // Sphere body
   const gx = sp.x - bRx * 0.28, gy = sp.y - bRy * 0.32;
   const g = ctx.createRadialGradient(gx, gy, bRx * 0.03, sp.x + bRx * 0.08, sp.y + bRy * 0.08, bRx * 1.35);
-  g.addColorStop(0,    '#585858');
-  g.addColorStop(0.28, '#282828');
-  g.addColorStop(0.60, '#0f0f0f');
-  g.addColorStop(1,    '#000000');
+  const pcd = b.player === 1 ? C.p1d : C.p2d;
+  if (design === 1) {
+    g.addColorStop(0,    pc);
+    g.addColorStop(0.5,  pcd);
+    g.addColorStop(1,    '#000000');
+  } else {
+    g.addColorStop(0,    '#585858');
+    g.addColorStop(0.28, '#282828');
+    g.addColorStop(0.60, '#0f0f0f');
+    g.addColorStop(1,    '#000000');
+  }
   ctx.beginPath();
   ctx.ellipse(sp.x, sp.y, bRx, bRy, 0, 0, Math.PI * 2);
   ctx.fillStyle = g;
