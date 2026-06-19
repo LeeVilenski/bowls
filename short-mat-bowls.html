@@ -680,7 +680,8 @@ function deliverBowl(player, angle, speed) {
   const bs = bowlStart();
   bowls.push({x:bs.x, y:bs.y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
               player, bias:biasDirs[player-1], stopped:false, offMat:false, toucher:false, inDitch:false,
-              rotAngle:0, trail:[], restProgress:0, delivering:true});
+              rotAngle:0, trail:[], restProgress:0, delivering:true,
+              design:splashCfg[`p${player}design`]});
   state = 'moving'; syncFireBtn(); syncFFBtn();
   cam.phase = 'tracking';
   cam.pendingNext = false;
