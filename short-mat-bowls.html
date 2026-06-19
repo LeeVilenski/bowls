@@ -48,39 +48,13 @@ body {
   max-width: 100%;
 }
 
-/* Bottom message bar */
-#bar {
-  flex-shrink: 0;
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: #111827;
-  border-bottom: 1px solid #1e293b;
-}
-#msgBox {
-  flex: 1; font-size: 11px; text-align: center; line-height: 1.3;
-  padding: 0 4px; opacity: 0.9;
-}
-#btnGroup { display: flex; gap: 4px; }
+/* Splash-only button base */
 button {
   padding: 7px 10px; border: none; border-radius: 6px; font-size: 11px;
   font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
   min-height: 36px; white-space: nowrap;
 }
 button:active { opacity: .7; }
-#btnMode { background: #7c3aed; color: #fff; }
-#btnBias { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
-#btnNew  { background: #1d4ed8; color: #fff; }
-#btnFire { background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
-#btnFire:not([disabled]) { background: #dc2626; color: #fff; }
-#btnFire[disabled] { opacity: 0.35; cursor: default; }
-#btnFF { background: #1e3a5f; color: #93c5fd; border: 1px solid #1e40af; }
-#btnFF:not([disabled]) { background: #1d4ed8; color: #fff; }
-#btnFF[disabled] { opacity: 0.35; cursor: default; }
-#btnFF.active { background: #7c3aed; color: #fff; border-color: #6d28d9; }
 
 /* ── Splash / Settings overlay ───────────────────────────────────── */
 #splash {
