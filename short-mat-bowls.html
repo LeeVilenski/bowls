@@ -920,7 +920,7 @@ function drawOverlayUI() {
 
   // Fire mode button (left side) — only during aim
   if (state === 'aim') {
-    const fx = 50, fy = btnY;
+    const fx = btnW/2 + 6, fy = btnY;
     ctx.fillStyle = fireModeActive ? '#dc2626' : 'rgba(127,29,29,0.7)';
     ctx.beginPath(); ctx.roundRect(fx - btnW/2, fy - btnH/2, btnW, btnH, btnR); ctx.fill();
     ctx.fillStyle = fireModeActive ? '#fff' : '#fca5a5';
