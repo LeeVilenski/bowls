@@ -1642,7 +1642,7 @@ function handlePointerDown(p) {
     }
   }
   if (state === 'moving') {
-    const ffx = W - 50;
+    const ffx = W - btnW/2 - 6;
     if (p.x >= ffx - btnW/2 && p.x <= ffx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
       ffModeActive = !ffModeActive;
       mouse.down = false; return;
