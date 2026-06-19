@@ -388,7 +388,8 @@ function allStopped() {
   return bowls.every(b => b.stopped || b.offMat);
 }
 
-function msg(html) { document.getElementById('msgBox').innerHTML = html; }
+let msgText = '';
+function msg(html) { msgText = html.replace(/<[^>]+>/g, ''); }
 function updateHUD() {
   document.getElementById('sc1').textContent = scores[0];
   document.getElementById('sc2').textContent = scores[1];
