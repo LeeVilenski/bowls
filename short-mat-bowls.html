@@ -1396,7 +1396,7 @@ function drawBowl(b) {
     const tnx2 = tspd2 > 0.01 ? tvx2 / tspd2 : 0;
     const tny2 = tspd2 > 0.01 ? tvy2 / tspd2 : -1;
     const pnx2 = -tny2, pny2 = tnx2;
-    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.strokeStyle = `rgba(0,0,0,${0.75 * (1 - rest)})`;
     ctx.lineWidth = r * 0.18;
     for (const off of [-0.30, -0.10, 0.10, 0.30]) {
       const cx2 = sp.x + pnx2 * bRx * off;
