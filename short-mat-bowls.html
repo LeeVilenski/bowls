@@ -1544,22 +1544,26 @@ function drawSidePanels() {
     ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
   }
 
-  // Shot holder indicator
+  // Shot holder indicator — shown centre-bottom above overlay buttons
   if (jack && !jack.offMat && bowls.some(b => !b.offMat)) {
-    let bestP = 0, bestD = Infinity;
-    for (const b of bowls) {
-      if (b.offMat) continue;
-      const d = Math.hypot(b.x - jack.x, b.y - jack.y);
-      if (d < bestD) { bestD = d; bestP = b.player; }
-    }
-    if (bestP) {
-      const sx = bestP === 1 ? SC : W - SC;
-      const sy = 160;
-      ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('●', sx, sy - 10);
-      ctx.font = 'bold 10px Segoe UI';
-      ctx.fillText('SHOT', sx, sy + 6);
+    const dists = bowls.filter(b => !b.offMat)
+      .map(b => ({ p: b.player, d: Math.hypot(b.x - jack.x, b.y - jack.y) }))
+      .sort((a, b) => a.d - b.d);
+    if (dists.length) {
+      const holder = dists[0].p;
+      let count = 0;
+      for (const e of dists) { if (e.p === holder) count++; else break; }
+      const col = holder === 1 ? C.p1 : C.p2;
+      const label = holder === 1 ? 'P1' : (mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0] : 'P2');
+      const sy = H - 160;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath(); ctx.roundRect(W/2 - 70, sy - 22, 140, 44, 8); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.font = 'bold 28px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(count, W/2, sy);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = 'bold 12px Segoe UI';
+      ctx.fillText(`${label} holding shot`, W/2, sy + 16);
       ctx.textBaseline = 'alphabetic';
     }
   }
