@@ -598,18 +598,21 @@ function aiPickShot() {
   const jx  = jack.x, jy = jack.y;
   const base = Math.atan2(jy - bs.y, jx - bs.x);
 
-  let bestAngle = base, bestPower = 0.6*MAX_SPD, bestDist = Infinity;
+  let bestAngle = base, bestPower = 0.6*MAX_SPD, bestDist = Infinity, bestBias = biasDirs[1];
 
-  for (let da = -55; da <= 55; da += ai.stepDeg) {
-    const angle = base + da * Math.PI/180;
-    for (const pct of ai.powers) {
-      const spd = pct * MAX_SPD;
-      const path = simPath(bs.x, bs.y, angle, spd, biasDirs[1], biasMult);
-      const end  = path[path.length-1];
-      const d    = Math.hypot(end.x - jx, end.y - jy);
-      if (d < bestDist) { bestDist = d; bestAngle = angle; bestPower = spd; }
+  for (const tryBias of ['left', 'right']) {
+    for (let da = -55; da <= 55; da += ai.stepDeg) {
+      const angle = base + da * Math.PI/180;
+      for (const pct of ai.powers) {
+        const spd = pct * MAX_SPD;
+        const path = simPath(bs.x, bs.y, angle, spd, tryBias, biasMult);
+        const end  = path[path.length-1];
+        const d    = Math.hypot(end.x - jx, end.y - jy);
+        if (d < bestDist) { bestDist = d; bestAngle = angle; bestPower = spd; bestBias = tryBias; }
+      }
     }
   }
+  setBiasDir(2, bestBias);
 
   return {
     angle: bestAngle + (Math.random()-0.5)*ai.jitter,
