@@ -1496,7 +1496,21 @@ function drawSidePanels() {
     ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
   }
 
-  // Distance lines + leader star
+  // Shot holder indicator
+  if (jack && !jack.offMat && bowls.some(b => !b.offMat)) {
+    let bestP = 0, bestD = Infinity;
+    for (const b of bowls) {
+      if (b.offMat) continue;
+      const d = Math.hypot(b.x - jack.x, b.y - jack.y);
+      if (d < bestD) { bestD = d; bestP = b.player; }
+    }
+    if (bestP) {
+      const sx = bestP === 1 ? SC : W - SC;
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 8px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillText('SHOT', sx, H - 20);
+    }
+  }
 }
 
 function drawDistances() {
