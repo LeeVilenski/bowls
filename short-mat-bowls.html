@@ -575,17 +575,30 @@ function simPath(sx, sy, angle, speed, bias, bMult) {
 }
 
 // ── AI ────────────────────────────────────────────────────────────
+const AI_PLAYERS = [
+  { name:'Beginner Barry', bio:'Just picked up bowls last month — enthusiastic but wayward.',
+    stepDeg:5.0, powers:[0.45,0.65,0.85], jitter:0.30, speedVar:0.20 },
+  { name:'Club Carol', bio:'Tuesday night regular at the local club. Solid but beatable.',
+    stepDeg:2.5, powers:[0.38,0.50,0.62,0.74,0.86], jitter:0.16, speedVar:0.14 },
+  { name:'County Dave', bio:'Represents the county. Rarely misses, always plays tactically.',
+    stepDeg:1.5, powers:[0.35,0.45,0.55,0.65,0.75,0.85], jitter:0.08, speedVar:0.07 },
+  { name:'Master Mo', bio:'National champion. Will make you work for every single shot.',
+    stepDeg:1.0, powers:[0.30,0.40,0.50,0.60,0.70,0.80,0.90], jitter:0.04, speedVar:0.03 },
+];
+let aiLevel = 1;
+
 function aiPickShot() {
   if (!jack || jack.offMat) return null;
+  const ai  = AI_PLAYERS[aiLevel];
   const bs  = bowlStart();
   const jx  = jack.x, jy = jack.y;
   const base = Math.atan2(jy - bs.y, jx - bs.x);
 
   let bestAngle = base, bestPower = 0.6*MAX_SPD, bestDist = Infinity;
 
-  for (let da = -55; da <= 55; da += 2.5) {
+  for (let da = -55; da <= 55; da += ai.stepDeg) {
     const angle = base + da * Math.PI/180;
-    for (const pct of [0.38, 0.50, 0.62, 0.74, 0.86]) {
+    for (const pct of ai.powers) {
       const spd = pct * MAX_SPD;
       const path = simPath(bs.x, bs.y, angle, spd, biasDirs[1], biasMult);
       const end  = path[path.length-1];
@@ -595,8 +608,8 @@ function aiPickShot() {
   }
 
   return {
-    angle: bestAngle + (Math.random()-0.5)*0.16,
-    speed: bestPower * (0.93 + Math.random()*0.14)
+    angle: bestAngle + (Math.random()-0.5)*ai.jitter,
+    speed: bestPower * (1 - ai.speedVar/2 + Math.random()*ai.speedVar)
   };
 }
 
