@@ -1599,41 +1599,8 @@ canvas.addEventListener('touchmove',  e => { e.preventDefault(); handlePointerMo
 canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp(); },            { passive: false });
 
 // Buttons
-document.getElementById('btnBias').addEventListener('click',()=>{
-  const p = playerForTurn(turnIdx);
-  setBiasDir(p, curBiasDir() === 'right' ? 'left' : 'right');
-  document.getElementById('btnBias').textContent = curBiasDir() === 'right' ? '↗ R' : '↖ L';
-});
-
-document.getElementById('btnFire').addEventListener('click',()=>{
-  if (state !== 'aim') return;
-  fireModeActive = !fireModeActive;
-  syncFireBtn();
-});
-
-function syncFireBtn() {
-  const btn = document.getElementById('btnFire');
-  btn.disabled = (state !== 'aim');
-  btn.textContent = fireModeActive ? 'Fire ●' : 'Fire';
-  btn.style.background = fireModeActive ? '#dc2626' : '';
-  btn.style.color = fireModeActive ? '#fff' : '';
-}
-
-document.getElementById('btnFF').addEventListener('click', () => {
-  if (state !== 'moving') return;
-  ffModeActive = !ffModeActive;
-  syncFFBtn();
-});
-
-function syncFFBtn() {
-  const btn   = document.getElementById('btnFF');
-  const bias  = document.getElementById('btnBias');
-  const isMoving = (state === 'moving');
-  btn.disabled = !isMoving;
-  btn.style.display = isMoving ? '' : 'none';
-  bias.style.display = isMoving ? 'none' : '';
-  btn.classList.toggle('active', ffModeActive);
-}
+function syncFireBtn() {}
+function syncFFBtn() {}
 
 document.addEventListener('keydown', e => {
   if (e.key === 'f' || e.key === 'F') {
