@@ -1620,13 +1620,13 @@ function handlePointerDown(p) {
   // Overlay button hit-tests
   const btnW = 156, btnH = 84, btnY = H - 80;
   if (state === 'aim') {
-    const fx = 50;
+    const fx = btnW/2 + 6;
     if (p.x >= fx - btnW/2 && p.x <= fx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
       fireModeActive = !fireModeActive;
       mouse.down = false; return;
     }
     // Head button (right side during aim)
-    const hx = W - 50;
+    const hx = W - btnW/2 - 6;
     if (p.x >= hx - btnW/2 && p.x <= hx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
       if (cam.phase === 'show-head') {
         cam.phase = 'return';
