@@ -1517,7 +1517,7 @@ function drawSidePanels() {
 
   // Right — P2/AI
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
-  const lbl2 = mode==='vs-ai'?'AI':'P2';
+  const lbl2 = mode==='vs-ai'? AI_PLAYERS[aiLevel].name.split(' ')[0] :'P2';
   ctx.fillStyle=C.p2; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(lbl2,W-SC,16);
   ctx.font='bold 22px Segoe UI';
