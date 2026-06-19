@@ -918,7 +918,7 @@ function drawOverlayUI() {
   const btnW = 52, btnH = 28, btnR = 6;
   const btnY = H - 44;
 
-  // Fire mode button (left side, above delivery area) — only during aim
+  // Fire mode button (left side) — only during aim
   if (state === 'aim') {
     const fx = 50, fy = btnY;
     ctx.fillStyle = fireModeActive ? '#dc2626' : 'rgba(127,29,29,0.7)';
@@ -926,6 +926,15 @@ function drawOverlayUI() {
     ctx.fillStyle = fireModeActive ? '#fff' : '#fca5a5';
     ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(fireModeActive ? 'FIRE ●' : 'FIRE', fx, fy);
+
+    // Show Head button (right side) — toggles zoom to jack area
+    const hx = W - 50, hy = btnY;
+    const headActive = cam.phase === 'show-head';
+    ctx.fillStyle = headActive ? '#0d9488' : 'rgba(13,94,88,0.7)';
+    ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.fillStyle = headActive ? '#fff' : '#5eead4';
+    ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(headActive ? '⬇ MAT' : '👁 HEAD', hx, hy);
   }
 
   // FF button (right side) — only during moving
