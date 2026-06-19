@@ -1256,6 +1256,7 @@ function drawBowl(b) {
   const bRy = r * (0.82 + rest * 0.18);
 
   // Sphere body
+  const design = b.design || 0;
   const gx = sp.x - bRx * 0.28, gy = sp.y - bRy * 0.32;
   const g = ctx.createRadialGradient(gx, gy, bRx * 0.03, sp.x + bRx * 0.08, sp.y + bRy * 0.08, bRx * 1.35);
   const pcd = b.player === 1 ? C.p1d : C.p2d;
