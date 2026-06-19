@@ -1543,7 +1543,6 @@ function handlePointerDown(p) {
       const ax = bss.x + ox;
       if (p.x >= ax - 22 && p.x <= ax + 22 && p.y >= arrowY - 12 && p.y <= arrowY + 12) {
         setBiasDir(playerForTurn(turnIdx), dir);
-        document.getElementById('btnBias').textContent = dir === 'right' ? '↗ R' : '↖ L';
         mouse.down = false; return;
       }
     }
