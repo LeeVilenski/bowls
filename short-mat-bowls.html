@@ -1777,7 +1777,9 @@ function buildSplash() {
     });
   }
   buildSwatches('sP1', ()=>splashCfg.p1idx, i=>splashCfg.p1idx=i);
+  seg('sD1', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p1design, v=>splashCfg.p1design=v);
   buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
+  seg('sD2', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p2design, v=>splashCfg.p2design=v);
 
   const BG_OPTS = [
     ['hardwood',     'Hardwood',      'bg-hardwood'],
