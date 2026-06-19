@@ -1544,26 +1544,30 @@ function drawSidePanels() {
     ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
   }
 
-  // Shot holder indicator — shown centre-bottom above overlay buttons
-  if (jack && !jack.offMat && bowls.some(b => !b.offMat)) {
-    const dists = bowls.filter(b => !b.offMat)
-      .map(b => ({ p: b.player, d: Math.hypot(b.x - jack.x, b.y - jack.y) }))
-      .sort((a, b) => a.d - b.d);
-    if (dists.length) {
+  // Shot holder indicator — above Fire (P1) or Head (P2) button
+  if (jack && !jack.offMat) {
+    const farDeadY = yFromFar(L.DEAD);
+    const liveBowls = bowls.filter(b => !b.offMat && b.y < farDeadY + RB);
+    if (liveBowls.length) {
+      const dists = liveBowls
+        .map(b => ({ p: b.player, d: Math.hypot(b.x - jack.x, b.y - jack.y) }))
+        .sort((a, b) => a.d - b.d);
       const holder = dists[0].p;
       let count = 0;
       for (const e of dists) { if (e.p === holder) count++; else break; }
       const col = holder === 1 ? C.p1 : C.p2;
       const label = holder === 1 ? 'P1' : (mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0] : 'P2');
-      const sy = H - 160;
+      const btnW2 = 156;
+      const sx = holder === 1 ? btnW2/2 + 6 : W - btnW2/2 - 6;
+      const sy = H - 80 - 84/2 - 30;
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.beginPath(); ctx.roundRect(W/2 - 70, sy - 22, 140, 44, 8); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(sx - 70, sy - 18, 140, 36, 8); ctx.fill();
       ctx.fillStyle = col;
-      ctx.font = 'bold 28px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(count, W/2, sy);
+      ctx.font = 'bold 24px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(count, sx - 30, sy);
       ctx.fillStyle = '#e2e8f0';
-      ctx.font = 'bold 12px Segoe UI';
-      ctx.fillText(`${label} holding shot`, W/2, sy + 16);
+      ctx.font = 'bold 11px Segoe UI';
+      ctx.fillText(`${label} shot`, sx + 20, sy);
       ctx.textBaseline = 'alphabetic';
     }
   }
