@@ -939,7 +939,7 @@ function drawOverlayUI() {
 
   // FF button (right side) — only during moving
   if (state === 'moving') {
-    const ffx = W - 50, ffy = btnY;
+    const ffx = W - btnW/2 - 6, ffy = btnY;
     ctx.fillStyle = ffModeActive ? '#7c3aed' : 'rgba(30,58,95,0.7)';
     ctx.beginPath(); ctx.roundRect(ffx - btnW/2, ffy - btnH/2, btnW, btnH, btnR); ctx.fill();
     ctx.fillStyle = ffModeActive ? '#fff' : '#93c5fd';
