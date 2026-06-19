@@ -660,6 +660,15 @@ function promptPlayer(p) {
     }, 1100);
   } else {
     state = 'aim'; syncFireBtn();
+    // Show head camera — zoom toward jack area
+    if (jack && !jack.offMat) {
+      const js = m2s(jack.x, jack.y);
+      const ds = m2s(bowlStart().x, bowlStart().y);
+      cam.phase = 'show-head';
+      cam.tx = W/2;
+      cam.ty = js.y + (ds.y - js.y) * 0.15;
+      cam.tz = 1.35;
+    }
     const col  = p===1 ? '#60a5fa' : '#f87171';
     const name = p===1 ? 'Player 1' : 'Player 2';
     msg(`End ${endNum}/${ENDS} — <span style="color:${col}">${name}</span>: drag from the delivery mark`);
