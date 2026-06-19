@@ -444,7 +444,7 @@ function stepObj(obj, bias) {
 
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.22) {
-    obj.stopped = true; obj.vx = obj.vy = 0;
+    obj.stopped = true; obj.vx = obj.vy = 0; if (obj.delivering) obj.delivering = false;
     const farDitchY = yFromFar(L.DITCH);
     const farDeadY  = yFromFar(L.DEAD);
     const r_obj = obj === jack ? RJ : RB;
