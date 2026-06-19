@@ -1618,7 +1618,7 @@ function handlePointerDown(p) {
   mouse = { x: p.x, y: p.y, down: true };
 
   // Overlay button hit-tests
-  const btnW = 52, btnH = 28, btnY = H - 44;
+  const btnW = 156, btnH = 84, btnY = H - 80;
   if (state === 'aim') {
     const fx = 50;
     if (p.x >= fx - btnW/2 && p.x <= fx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
