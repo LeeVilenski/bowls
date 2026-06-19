@@ -1,5 +1,12 @@
-const CACHE = 'bowls-v3';
-const ASSETS = ['./short-mat-bowls.html', './manifest.json', './icon.svg'];
+const CACHE = 'bowls-v4';
+const ASSETS = [
+  './',
+  './short-mat-bowls.html',
+  './manifest.json',
+  './icon.svg',
+  './icon-192.png',
+  './icon-512.png'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -19,8 +26,10 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request)
       .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(e.request))
