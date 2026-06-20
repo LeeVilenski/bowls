@@ -1,4 +1,4 @@
-const CACHE = 'bowls-v4';
+const CACHE = 'bowls-v5';
 const ASSETS = [
   './',
   './short-mat-bowls.html',
