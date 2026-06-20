@@ -815,8 +815,16 @@ function promptPlayer(p) {
   }
 }
 
+let _preShot = {};
 function deliverBowl(player, angle, speed) {
   const bs = bowlStart();
+  _preShot = {
+    player,
+    fired: fireModeActive,
+    liveBowls: bowls.filter(b => !b.offMat).length,
+    jackInDitch: jack && jack.inDitch,
+    jackOffMat: jack && jack.offMat,
+  };
   bowls.push({x:bs.x, y:bs.y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
               player, bias:biasDirs[player-1], stopped:false, offMat:false, toucher:false, inDitch:false,
               rotAngle:0, trail:[], restProgress:0, delivering:true,
@@ -912,6 +920,17 @@ function applyCameraTransform() {
 }
 
 function _doOnAllStopped() {
+  // Post-shot achievement checks
+  if (_preShot.player === 1) {
+    // "Playing Up!" — fired shot removed 2+ opponent bowls
+    if (_preShot.fired) {
+      const liveNow = bowls.filter(b => !b.offMat).length;
+      const removed = _preShot.liveBowls - liveNow;
+      if (removed >= 2) unlockAch('playing_up');
+    }
+    // "Ditching It" — jack went into ditch this shot
+    if (jack && jack.inDitch && !_preShot.jackInDitch) unlockAch('ditch_jack');
+  }
   turnIdx++;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
@@ -946,6 +965,7 @@ function handleJackOffSide() {
     scores[opp - 1] += 3;
     jackOwner = opp;
     updateHUD();
+    if (hitter === 1) checkAchievements('lose_jack');
     const oCol  = opp === 1 ? '#60a5fa' : '#f87171';
     const oName = opp === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
     state = 'end-result';
@@ -968,6 +988,8 @@ function finishEnd() {
     msg(`${endLabel()} — <span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Click to continue.`);
     jackOwner = res.winner;
     checkAchievements('end_scored', res);
+    const p1Bowls = bowls.filter(b => b.player === 1 && !b.offMat);
+    if (p1Bowls.length === BPP && p1Bowls.every(b => b.toucher)) unlockAch('perfection');
   } else {
     msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
   }
@@ -2483,14 +2505,18 @@ const ACHIEVEMENTS = [
   { id:'first_win',     icon:'🥇', name:'First Victory',       desc:'Win your first game' },
   { id:'win_3',         icon:'🔥', name:'On a Roll',           desc:'Win 3 games' },
   { id:'win_10',        icon:'👑', name:'Champion',            desc:'Win 10 games' },
-  { id:'perfect_end',   icon:'💎', name:'Perfect End',         desc:'Score all 4 bowls in a single end' },
-  { id:'shutout',       icon:'🛡️', name:'Shutout',             desc:'Win a game without opponent scoring' },
+  { id:'perfect_end',   icon:'💎', name:'Perfect End',         desc:'Score a 4!' },
+  { id:'shutout',       icon:'🛡️', name:'Whitewash',           desc:'Win a game without opponent scoring' },
   { id:'toucher',       icon:'🎯', name:'Touching Wood',       desc:'Get a toucher' },
+  { id:'perfection',    icon:'✨', name:'Perfection',          desc:'Get a toucher with all four woods in one end' },
   { id:'comeback',      icon:'⚡', name:'Comeback King',       desc:'Win after being 3+ points behind' },
-  { id:'extra_ends',    icon:'⏰', name:'Overtime',            desc:'Win a game in extra ends' },
+  { id:'extra_ends',    icon:'⏰', name:'Golden Goal',         desc:'Win a game in extra ends' },
+  { id:'playing_up',    icon:'💥', name:'Playing Up!',         desc:'Remove two or more woods with one shot whilst firing' },
+  { id:'ditch_jack',    icon:'🕳️', name:'Ditching It',         desc:'Put the jack in the ditch' },
+  { id:'lose_jack',     icon:'🤯', name:'How Did That Happen', desc:'Lose three shots by removing the jack' },
   { id:'play_10',       icon:'🎳', name:'Regular',             desc:'Play 10 games' },
   { id:'play_50',       icon:'🏅', name:'Dedicated',           desc:'Play 50 games' },
-  { id:'score_100',     icon:'💯', name:'Century',             desc:'Score 100 total points across all games' },
+  { id:'score_100',     icon:'💯', name:'Century',             desc:'Score 100 shots across all games' },
   { id:'beat_master',   icon:'🧠', name:'Master Class',        desc:'Beat a Master AI opponent' },
 ];
 
@@ -2551,9 +2577,8 @@ function checkAchievements(event, data) {
     if (deficit > stats.maxBehind) { stats.maxBehind = deficit; saveStats(stats); }
   }
 
-  if (event === 'toucher') {
-    unlockAch('toucher');
-  }
+  if (event === 'toucher') unlockAch('toucher');
+  if (event === 'lose_jack') unlockAch('lose_jack');
 
   if (event === 'game_over') {
     stats.games++;
