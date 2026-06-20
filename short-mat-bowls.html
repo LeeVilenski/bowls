@@ -1933,6 +1933,50 @@ function buildSplash() {
   buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
   seg('sD2', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p2design, v=>splashCfg.p2design=v);
 
+  // Surface presets & sliders
+  const spdSlider = document.getElementById('sSpeedSlider');
+  const spdLbl = document.getElementById('sSpeedLbl');
+  const bendLSlider = document.getElementById('sBendLeftSlider');
+  const bendLLbl = document.getElementById('sBendLeftLbl');
+  const bendRSlider = document.getElementById('sBendRightSlider');
+  const bendRLbl = document.getElementById('sBendRightLbl');
+
+  function syncSurfaceSliders() {
+    spdSlider.value = splashCfg.speedVal; spdLbl.textContent = splashCfg.speedVal;
+    bendLSlider.value = splashCfg.bendLeft; bendLLbl.textContent = splashCfg.bendLeft;
+    bendRSlider.value = splashCfg.bendRight; bendRLbl.textContent = splashCfg.bendRight;
+  }
+  syncSurfaceSliders();
+
+  spdSlider.oninput = () => { splashCfg.speedVal = +spdSlider.value; spdLbl.textContent = splashCfg.speedVal; clearSurfacePreset(); };
+  bendLSlider.oninput = () => { splashCfg.bendLeft = +bendLSlider.value; bendLLbl.textContent = splashCfg.bendLeft; clearSurfacePreset(); };
+  bendRSlider.oninput = () => { splashCfg.bendRight = +bendRSlider.value; bendRLbl.textContent = splashCfg.bendRight; clearSurfacePreset(); };
+
+  function clearSurfacePreset() {
+    document.getElementById('sSurface').querySelectorAll('button').forEach(b => b.classList.remove('sel'));
+  }
+
+  const surfacePresets = [
+    ['Fast', { speedVal: 75, bendLeft: 25, bendRight: 25 }],
+    ['Medium', { speedVal: 50, bendLeft: 50, bendRight: 50 }],
+    ['Slow', { speedVal: 25, bendLeft: 75, bendRight: 75 }],
+  ];
+  {
+    const el = document.getElementById('sSurface');
+    surfacePresets.forEach(([label, vals]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (label === 'Medium') b.classList.add('sel');
+      b.onclick = () => {
+        Object.assign(splashCfg, vals);
+        syncSurfaceSliders();
+        el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+      };
+      el.appendChild(b);
+    });
+  }
+
   const BG_OPTS = [
     ['hardwood',     'Hardwood',      'bg-hardwood'],
     ['green-carpet', 'Green Carpet',  'bg-green-carpet'],
