@@ -600,7 +600,7 @@ function simPath(sx, sy, angle, speed, bias, bMult) {
     const movingForward = delivDir === 1 ? vy < 0 : vy > 0;
     if (movingForward && bias) {
       const sign = bias === 'right' ? 1 : -1;
-      const bm = bias === 'left' ? biasMultLeft : biasMultRight;
+      const bm = (bias === 'left' ? biasMultLeft : biasMultRight) * biasMult;
       vx += -ny * sign * BIAS_K * bm * spd;
       vy +=  nx * sign * BIAS_K * bm * spd;
     }
