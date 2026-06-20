@@ -1215,9 +1215,10 @@ function gameOver() {
     else if (scores[1]>scores[0]) res=`<span style="color:#f87171">${n2} wins</span> ${scores[1]}–${scores[0]}`;
     else                          res=`Draw! ${scores[0]}–${scores[1]}`;
   }
-  if (mode === 'online' && sb) {
-    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
-    localStorage.removeItem('bowls_activeGame');
+  if (mode === 'online' && sb && onlineGameId) {
+    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId).then(() => {
+      localStorage.removeItem('bowls_activeGame');
+    });
   }
   msg(`Game over — ${res}. Press New Game to play again.`);
 }
@@ -1227,10 +1228,10 @@ function doConcede() {
   finishConcede(localPlayer);
 }
 
-function finishConcede(concedingPlayer) {
+async function finishConcede(concedingPlayer) {
   state = 'game-over';
-  if (mode === 'online' && sb) {
-    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+  if (mode === 'online' && sb && onlineGameId) {
+    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
   }
   if (concedingPlayer === localPlayer) {
@@ -1965,8 +1966,12 @@ function drawSidePanels() {
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p2d; ctx.lineWidth=1.5; ctx.stroke();
   }
-  // New game button
-  drawPanelBtn(W-SC, PANEL_BTN.y, 'New', '#1e3a8a', '#93c5fd');
+  // New game / Quit button
+  if (mode === 'online' && state !== 'game-over' && state !== 'idle') {
+    drawPanelBtn(W-SC, PANEL_BTN.y, 'Quit', '#7f1d1d', '#fca5a5');
+  } else {
+    drawPanelBtn(W-SC, PANEL_BTN.y, 'New', '#1e3a8a', '#93c5fd');
+  }
 
   // Active player dot
   if (state==='aim'||state==='ai-turn') {
@@ -2495,7 +2500,11 @@ function handlePointerDown(p) {
     }
   }
   if (hitPanelBtn(p, W-SC)) {
-    showSplash();
+    if (mode === 'online' && state !== 'game-over' && state !== 'idle') {
+      doConcede();
+    } else {
+      showSplash();
+    }
     mouse.down = false; return;
   }
 
@@ -3114,13 +3123,17 @@ async function doResumeLobby(game) {
   document.getElementById('splash').classList.add('hidden');
 
   const moves = await fetchMoves(game.id);
+  console.log('[resume] fetched', moves.length, 'moves for game', game.id);
   startGame();
   replayMoves(moves);
 }
 
 function replayMoves(moves) {
+  console.log('[replay] replaying', moves.length, 'moves');
   for (const m of moves) {
+    if (typeof m.data === 'string') m.data = JSON.parse(m.data);
     moveNum = m.move_num;
+    console.log('[replay] move', m.move_num, m.type, 'player', m.player);
     if (m.type === 'jack') {
       jack = { x: m.data.x, y: m.data.y, vx:0, vy:0, stopped:true, offMat:false, offSide:false, inDitch:false };
       beginTurns();
