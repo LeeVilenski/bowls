@@ -1828,7 +1828,6 @@ function handlePointerUp() {
     if (pct > 0) {
       const ceiling = fireModeActive ? MAX_SPD * FIRE_MULT : MAX_SPD;
       deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), MIN_SPD + pct * (ceiling - MIN_SPD));
-      resetAim();
     } else {
       const mm = s2m(swipeStartX, swipeStartY);
       if (mm) {
