@@ -1222,6 +1222,24 @@ function gameOver() {
   msg(`Game over — ${res}. Press New Game to play again.`);
 }
 
+function doConcede() {
+  sendMove('concede', localPlayer, {});
+  finishConcede(localPlayer);
+}
+
+function finishConcede(concedingPlayer) {
+  state = 'game-over';
+  if (mode === 'online' && sb) {
+    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+    localStorage.removeItem('bowls_activeGame');
+  }
+  if (concedingPlayer === localPlayer) {
+    msg(`Game over — <span style="color:#ef4444">You conceded</span>. ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+  } else {
+    msg(`Game over — <span style="color:#22c55e">Opponent conceded!</span> ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+  }
+}
+
 // ── Drawing ───────────────────────────────────────────────────────
 function drawFloor() {
   if (bgStyle === 'hardwood') {
@@ -1267,9 +1285,10 @@ function draw() {
   drawMat();
   if (jack && !jack.offMat) drawJack();
   for (const b of bowls) drawBowl(b);
-  if (state==='aim') drawAim();
+  const myAim = state==='aim' && !(mode==='online' && playerForTurn(turnIdx)!==localPlayer);
+  if (myAim) drawAim();
   ctx.restore();
-  if (state==='aim') drawAimUI();
+  if (myAim) drawAimUI();
   drawSidePanels();
   if (headOverlay) drawHeadOverlay();
   drawOverlayUI();
@@ -1279,8 +1298,8 @@ function drawOverlayUI() {
   const btnW = 156, btnH = 84, btnR = 12;
   const btnY = H - 80;
 
-  // Fire mode button (left side) — only during aim
-  if (state === 'aim') {
+  // Fire mode button (left side) — only during local aim
+  if (state === 'aim' && !(mode==='online' && playerForTurn(turnIdx)!==localPlayer)) {
     const fx = btnW/2 + 6, fy = btnY;
     ctx.fillStyle = fireModeActive ? '#dc2626' : 'rgba(127,29,29,0.7)';
     ctx.beginPath(); ctx.roundRect(fx - btnW/2, fy - btnH/2, btnW, btnH, btnR); ctx.fill();
@@ -1923,9 +1942,13 @@ function drawSidePanels() {
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p1d; ctx.lineWidth=1.5; ctx.stroke();
   }
-  // Mode button
-  const modeLabel = mode==='online'?'Online':(mode==='vs-ai'?'vs AI':'2P');
-  drawPanelBtn(SC, PANEL_BTN.y, modeLabel, '#4c1d95', '#c4b5fd');
+  // Mode button / Concede button
+  if (mode === 'online' && state !== 'idle' && state !== 'game-over') {
+    drawPanelBtn(SC, PANEL_BTN.y, concedeConfirm ? 'Sure?' : 'Give', '#7f1d1d', '#fca5a5');
+  } else {
+    const modeLabel = mode==='online'?'Online':(mode==='vs-ai'?'vs AI':'2P');
+    drawPanelBtn(SC, PANEL_BTN.y, modeLabel, '#4c1d95', '#c4b5fd');
+  }
 
   // Right — P2/AI
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
@@ -2453,10 +2476,23 @@ function handlePointerDown(p) {
 
   // Canvas-drawn panel buttons
   const SP=38, SC=19;
-  if (hitPanelBtn(p, SC) && mode !== 'online') {
-    mode = mode==='vs-ai'?'vs-player':'vs-ai';
-    document.getElementById('lbl2').textContent = mode==='vs-ai'?'AI':'P2';
-    mouse.down = false; return;
+  if (hitPanelBtn(p, SC)) {
+    if (mode === 'online' && state !== 'idle' && state !== 'game-over') {
+      if (concedeConfirm) {
+        concedeConfirm = false;
+        clearTimeout(concedeConfirmTimer);
+        doConcede();
+      } else {
+        concedeConfirm = true;
+        clearTimeout(concedeConfirmTimer);
+        concedeConfirmTimer = setTimeout(() => { concedeConfirm = false; }, 3000);
+      }
+      mouse.down = false; return;
+    } else if (mode !== 'online') {
+      mode = mode==='vs-ai'?'vs-player':'vs-ai';
+      document.getElementById('lbl2').textContent = mode==='vs-ai'?'AI':'P2';
+      mouse.down = false; return;
+    }
   }
   if (hitPanelBtn(p, W-SC)) {
     showSplash();
@@ -2603,6 +2639,8 @@ let peerLatencyMs = -1;
 let pingInterval = null;
 let reconnectTimer = null;
 let pendingMoves = [];
+let concedeConfirm = false;
+let concedeConfirmTimer = null;
 
 const TIME_CONTROLS = [
   { label:'30 seconds', value:'30s',  ms:30000,     realtime:true },
@@ -2771,6 +2809,7 @@ function cleanupNet() {
   onlineGameId = '';
   localPlayer = 0;
   moveNum = 0;
+  hostGameStarted = false;
 }
 
 // ── Remote move handler ──────────────────────────────────────────
@@ -2804,6 +2843,8 @@ function applyRemoteMove(move) {
   } else if (move.type === 'end_ack') {
     opponentAcked = true;
     if (localAcked && opponentAcked) advanceEnd();
+  } else if (move.type === 'concede') {
+    finishConcede(move.player);
   }
 }
 
@@ -3263,8 +3304,10 @@ function onGuestJoined(game) {
   finishJoinAsHost(game);
 }
 
+let hostGameStarted = false;
 function finishJoinAsHost(game) {
-  if (moveSubscription) return;
+  if (hostGameStarted) return;
+  hostGameStarted = true;
   unsubscribeLobby();
   const settings = game.settings || {};
   settings.p2Color = settings.p2Color != null ? settings.p2Color : 2;
@@ -3284,6 +3327,7 @@ async function doCancelCreate() {
     await deleteLobby(onlineGameId);
   }
   cleanupNet();
+  hostGameStarted = false;
   document.getElementById('waiting-view').classList.remove('show');
   document.getElementById('btnSubmitCreate').style.display = '';
   hideCreatePanel();
@@ -3318,6 +3362,7 @@ function applyAndStart() {
 function showSplash() {
   clearTimeout(aiTimer);
   cleanupNet();
+  concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
