@@ -3123,7 +3123,66 @@ function replayMoves(moves) {
     moveNum = m.move_num;
     if (m.type === 'jack') {
       jack = { x: m.data.x, y: m.data.y, vx:0, vy:0, stopped:true, offMat:false, offSide:false, inDitch:false };
+      beginTurns();
+    } else if (m.type === 'shot') {
+      const d = m.data;
+      setBiasDir(m.player, d.biasDir);
+      delivPos = { x: d.delivX, y: bowlStart().y };
+      const bs = bowlStart();
+      bowls.push({x:bs.x, y:bs.y, vx:Math.cos(d.angle)*d.speed, vy:Math.sin(d.angle)*d.speed,
+                  player:m.player, bias:biasDirs[m.player-1], stopped:false, offMat:false, toucher:false, inDitch:false,
+                  rotAngle:0, trail:[], restProgress:0, delivering:true,
+                  design:splashCfg[`p${m.player}design`]});
+      for (let i = 0; i < 3000; i++) {
+        for (const b of bowls) stepObj(b, b.bias);
+        stepObj(jack, null);
+        stepCollisions();
+        if (allStopped()) break;
+      }
+      if (jack && jack.offSide) {
+        const hitter = lastJackHitter ?? m.player;
+        const idx = hitter - 1;
+        jackOffCounts[idx]++;
+        if (jackOffCounts[idx] >= 3) {
+          const opp = hitter === 1 ? 2 : 1;
+          scores[opp - 1] += 3;
+          jackOwner = opp;
+          updateHUD();
+        }
+        bowls = []; jack = null; turnIdx = 0; lastJackHitter = null;
+        continue;
+      }
+      turnIdx++;
+      if (turnIdx >= BPP * 2) {
+        const res = scoreEnd();
+        if (res) {
+          scores[res.winner-1] += res.pts;
+          jackOwner = res.winner;
+          updateHUD();
+        }
+      }
+    } else if (m.type === 'end_ack') {
+      if (m.player === localPlayer) localAcked = true;
+      else opponentAcked = true;
+      if (localAcked && opponentAcked) {
+        endNum++;
+        if (endNum > ENDS && scores[0] !== scores[1]) {
+          gameOver();
+          return;
+        }
+        bowls = []; jack = null; turnIdx = 0; lastJackHitter = null;
+        localAcked = false; opponentAcked = false; pendingMoves = [];
+      }
+    } else if (m.type === 'concede') {
+      finishConcede(m.player);
+      return;
     }
+  }
+  resetCam();
+  if (jack && turnIdx < BPP * 2) {
+    promptPlayer(playerForTurn(turnIdx));
+  } else if (!jack && state !== 'game-over') {
+    state = 'place-jack'; syncFireBtn();
   }
 }
 
