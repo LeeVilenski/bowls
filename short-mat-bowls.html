@@ -1266,9 +1266,10 @@ function draw() {
   drawMat();
   if (jack && !jack.offMat) drawJack();
   for (const b of bowls) drawBowl(b);
-  if (state==='aim') drawAim();
+  const myAim = state==='aim' && !(mode==='online' && playerForTurn(turnIdx)!==localPlayer);
+  if (myAim) drawAim();
   ctx.restore();
-  if (state==='aim') drawAimUI();
+  if (myAim) drawAimUI();
   drawSidePanels();
   if (headOverlay) drawHeadOverlay();
   drawOverlayUI();
@@ -1278,8 +1279,8 @@ function drawOverlayUI() {
   const btnW = 156, btnH = 84, btnR = 12;
   const btnY = H - 80;
 
-  // Fire mode button (left side) — only during aim
-  if (state === 'aim') {
+  // Fire mode button (left side) — only during local aim
+  if (state === 'aim' && !(mode==='online' && playerForTurn(turnIdx)!==localPlayer)) {
     const fx = btnW/2 + 6, fy = btnY;
     ctx.fillStyle = fireModeActive ? '#dc2626' : 'rgba(127,29,29,0.7)';
     ctx.beginPath(); ctx.roundRect(fx - btnW/2, fy - btnH/2, btnW, btnH, btnR); ctx.fill();
@@ -2676,7 +2677,7 @@ async function sendMove(type, player, data) {
   const row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
   await sb.from('moves').insert(row);
   if (netConn && netConn.open) {
-    netConn.send({ type: 'MOVE', ...row });
+    netConn.send({ kind: 'MOVE', ...row });
   }
 }
 
@@ -2740,7 +2741,7 @@ function setupConn(conn) {
   conn.on('data', (msg) => {
     if (msg.type === 'PING') { conn.send({ type: 'PONG', t: msg.t }); return; }
     if (msg.type === 'PONG') { peerLatencyMs = Date.now() - msg.t; return; }
-    if (msg.type === 'MOVE') { onRemoteMove(msg); }
+    if (msg.kind === 'MOVE') { onRemoteMove(msg); }
   });
   conn.on('close', () => onPeerDisconnect());
   conn.on('error', () => onPeerDisconnect());
@@ -2770,6 +2771,7 @@ function cleanupNet() {
   onlineGameId = '';
   localPlayer = 0;
   moveNum = 0;
+  hostGameStarted = false;
 }
 
 // ── Remote move handler ──────────────────────────────────────────
@@ -3262,7 +3264,10 @@ function onGuestJoined(game) {
   finishJoinAsHost(game);
 }
 
+let hostGameStarted = false;
 function finishJoinAsHost(game) {
+  if (hostGameStarted) return;
+  hostGameStarted = true;
   const settings = game.settings || {};
   settings.p2Color = settings.p2Color != null ? settings.p2Color : 2;
   settings.p2Design = settings.p2Design != null ? settings.p2Design : 0;
@@ -3281,6 +3286,7 @@ async function doCancelCreate() {
     await deleteLobby(onlineGameId);
   }
   cleanupNet();
+  hostGameStarted = false;
   document.getElementById('waiting-view').classList.remove('show');
   document.getElementById('btnSubmitCreate').style.display = '';
   hideCreatePanel();
