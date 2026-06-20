@@ -164,6 +164,26 @@ button:active { opacity: .7; }
 
 
     <div class="spl-card">
+      <div class="spl-head">Surface</div>
+      <div class="spl-row"><span class="spl-lbl">Preset</span><div class="seg" id="sSurface"></div></div>
+      <div class="spl-row">
+        <span class="spl-lbl">Speed</span>
+        <input type="range" id="sSpeedSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="sSpeedLbl">50</span>
+      </div>
+      <div class="spl-row">
+        <span class="spl-lbl">Bend ◀</span>
+        <input type="range" id="sBendLeftSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="sBendLeftLbl">50</span>
+      </div>
+      <div class="spl-row">
+        <span class="spl-lbl">Bend ▶</span>
+        <input type="range" id="sBendRightSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="sBendRightLbl">50</span>
+      </div>
+    </div>
+
+    <div class="spl-card">
       <div class="spl-head">Background</div>
       <div class="bg-grid" id="sBg"></div>
     </div>
@@ -292,11 +312,14 @@ const BOWL_COLOURS = [
 ];
 
 const BOWL_DESIGNS = ['Classic','Speckled','Ringed'];
-let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:0.15, p1idx:0, p2idx:1, p1design:0, p2design:0, aiLevel:1, bg:'hardwood' };
+let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:0.15, p1idx:0, p2idx:1, p1design:0, p2design:0, aiLevel:1, bg:'hardwood', speedVal:50, bendLeft:50, bendRight:50 };
 let biasDirs = ['right', 'right']; // per-player bias direction, remembered across turns
 function curBiasDir()          { return biasDirs[playerForTurn(turnIdx) - 1]; }
 function setBiasDir(p, dir)    { biasDirs[p - 1] = dir; }
 let biasMult = 0.15;
+let biasMultLeft = 0.15;
+let biasMultRight = 0.15;
+let friction = FRICTION;
 
 let bowls    = [];
 let jack     = null;
@@ -418,13 +441,13 @@ function updateHUD() {
 function applyBias(obj, bias) {
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.01) return;
-  // Only bias when travelling toward the far end — not on rebound or backward roll
   const movingForward = delivDir === 1 ? obj.vy < 0 : obj.vy > 0;
   if (!movingForward) return;
   const nx = obj.vx/spd, ny = obj.vy/spd;
   const sign = bias === 'right' ? 1 : -1;
-  obj.vx += -ny * sign * BIAS_K * biasMult * spd;
-  obj.vy +=  nx * sign * BIAS_K * biasMult * spd;
+  const bm = bias === 'left' ? biasMultLeft : biasMultRight;
+  obj.vx += -ny * sign * BIAS_K * bm * spd;
+  obj.vy +=  nx * sign * BIAS_K * bm * spd;
 }
 
 function stepObj(obj, bias) {
@@ -466,7 +489,7 @@ function stepObj(obj, bias) {
   }
 
   if (bias) applyBias(obj, bias);
-  const fr = (obj === jack) ? JACK_FRICTION : FRICTION;
+  const fr = (obj === jack) ? JACK_FRICTION : friction;
   obj.vx *= fr; obj.vy *= fr;
   obj.x  += obj.vx;  obj.y  += obj.vy;
 
@@ -577,10 +600,11 @@ function simPath(sx, sy, angle, speed, bias, bMult) {
     const movingForward = delivDir === 1 ? vy < 0 : vy > 0;
     if (movingForward && bias) {
       const sign = bias === 'right' ? 1 : -1;
-      vx += -ny * sign * BIAS_K * bMult * spd;
-      vy +=  nx * sign * BIAS_K * bMult * spd;
+      const bm = bias === 'left' ? biasMultLeft : biasMultRight;
+      vx += -ny * sign * BIAS_K * bm * spd;
+      vy +=  nx * sign * BIAS_K * bm * spd;
     }
-    vx *= FRICTION; vy *= FRICTION;
+    vx *= friction; vy *= friction;
     x += vx; y += vy;
     if (x < MAT.x || x > MAT.x+MAT.w || y < MAT.y || y > MAT.y+MAT.h) break;
     if (x-RB < FENDER.x+FENDER.w && x+RB > FENDER.x &&
@@ -1908,6 +1932,52 @@ function buildSplash() {
   buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
   seg('sD2', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p2design, v=>splashCfg.p2design=v);
 
+  // Surface presets & sliders
+  const spdSlider = document.getElementById('sSpeedSlider');
+  const spdLbl = document.getElementById('sSpeedLbl');
+  const bendLSlider = document.getElementById('sBendLeftSlider');
+  const bendLLbl = document.getElementById('sBendLeftLbl');
+  const bendRSlider = document.getElementById('sBendRightSlider');
+  const bendRLbl = document.getElementById('sBendRightLbl');
+
+  function syncSurfaceSliders() {
+    spdSlider.value = splashCfg.speedVal; spdLbl.textContent = splashCfg.speedVal;
+    bendLSlider.value = splashCfg.bendLeft; bendLLbl.textContent = splashCfg.bendLeft;
+    bendRSlider.value = splashCfg.bendRight; bendRLbl.textContent = splashCfg.bendRight;
+  }
+  syncSurfaceSliders();
+
+  spdSlider.oninput = () => { splashCfg.speedVal = +spdSlider.value; spdLbl.textContent = splashCfg.speedVal; clearSurfacePreset(); };
+  bendLSlider.oninput = () => { splashCfg.bendLeft = +bendLSlider.value; bendLLbl.textContent = splashCfg.bendLeft; clearSurfacePreset(); };
+  bendRSlider.oninput = () => { splashCfg.bendRight = +bendRSlider.value; bendRLbl.textContent = splashCfg.bendRight; clearSurfacePreset(); };
+
+  function clearSurfacePreset() {
+    document.getElementById('sSurface').querySelectorAll('button').forEach(b => b.classList.remove('sel'));
+  }
+
+  const surfacePresets = [
+    ['Fast', { speedVal: 75, bendLeft: 25, bendRight: 25 }],
+    ['Medium', { speedVal: 50, bendLeft: 50, bendRight: 50 }],
+    ['Slow', { speedVal: 25, bendLeft: 75, bendRight: 75 }],
+    ['Wonky', { speedVal: 45, bendLeft: 80, bendRight: 20 }],
+    ['Uneven', { speedVal: 60, bendLeft: 30, bendRight: 70 }],
+  ];
+  {
+    const el = document.getElementById('sSurface');
+    surfacePresets.forEach(([label, vals]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (label === 'Medium' && splashCfg.speedVal === 50 && splashCfg.bendLeft === 50 && splashCfg.bendRight === 50) b.classList.add('sel');
+      b.onclick = () => {
+        Object.assign(splashCfg, vals);
+        syncSurfaceSliders();
+        el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+      };
+      el.appendChild(b);
+    });
+  }
+
   const BG_OPTS = [
     ['hardwood',     'Hardwood',      'bg-hardwood'],
     ['green-carpet', 'Green Carpet',  'bg-green-carpet'],
@@ -1937,6 +2007,12 @@ function applyAndStart() {
   RB       = 10 + splashCfg.size;          // size 0→10px … size 5→15px
   biasMult = splashCfg.biasVal;
   bgStyle  = splashCfg.bg;
+
+  // Surface: speed 0→0.9930 (slow), 50→0.9955 (medium), 100→0.9975 (fast)
+  friction = 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
+  // Bend: 0→0.0, 50→0.5, 100→1.0
+  biasMultLeft  = splashCfg.bendLeft / 100;
+  biasMultRight = splashCfg.bendRight / 100;
 
   const col = BOWL_COLOURS[splashCfg.p1idx];
   C.p1 = col.main; C.p1d = col.dark;
