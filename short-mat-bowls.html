@@ -124,12 +124,48 @@ button:active { opacity: .7; }
   color: #fff; border-radius: 12px; border: none; width: 100%;
   box-shadow: 0 4px 20px rgba(109,40,217,0.35); letter-spacing: 0.3px;
 }
-#btnAch {
+#btnAch, #btnProfile {
   padding: 10px; font-size: 13px; font-weight: 700;
   background: #1e293b; color: #94a3b8; border-radius: 10px;
   border: 1px solid #334155; width: 100%; margin-top: -4px;
 }
-#btnAch:hover { background: #334155; color: #e2e8f0; }
+#btnAch:hover, #btnProfile:hover { background: #334155; color: #e2e8f0; }
+
+#profile-panel {
+  position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#profile-panel.show { display: flex; }
+#profile-inner { width: 100%; max-width: 440px; }
+#profile-back {
+  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
+}
+.profile-title { font-size: 20px; font-weight: 800; margin-bottom: 14px; }
+#profile-name {
+  width: 100%; padding: 10px 14px; font-size: 14px; font-weight: 600;
+  background: #111827; color: #e2e8f0; border: 1px solid #334155;
+  border-radius: 8px; box-sizing: border-box;
+}
+.stat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid #1e293b;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-lbl { font-size: 12px; color: #94a3b8; flex-shrink: 0; }
+.stat-val { font-size: 14px; font-weight: 700; color: #e2e8f0; text-align: right; }
+.stat-bar-wrap {
+  flex: 1; height: 8px; background: #1e293b; border-radius: 4px;
+  margin: 0 12px; overflow: hidden; min-width: 60px;
+}
+.stat-bar {
+  height: 100%; border-radius: 4px; transition: width 0.4s ease;
+}
+.stat-bar.green { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.stat-bar.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+.stat-bar.purple { background: linear-gradient(90deg, #a855f7, #7c3aed); }
 
 /* Achievement panel */
 #ach-panel {
@@ -230,14 +266,14 @@ button:active { opacity: .7; }
 }
 
 /* Create game sub-view */
-#create-game-panel {
+#create-game-panel, #join-bowl-panel {
   position: fixed; inset: 0; z-index: 260; background: #0a0f1e;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: none; flex-direction: column; align-items: center;
   padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
 }
-#create-game-panel.show { display: flex; }
-#create-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
+#create-game-panel.show, #join-bowl-panel.show { display: flex; }
+#create-inner, #join-bowl-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
 #create-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; align-self: flex-start;
@@ -253,12 +289,12 @@ button:active { opacity: .7; }
 #waiting-msg { font-size: 13px; color: #94a3b8; }
 .pulse { animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-#btnCancelCreate {
+#btnCancelCreate, #btnJoinCancel {
   padding: 10px 20px; font-size: 12px; font-weight: 600;
   background: #7f1d1d; color: #fca5a5; border-radius: 8px; border: 1px solid #991b1b;
 }
 
-#btnSubmitCreate {
+#btnSubmitCreate, #btnJoinConfirm {
   padding: 14px; font-size: 15px; font-weight: 800;
   background: linear-gradient(135deg,#1d4ed8,#6d28d9);
   color: #fff; border-radius: 12px; border: none; width: 100%;
@@ -340,7 +376,28 @@ button:active { opacity: .7; }
     </div>
 
     <button id="btnStart">Start Game</button>
+    <button id="btnProfile">👤 Profile</button>
     <button id="btnAch">🏆 Achievements</button>
+  </div>
+</div>
+
+<div id="profile-panel">
+  <div id="profile-inner">
+    <button id="profile-back">&larr; Back</button>
+    <div class="profile-title">👤 Player Profile</div>
+    <div class="spl-card">
+      <div class="spl-head">Identity</div>
+      <div class="spl-row"><span class="spl-lbl">Name</span><input type="text" id="profile-name" maxlength="20" placeholder="Enter name..."></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Default Bowls</div>
+      <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="profP1"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="profD1"></div></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Statistics</div>
+      <div id="profile-stats"></div>
+    </div>
   </div>
 </div>
 
@@ -428,6 +485,18 @@ button:active { opacity: .7; }
       <div id="waiting-msg" class="pulse">Waiting for opponent...</div>
       <button id="btnCancelCreate">Cancel</button>
     </div>
+  </div>
+</div>
+<div id="join-bowl-panel">
+  <div id="join-bowl-inner">
+    <div class="online-title">Choose Your Bowls</div>
+    <div class="spl-card">
+      <div class="spl-head">Your Bowls</div>
+      <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="jP2"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="jD2"></div></div>
+    </div>
+    <button id="btnJoinConfirm">Join Game</button>
+    <button id="btnJoinCancel">Cancel</button>
   </div>
 </div>
 
@@ -2702,9 +2771,11 @@ async function listMyGames() {
   return data || [];
 }
 
-async function joinLobby(gameId) {
+async function joinLobby(gameId, p2Bowls) {
   if (!initSupabase()) return false;
-  const { data, error } = await sb.from('games').update({ guest_name: netDisplayName, status: 'active' })
+  const { data: current } = await sb.from('games').select('settings').eq('id', gameId).single();
+  const mergedSettings = { ...(current && current.settings || {}), ...p2Bowls };
+  const { data, error } = await sb.from('games').update({ guest_name: netDisplayName, status: 'active', settings: mergedSettings })
     .eq('id', gameId).eq('status', 'waiting').select().single();
   if (error || !data) { console.error('joinLobby', error); return false; }
   onlineGameId = gameId;
@@ -3084,13 +3155,67 @@ async function refreshLobby() {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-async function doJoinLobby(gameId, gameRow) {
+let joinBowlCfg = { p2idx: 2, p2design: 0 };
+let joinBowlPanelBuilt = false;
+let pendingJoinGameId = null;
+
+function buildJoinBowlPanel() {
+  if (joinBowlPanelBuilt) return;
+  joinBowlPanelBuilt = true;
+  const p2El = document.getElementById('jP2');
+  BOWL_COLOURS.forEach((col, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'sw' + (i === joinBowlCfg.p2idx ? ' sel' : '');
+    sw.style.background = col.main;
+    sw.title = col.name;
+    sw.onclick = () => {
+      joinBowlCfg.p2idx = i;
+      p2El.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+    };
+    p2El.appendChild(sw);
+  });
+  const d2El = document.getElementById('jD2');
+  BOWL_DESIGNS.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    if (i === joinBowlCfg.p2design) b.classList.add('sel');
+    b.onclick = () => {
+      joinBowlCfg.p2design = i;
+      d2El.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    d2El.appendChild(b);
+  });
+  document.getElementById('btnJoinConfirm').onclick = confirmJoinLobby;
+  document.getElementById('btnJoinCancel').onclick = () => {
+    pendingJoinGameId = null;
+    document.getElementById('join-bowl-panel').classList.remove('show');
+  };
+}
+
+function doJoinLobby(gameId, gameRow) {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
-  const game = await joinLobby(gameId);
-  if (!game) { alert('Could not join — game may have started'); refreshLobby(); return; }
+  pendingJoinGameId = gameId;
+  if (!joinBowlPanelBuilt) {
+    const prof = loadProfile();
+    if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
+    if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
+  }
+  buildJoinBowlPanel();
+  document.getElementById('join-bowl-panel').classList.add('show');
+}
+
+async function confirmJoinLobby() {
+  const gameId = pendingJoinGameId;
+  if (!gameId) return;
+  pendingJoinGameId = null;
+  const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
+  if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
+
   const tc = game.time_control;
   applyOnlineSettings(game.settings, game.seed);
   shotClockLimit = getTimeControlMs(tc);
+  document.getElementById('join-bowl-panel').classList.remove('show');
   hideOnlinePanel();
   document.getElementById('create-game-panel').classList.remove('show');
 
@@ -3235,7 +3360,12 @@ let createPanelBuilt = false;
 function showCreatePanel() {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
   const panel = document.getElementById('create-game-panel');
-  if (!createPanelBuilt) buildCreatePanel();
+  if (!createPanelBuilt) {
+    const prof = loadProfile();
+    if (prof.p1idx != null) createCfg.p1idx = prof.p1idx;
+    if (prof.p1design != null) createCfg.p1design = prof.p1design;
+    buildCreatePanel();
+  }
   document.getElementById('waiting-view').classList.remove('show');
   panel.classList.add('show');
 }
@@ -3377,14 +3507,15 @@ function onGuestJoined(game) {
 }
 
 let hostGameStarted = false;
-function finishJoinAsHost(game) {
+async function finishJoinAsHost(game) {
   if (hostGameStarted) return;
   hostGameStarted = true;
   unsubscribeLobby();
-  const settings = game.settings || {};
+  const { data: fresh } = await sb.from('games').select('*').eq('id', game.id).single();
+  const settings = (fresh || game).settings || {};
   settings.p2Color = settings.p2Color != null ? settings.p2Color : 2;
   settings.p2Design = settings.p2Design != null ? settings.p2Design : 0;
-  applyOnlineSettings(settings, game.seed);
+  applyOnlineSettings(settings, (fresh || game).seed);
   hideCreatePanel();
   hideOnlinePanel();
   subscribeMoves(game.id);
@@ -3469,8 +3600,9 @@ function loadAch() {
 }
 function saveAch(data) { localStorage.setItem(ACH_KEY, JSON.stringify(data)); }
 function loadStats() {
-  try { return JSON.parse(localStorage.getItem(STATS_KEY)) || { wins:0, games:0, totalPts:0, maxBehind:0 }; }
-  catch { return { wins:0, games:0, totalPts:0, maxBehind:0 }; }
+  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0 };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem(STATS_KEY))); }
+  catch { return def; }
 }
 function saveStats(s) { localStorage.setItem(STATS_KEY, JSON.stringify(s)); }
 
@@ -3502,19 +3634,25 @@ function showNextToast() {
   }, 3000);
 }
 
+function myPlayerIdx() {
+  return mode === 'online' ? localPlayer : 1;
+}
+
 function checkAchievements(event, data) {
   const stats = loadStats();
+  const me = myPlayerIdx();
 
   if (event === 'end_scored' && data) {
-    if (data.winner === 1) {
+    if (data.winner === me) {
       if (data.pts === 4) unlockAch('perfect_end');
+      stats.totalPts += data.pts;
+      stats.endsWon++;
     }
-    stats.totalPts += data.winner === 1 ? data.pts : 0;
     saveStats(stats);
     if (stats.totalPts >= 100) unlockAch('score_100');
 
-    // Track max deficit for comeback detection
-    const deficit = scores[1] - scores[0];
+    const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
+    const deficit = oppScore - myScore;
     if (deficit > stats.maxBehind) { stats.maxBehind = deficit; saveStats(stats); }
   }
 
@@ -3523,13 +3661,18 @@ function checkAchievements(event, data) {
 
   if (event === 'game_over') {
     stats.games++;
-    const won = scores[0] > scores[1];
+    const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
+    const won = myScore > oppScore;
+    if (mode === 'online') stats.onlineGames++;
     if (won) {
       stats.wins++;
+      if (mode === 'online') stats.onlineWins++;
+      const margin = myScore - oppScore;
+      if (margin > stats.bestMargin) stats.bestMargin = margin;
       unlockAch('first_win');
       if (stats.wins >= 3) unlockAch('win_3');
       if (stats.wins >= 10) unlockAch('win_10');
-      if (scores[1] === 0) unlockAch('shutout');
+      if (oppScore === 0) unlockAch('shutout');
       if (stats.maxBehind >= 3) unlockAch('comeback');
       if (endNum > ENDS) unlockAch('extra_ends');
       if (mode === 'vs-ai' && aiLevel === 3) unlockAch('beat_master');
@@ -3568,7 +3711,128 @@ document.getElementById('ach-back').onclick = () => {
   document.getElementById('ach-panel').classList.remove('show');
 };
 
+// ── Profile ──────────────────────────────────────────────────────
+const PROFILE_KEY = 'bowls_profile';
+
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || {}; } catch { return {}; }
+}
+function saveProfile(p) { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); }
+
+let profileBuilt = false;
+
+function buildProfilePanel() {
+  if (profileBuilt) return;
+  profileBuilt = true;
+
+  const nameInput = document.getElementById('profile-name');
+  nameInput.value = localStorage.getItem('bowls_name') || '';
+  nameInput.oninput = () => {
+    const v = nameInput.value.trim();
+    localStorage.setItem('bowls_name', v);
+    netDisplayName = v;
+    const lobbyInput = document.getElementById('lobby-name');
+    if (lobbyInput) lobbyInput.value = v;
+  };
+
+  const prof = loadProfile();
+  const p1idx = prof.p1idx != null ? prof.p1idx : 0;
+  const p1design = prof.p1design != null ? prof.p1design : 0;
+
+  const p1El = document.getElementById('profP1');
+  BOWL_COLOURS.forEach((col, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'sw' + (i === p1idx ? ' sel' : '');
+    sw.style.background = col.main;
+    sw.title = col.name;
+    sw.onclick = () => {
+      const p = loadProfile();
+      p.p1idx = i;
+      saveProfile(p);
+      p1El.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+    };
+    p1El.appendChild(sw);
+  });
+
+  const d1El = document.getElementById('profD1');
+  BOWL_DESIGNS.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    if (i === p1design) b.classList.add('sel');
+    b.onclick = () => {
+      const p = loadProfile();
+      p.p1design = i;
+      saveProfile(p);
+      d1El.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    d1El.appendChild(b);
+  });
+}
+
+function renderProfileStats() {
+  const s = loadStats();
+  const el = document.getElementById('profile-stats');
+  const winPct = s.games > 0 ? Math.round(s.wins / s.games * 100) : 0;
+  const losses = s.games - s.wins;
+  const localGames = s.games - s.onlineGames;
+  const localWins = s.wins - s.onlineWins;
+  const localLosses = localGames - localWins;
+  const onlineLosses = s.onlineGames - s.onlineWins;
+  const maxPts = Math.max(s.totalPts, 1);
+
+  el.innerHTML =
+    statBar('Win Rate', winPct + '%', winPct, 'green') +
+    statRow('Games Played', s.games) +
+    statRow('Wins / Losses', s.wins + ' / ' + losses) +
+    statBar('Shots Scored', s.totalPts, Math.min(s.totalPts / maxPts * 100, 100), 'blue') +
+    statBar('Online', s.onlineWins + 'W – ' + onlineLosses + 'L',
+      s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0, 'purple') +
+    statBar('Local', localWins + 'W – ' + localLosses + 'L',
+      localGames > 0 ? Math.round(localWins / localGames * 100) : 0, 'green') +
+    statRow('Ends Won', s.endsWon) +
+    statRow('Best Margin', s.bestMargin);
+}
+
+function statBar(label, valText, pct, color) {
+  return `<div class="stat-row"><span class="stat-lbl">${label}</span>` +
+    `<div class="stat-bar-wrap"><div class="stat-bar ${color}" style="width:${pct}%"></div></div>` +
+    `<span class="stat-val">${valText}</span></div>`;
+}
+
+function statRow(label, val) {
+  return `<div class="stat-row"><span class="stat-lbl">${label}</span>` +
+    `<span class="stat-val">${val}</span></div>`;
+}
+
+function showProfilePanel() {
+  buildProfilePanel();
+  renderProfileStats();
+  document.getElementById('profile-panel').classList.add('show');
+}
+
+document.getElementById('btnProfile').onclick = showProfilePanel;
+document.getElementById('profile-back').onclick = () => {
+  document.getElementById('profile-panel').classList.remove('show');
+  applyProfileToSplash();
+};
+
+function applyProfileToSplash() {
+  const prof = loadProfile();
+  if (prof.p1idx != null) {
+    splashCfg.p1idx = prof.p1idx;
+    const sP1 = document.getElementById('sP1');
+    if (sP1) sP1.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === prof.p1idx));
+  }
+  if (prof.p1design != null) {
+    splashCfg.p1design = prof.p1design;
+    const sD1 = document.getElementById('sD1');
+    if (sD1) sD1.querySelectorAll('button').forEach((b, j) => b.classList.toggle('sel', j === prof.p1design));
+  }
+}
+
 buildSplash();
+applyProfileToSplash();
 showSplash();
 
 requestAnimationFrame(loop);
