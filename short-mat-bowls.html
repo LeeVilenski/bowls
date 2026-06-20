@@ -2007,6 +2007,12 @@ function applyAndStart() {
   biasMult = splashCfg.biasVal;
   bgStyle  = splashCfg.bg;
 
+  // Surface: speed 0→0.9930 (slow), 50→0.9955 (medium), 100→0.9975 (fast)
+  friction = 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
+  // Bend: 0→0.0, 50→0.5, 100→1.0
+  biasMultLeft  = splashCfg.bendLeft / 100;
+  biasMultRight = splashCfg.bendRight / 100;
+
   const col = BOWL_COLOURS[splashCfg.p1idx];
   C.p1 = col.main; C.p1d = col.dark;
   const col2 = BOWL_COLOURS[splashCfg.p2idx];
