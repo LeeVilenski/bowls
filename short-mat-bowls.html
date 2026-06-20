@@ -456,7 +456,10 @@ function doormatBounds() {
 let delivPos = null;
 
 function bowlStart() {
-  if (delivPos) return { x: delivPos.x, y: delivPos.y };
+  if (delivPos) {
+    const y = Math.max(MAT.y + RB + 1, Math.min(MAT.y + MAT.h - RB - 1, delivPos.y));
+    return { x: delivPos.x, y };
+  }
   const dm = doormatBounds();
   return { x: (dm.x1 + dm.x2) / 2, y: delivDir === 1 ? dm.y1 : dm.y2 };
 }
