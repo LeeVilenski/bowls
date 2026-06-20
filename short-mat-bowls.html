@@ -10,6 +10,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>Short Mat Bowls</title>
+<script src="https://unpkg.com/peerjs@1/dist/peerjs.min.js" defer></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2" defer></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; }
@@ -172,6 +174,106 @@ button:active { opacity: .7; }
 #ach-toast .toast-name { font-weight: 700; color: #fbbf24; }
 #ach-toast .toast-lbl { color: #94a3b8; font-size: 10px; }
 
+/* Online lobby panel */
+#online-panel {
+  position: fixed; inset: 0; z-index: 250; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#online-panel.show { display: flex; }
+#online-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
+.online-title { font-size: 20px; font-weight: 800; text-align: center; padding: 6px 0; }
+#online-back {
+  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; align-self: flex-start;
+}
+#lobby-name-row { display: flex; gap: 8px; align-items: center; }
+#lobby-name-row input {
+  flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155;
+  background: #1e293b; color: #e2e8f0; font-size: 13px; font-family: inherit;
+}
+#lobby-name-row input::placeholder { color: #475569; }
+.lobby-section { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #475569; margin-top: 4px; }
+#lobby-list { display: flex; flex-direction: column; gap: 6px; }
+.lobby-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: #111827; border-radius: 10px; border: 1px solid #1e293b;
+  cursor: pointer; transition: border-color .15s;
+}
+.lobby-row:hover { border-color: #3b82f6; }
+.lobby-host { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobby-tc { font-size: 11px; color: #60a5fa; font-weight: 600; }
+.lobby-ends { font-size: 10px; color: #64748b; }
+.lobby-empty { font-size: 12px; color: #475569; text-align: center; padding: 16px 0; }
+#my-games-list { display: flex; flex-direction: column; gap: 6px; }
+.my-game-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: #111827; border-radius: 10px; border: 1px solid #1e293b;
+  cursor: pointer; transition: border-color .15s;
+}
+.my-game-row:hover { border-color: #22c55e; }
+.my-game-opp { font-size: 13px; font-weight: 700; flex: 1; }
+.my-game-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+  background: #22c55e; color: #fff;
+}
+.my-game-badge.waiting { background: #475569; }
+#btnCreateGame {
+  padding: 12px; font-size: 14px; font-weight: 800;
+  background: linear-gradient(135deg,#1d4ed8,#6d28d9);
+  color: #fff; border-radius: 10px; border: none; width: 100%;
+}
+#btnRefreshLobby {
+  padding: 6px 14px; font-size: 11px; font-weight: 600;
+  background: #1e293b; color: #94a3b8; border-radius: 6px; border: 1px solid #334155;
+}
+
+/* Create game sub-view */
+#create-game-panel {
+  position: fixed; inset: 0; z-index: 260; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#create-game-panel.show { display: flex; }
+#create-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
+#create-back {
+  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; align-self: flex-start;
+}
+#waiting-view {
+  display: none; flex-direction: column; align-items: center; gap: 12px; padding: 20px 0;
+}
+#waiting-view.show { display: flex; }
+#waiting-code {
+  font-size: 36px; font-weight: 900; letter-spacing: 6px; color: #60a5fa;
+  font-family: 'Courier New', monospace;
+}
+#waiting-msg { font-size: 13px; color: #94a3b8; }
+.pulse { animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+#btnCancelCreate {
+  padding: 10px 20px; font-size: 12px; font-weight: 600;
+  background: #7f1d1d; color: #fca5a5; border-radius: 8px; border: 1px solid #991b1b;
+}
+
+#btnSubmitCreate {
+  padding: 14px; font-size: 15px; font-weight: 800;
+  background: linear-gradient(135deg,#1d4ed8,#6d28d9);
+  color: #fff; border-radius: 12px; border: none; width: 100%;
+  box-shadow: 0 4px 20px rgba(109,40,217,0.35);
+}
+
+/* Latency indicator */
+.latency-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.latency-dot.green { background: #22c55e; }
+.latency-dot.yellow { background: #eab308; }
+.latency-dot.red { background: #ef4444; }
+.latency-dot.off { background: #334155; }
+
 </style>
 </head>
 <body>
@@ -256,6 +358,76 @@ button:active { opacity: .7; }
   <div class="toast-text">
     <div class="toast-lbl">Achievement Unlocked</div>
     <div class="toast-name" id="toast-name"></div>
+  </div>
+</div>
+
+<div id="online-panel">
+  <div id="online-inner">
+    <button id="online-back">&larr; Back</button>
+    <div class="online-title">Online</div>
+    <div id="lobby-name-row">
+      <input type="text" id="lobby-name" placeholder="Your display name" maxlength="20" autocomplete="off">
+    </div>
+    <button id="btnCreateGame">Create Game</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+      <span class="lobby-section">Open Games</span>
+      <button id="btnRefreshLobby">Refresh</button>
+    </div>
+    <div id="lobby-list"><div class="lobby-empty">No games available</div></div>
+    <span class="lobby-section">My Games</span>
+    <div id="my-games-list"><div class="lobby-empty">No active games</div></div>
+  </div>
+</div>
+
+<div id="create-game-panel">
+  <div id="create-inner">
+    <button id="create-back">&larr; Back</button>
+    <div class="online-title">Create Game</div>
+    <div class="spl-card">
+      <div class="spl-head">Game Settings</div>
+      <div class="spl-row"><span class="spl-lbl">Ends</span><div class="seg" id="cEnds"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Time</span><div class="seg" id="cTime"></div></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Bowls</div>
+      <div class="spl-row">
+        <span class="spl-lbl">Size</span>
+        <input type="range" id="cSizeSlider" min="0" max="5" step="1" value="3">
+        <span class="rval" id="cSizeLbl">3</span>
+      </div>
+      <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="cBias"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Your colour</span><div class="swatches" id="cP1"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="cD1"></div></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Surface</div>
+      <div class="spl-row"><span class="spl-lbl">Preset</span><div class="seg" id="cSurface"></div></div>
+      <div class="spl-row">
+        <span class="spl-lbl">Speed</span>
+        <input type="range" id="cSpeedSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="cSpeedLbl">50</span>
+      </div>
+      <div class="spl-row">
+        <span class="spl-lbl">Bend &#9664;</span>
+        <input type="range" id="cBendLeftSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="cBendLeftLbl">50</span>
+      </div>
+      <div class="spl-row">
+        <span class="spl-lbl">Bend &#9654;</span>
+        <input type="range" id="cBendRightSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="cBendRightLbl">50</span>
+      </div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Background</div>
+      <div class="bg-grid" id="cBg"></div>
+    </div>
+    <button id="btnSubmitCreate">Create &amp; Wait</button>
+    <div id="waiting-view">
+      <div id="waiting-code"></div>
+      <div id="waiting-msg" class="pulse">Waiting for opponent...</div>
+      <button id="btnCancelCreate">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -361,6 +533,18 @@ const C = {
   p1:'#3b82f6', p1d:'#1d4ed8',
   p2:'#ef4444', p2d:'#b91c1c',
 };
+
+// ── Seeded PRNG (deterministic across peers) ─────────────────────
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let rngSeed = Date.now();
+let seededRng = mulberry32(rngSeed);
 
 // ── Game state ────────────────────────────────────────────────────
 let mode     = 'vs-ai';
@@ -537,7 +721,7 @@ function stepObj(obj, bias) {
         const hitOnBiasSide = obj.lastHitNx * biasSign > 0;
         toppleChance += hitOnBiasSide ? -0.35 : 0.25;
       }
-      obj.restTarget = Math.random() < Math.max(0.05, Math.min(0.95, toppleChance)) ? 1 : 0;
+      obj.restTarget = seededRng() < Math.max(0.05, Math.min(0.95, toppleChance)) ? 1 : 0;
     }
     const farDitchY = yFromFar(L.DITCH);
     const farDeadY  = yFromFar(L.DEAD);
@@ -743,8 +927,8 @@ function aiPickShot() {
   delivPos = { x: bestX, y: bsY };
 
   return {
-    angle: bestAngle + (Math.random()-0.5)*ai.jitter,
-    speed: bestPower * (1 - ai.speedVar/2 + Math.random()*ai.speedVar)
+    angle: bestAngle + (seededRng()-0.5)*ai.jitter,
+    speed: bestPower * (1 - ai.speedVar/2 + seededRng()*ai.speedVar)
   };
 }
 
@@ -765,6 +949,8 @@ function scoreEnd() {
 // ── Game flow ─────────────────────────────────────────────────────
 function startGame() {
   clearTimeout(aiTimer);
+  if (mode !== 'online') { rngSeed = Date.now(); }
+  seededRng = mulberry32(rngSeed);
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
@@ -773,14 +959,16 @@ function startGame() {
 
 function startEnd() {
   bowls=[]; jack=null; turnIdx=0; lastJackHitter=null;
+  localAcked = false; opponentAcked = false; pendingMoves = [];
   resetCam(); resetAim();
   state='place-jack'; syncFireBtn();
   if (jackOwner === 2 && mode === 'vs-ai') {
     aiPlaceJack();
+  } else if (mode === 'online' && jackOwner !== localPlayer) {
+    msg(`${endLabel()} — <span style="color:#94a3b8">Opponent is placing the jack…</span>`);
   } else {
-    const who = jackOwner===1
-      ? '<span style="color:#60a5fa">Player 1</span>'
-      : '<span style="color:#f87171">Player 2</span>';
+    const who = mode === 'online' ? '<span style="color:#60a5fa">You</span>'
+      : (jackOwner===1 ? '<span style="color:#60a5fa">Player 1</span>' : '<span style="color:#f87171">Player 2</span>');
     msg(`${endLabel()} — ${who}: click along the glowing jack line (far end) to place the jack`);
   }
 }
@@ -791,7 +979,7 @@ function aiPlaceJack() {
   const hi = Math.max(jackYMin(), jackYMax());
   jack = {
     x: jackLineX(),
-    y: lo + Math.random() * (hi - lo),
+    y: lo + seededRng() * (hi - lo),
     vx:0, vy:0, stopped:true, offMat:false
   };
   beginTurns();
@@ -801,6 +989,7 @@ function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End
 function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 
 function promptPlayer(p) {
+  shotClockStart = mode === 'online' ? Date.now() : 0;
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`${endLabel()} — <span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -810,10 +999,13 @@ function promptPlayer(p) {
       if (!shot) return;
       deliverBowl(p, shot.angle, shot.speed);
     }, 1100);
+  } else if (mode === 'online' && p !== localPlayer) {
+    state = 'aim'; syncFireBtn();
+    msg(`${endLabel()} — <span style="color:#94a3b8">Opponent's turn…</span>`);
   } else {
     state = 'aim'; syncFireBtn();
     const col  = p===1 ? '#60a5fa' : '#f87171';
-    const name = p===1 ? 'Player 1' : 'Player 2';
+    const name = mode === 'online' ? 'Your turn' : (p===1 ? 'Player 1' : 'Player 2');
     msg(`${endLabel()} — <span style="color:${col}">${name}</span>: drag from the delivery mark`);
   }
 }
@@ -935,6 +1127,7 @@ function _doOnAllStopped() {
     if (jack && jack.inDitch && !_preShot.jackInDitch) unlockAch('ditch_jack');
   }
   turnIdx++;
+  if (mode === 'online') processPendingMoves();
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
 }
@@ -1007,11 +1200,24 @@ function advanceEnd() {
 function gameOver() {
   state = 'game-over';
   checkAchievements('game_over');
-  const n2 = mode==='vs-ai' ? 'AI' : 'Player 2';
+  const n2 = mode==='vs-ai' ? 'AI' : (mode==='online' ? 'Opponent' : 'Player 2');
   let res;
-  if (scores[0]>scores[1])      res=`<span style="color:#60a5fa">Player 1 wins</span> ${scores[0]}–${scores[1]}`;
-  else if (scores[1]>scores[0]) res=`<span style="color:#f87171">${n2} wins</span> ${scores[1]}–${scores[0]}`;
-  else                          res=`Draw! ${scores[0]}–${scores[1]}`;
+  if (mode === 'online') {
+    if (scores[localPlayer-1] > scores[localPlayer===1?1:0])
+      res = `<span style="color:#22c55e">You win!</span> ${scores[0]}–${scores[1]}`;
+    else if (scores[localPlayer-1] < scores[localPlayer===1?1:0])
+      res = `<span style="color:#ef4444">You lose</span> ${scores[0]}–${scores[1]}`;
+    else
+      res = `Draw! ${scores[0]}–${scores[1]}`;
+  } else {
+    if (scores[0]>scores[1])      res=`<span style="color:#60a5fa">Player 1 wins</span> ${scores[0]}–${scores[1]}`;
+    else if (scores[1]>scores[0]) res=`<span style="color:#f87171">${n2} wins</span> ${scores[1]}–${scores[0]}`;
+    else                          res=`Draw! ${scores[0]}–${scores[1]}`;
+  }
+  if (mode === 'online' && sb) {
+    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+    localStorage.removeItem('bowls_activeGame');
+  }
   msg(`Game over — ${res}. Press New Game to play again.`);
 }
 
@@ -1717,12 +1923,12 @@ function drawSidePanels() {
     ctx.strokeStyle=C.p1d; ctx.lineWidth=1.5; ctx.stroke();
   }
   // Mode button
-  const modeLabel = mode==='vs-ai'?'vs AI':'2P';
+  const modeLabel = mode==='online'?'Online':(mode==='vs-ai'?'vs AI':'2P');
   drawPanelBtn(SC, PANEL_BTN.y, modeLabel, '#4c1d95', '#c4b5fd');
 
   // Right — P2/AI
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
-  const lbl2 = mode==='vs-ai'? AI_PLAYERS[aiLevel].name.split(' ')[0] :'P2';
+  const lbl2 = mode==='vs-ai'? AI_PLAYERS[aiLevel].name.split(' ')[0] : (mode==='online'?'Opp':'P2');
   ctx.fillStyle=C.p2; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(lbl2,W-SC,16);
   ctx.font='bold 22px Segoe UI';
@@ -1744,6 +1950,22 @@ function drawSidePanels() {
     const ax=cur===1?SC:W-SC;
     ctx.fillStyle='#fbbf24';
     ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
+  }
+
+  // Online latency indicator
+  if (mode === 'online' && peerLatencyMs >= 0) {
+    const col = peerLatencyMs < 100 ? '#22c55e' : peerLatencyMs < 250 ? '#eab308' : '#ef4444';
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(W/2, 10, 4, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Shot clock
+  if (mode === 'online' && shotClockStart && shotClockLimit) {
+    const rem = shotClockRemaining();
+    const txt = formatClock(rem);
+    ctx.fillStyle = rem < 10000 ? '#ef4444' : '#94a3b8';
+    ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(txt, W/2, 26);
   }
 
   // Shot holder indicator — above Fire (P1) or Head (P2) button
@@ -2230,7 +2452,7 @@ function handlePointerDown(p) {
 
   // Canvas-drawn panel buttons
   const SP=38, SC=19;
-  if (hitPanelBtn(p, SC)) {
+  if (hitPanelBtn(p, SC) && mode !== 'online') {
     mode = mode==='vs-ai'?'vs-player':'vs-ai';
     document.getElementById('lbl2').textContent = mode==='vs-ai'?'AI':'P2';
     mouse.down = false; return;
@@ -2241,6 +2463,7 @@ function handlePointerDown(p) {
   }
 
   if (state === 'place-jack') {
+    if (mode === 'online' && jackOwner !== localPlayer) { mouse.down = false; return; }
     const mm = s2m(p.x, p.y);
     if (mm) {
       const jx = jackLineX();
@@ -2248,6 +2471,7 @@ function handlePointerDown(p) {
       if (Math.abs(mm.x - jx) < MAT.w * 0.3 && mm.y >= lo - 20 && mm.y <= hi + 20) {
         const jy = Math.max(lo, Math.min(hi, mm.y));
         jack = { x: jx, y: jy, vx: 0, vy: 0, stopped: true, offMat: false, inDitch: false };
+        if (mode === 'online') sendMove('jack', localPlayer, { x: jx, y: jy });
         beginTurns();
         mouse.down = false; return;
       } else {
@@ -2255,6 +2479,7 @@ function handlePointerDown(p) {
       }
     }
   } else if (state === 'aim') {
+    if (mode === 'online' && playerForTurn(turnIdx) !== localPlayer) { mouse.down = false; return; }
     // Check bias arrow taps (fixed position, not relative to delivery point)
     const arrowY = H - 115, arrowGap = 80, abW = 60, abH = 36;
     for (const [dir, ox] of [['left', -arrowGap], ['right', arrowGap]]) {
@@ -2272,7 +2497,14 @@ function handlePointerDown(p) {
     swipeStartX   = p.x;
     aimLiveSpeed  = 0;
   } else if (state === 'end-result') {
-    advanceEnd();
+    if (mode === 'online') {
+      localAcked = true;
+      sendMove('end_ack', localPlayer, {});
+      if (opponentAcked) advanceEnd();
+      else msg('Waiting for opponent…');
+    } else {
+      advanceEnd();
+    }
   } else if (state === 'jack-off-side') {
     startEnd();
   }
@@ -2298,7 +2530,12 @@ function handlePointerUp() {
     const pct = swipeDistPct();
     if (pct > 0) {
       const ceiling = fireModeActive ? MAX_SPD * FIRE_MULT : MAX_SPD;
-      deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), MIN_SPD + pct * (ceiling - MIN_SPD));
+      const shotAngle = aimAngle ?? defaultAimAngle();
+      const shotSpeed = MIN_SPD + pct * (ceiling - MIN_SPD);
+      if (mode === 'online') {
+        sendMove('shot', localPlayer, { angle: shotAngle, speed: shotSpeed, biasDir: biasDirs[localPlayer-1], delivX: delivPos ? delivPos.x : bowlStart().x });
+      }
+      deliverBowl(playerForTurn(turnIdx), shotAngle, shotSpeed);
     } else {
       const mm = s2m(swipeStartX, swipeStartY);
       if (mm) {
@@ -2347,6 +2584,251 @@ if ('serviceWorker' in navigator) {
     .catch(() => {});
 }
 
+// ── Online Multiplayer ────────────────────────────────────────────
+const SUPABASE_URL  = 'https://qbbcxkmvcpwcwrcdtcce.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFiYmN4a212Y3B3Y3dyY2R0Y2NlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5ODExMzUsImV4cCI6MjA5NzU1NzEzNX0.g8jFLYNqmpEHznmvRXUZIU_IH5N8BymoetYTQkzf91I';
+let sb = null;
+let netPeer = null, netConn = null;
+let localPlayer = 0;
+let onlineGameId = '';
+let moveNum = 0;
+let shotClockLimit = 0;
+let shotClockStart = 0;
+let opponentAcked = false, localAcked = false;
+let netDisplayName = localStorage.getItem('bowls_name') || '';
+let moveSubscription = null;
+let lobbySubscription = null;
+let peerLatencyMs = -1;
+let pingInterval = null;
+let reconnectTimer = null;
+let pendingMoves = [];
+
+const TIME_CONTROLS = [
+  { label:'30 seconds', value:'30s',  ms:30000,     realtime:true },
+  { label:'1 minute',   value:'1m',   ms:60000,     realtime:true },
+  { label:'5 minutes',  value:'5m',   ms:300000,    realtime:true },
+  { label:'30 minutes', value:'30m',  ms:1800000,   realtime:false },
+  { label:'4 hours',    value:'4h',   ms:14400000,  realtime:false },
+  { label:'1 day',      value:'1d',   ms:86400000,  realtime:false },
+  { label:'2 days',     value:'2d',   ms:172800000, realtime:false },
+];
+
+function initSupabase() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return false;
+  if (!sb) sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  return true;
+}
+
+function genRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+async function createLobby(settings, timeControl) {
+  if (!initSupabase()) return null;
+  const id = genRoomCode();
+  rngSeed = Date.now() ^ (Math.random() * 0xFFFFFFFF >>> 0);
+  const { error } = await sb.from('games').insert({
+    id, host_name: netDisplayName, settings, time_control: timeControl, seed: rngSeed, status: 'waiting'
+  });
+  if (error) { console.error('createLobby', error); return null; }
+  onlineGameId = id;
+  localPlayer = 1;
+  return id;
+}
+
+async function listLobbies() {
+  if (!initSupabase()) return [];
+  const { data, error } = await sb.from('games').select('*').eq('status', 'waiting').order('created_at', { ascending: false });
+  if (error) { console.error('listLobbies', error); return []; }
+  return data || [];
+}
+
+async function listMyGames() {
+  if (!initSupabase() || !netDisplayName) return [];
+  const { data, error } = await sb.from('games').select('*').eq('status', 'active')
+    .or(`host_name.eq.${netDisplayName},guest_name.eq.${netDisplayName}`);
+  if (error) { console.error('listMyGames', error); return []; }
+  return data || [];
+}
+
+async function joinLobby(gameId) {
+  if (!initSupabase()) return false;
+  const { data, error } = await sb.from('games').update({ guest_name: netDisplayName, status: 'active' })
+    .eq('id', gameId).eq('status', 'waiting').select().single();
+  if (error || !data) { console.error('joinLobby', error); return false; }
+  onlineGameId = gameId;
+  localPlayer = 2;
+  rngSeed = data.seed;
+  return data;
+}
+
+async function deleteLobby(gameId) {
+  if (!sb) return;
+  await sb.from('games').delete().eq('id', gameId);
+}
+
+async function sendMove(type, player, data) {
+  if (!sb) return;
+  moveNum++;
+  const row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
+  await sb.from('moves').insert(row);
+  if (netConn && netConn.open) {
+    netConn.send({ type: 'MOVE', ...row });
+  }
+}
+
+async function fetchMoves(gameId) {
+  if (!sb) return [];
+  const { data, error } = await sb.from('moves').select('*').eq('game_id', gameId).order('move_num');
+  if (error) { console.error('fetchMoves', error); return []; }
+  return data || [];
+}
+
+function subscribeMoves(gameId) {
+  if (!sb || moveSubscription) return;
+  moveSubscription = sb.channel(`moves:${gameId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves', filter: `game_id=eq.${gameId}` },
+      (payload) => { if (payload.new.player !== localPlayer) onRemoteMove(payload.new); })
+    .subscribe();
+}
+
+function unsubscribeMoves() {
+  if (moveSubscription) { sb.removeChannel(moveSubscription); moveSubscription = null; }
+}
+
+function subscribeLobby(callback) {
+  if (!sb) return;
+  if (lobbySubscription) { sb.removeChannel(lobbySubscription); }
+  lobbySubscription = sb.channel('lobby')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => callback())
+    .subscribe();
+}
+
+function unsubscribeLobby() {
+  if (lobbySubscription) { sb.removeChannel(lobbySubscription); lobbySubscription = null; }
+}
+
+// ── PeerJS (real-time overlay) ───────────────────────────────────
+function setupPeer(id, onOpen) {
+  netPeer = new Peer(id || undefined);
+  netPeer.on('open', () => { if (onOpen) onOpen(netPeer.id); });
+  netPeer.on('error', (e) => console.warn('PeerJS error', e));
+}
+
+function peerHost(roomCode, onGuest) {
+  setupPeer(roomCode, () => {
+    netPeer.on('connection', (conn) => {
+      netConn = conn;
+      setupConn(conn);
+      if (onGuest) onGuest();
+    });
+  });
+}
+
+function peerJoin(roomCode, onConnected) {
+  setupPeer(null, () => {
+    netConn = netPeer.connect(roomCode, { reliable: true });
+    setupConn(netConn);
+    netConn.on('open', () => { if (onConnected) onConnected(); });
+  });
+}
+
+function setupConn(conn) {
+  conn.on('data', (msg) => {
+    if (msg.type === 'PING') { conn.send({ type: 'PONG', t: msg.t }); return; }
+    if (msg.type === 'PONG') { peerLatencyMs = Date.now() - msg.t; return; }
+    if (msg.type === 'MOVE') { onRemoteMove(msg); }
+  });
+  conn.on('close', () => onPeerDisconnect());
+  conn.on('error', () => onPeerDisconnect());
+  startPing();
+}
+
+function startPing() {
+  clearInterval(pingInterval);
+  pingInterval = setInterval(() => {
+    if (netConn && netConn.open) netConn.send({ type: 'PING', t: Date.now() });
+  }, 2000);
+}
+
+function onPeerDisconnect() {
+  peerLatencyMs = -1;
+  clearInterval(pingInterval);
+}
+
+function cleanupNet() {
+  unsubscribeMoves();
+  unsubscribeLobby();
+  clearInterval(pingInterval);
+  clearTimeout(reconnectTimer);
+  if (netConn) { netConn.close(); netConn = null; }
+  if (netPeer) { netPeer.destroy(); netPeer = null; }
+  peerLatencyMs = -1;
+  onlineGameId = '';
+  localPlayer = 0;
+  moveNum = 0;
+}
+
+// ── Remote move handler ──────────────────────────────────────────
+function onRemoteMove(move) {
+  if (move.move_num <= moveNum) return;
+  moveNum = move.move_num;
+  if (state === 'moving') {
+    pendingMoves.push(move);
+    return;
+  }
+  applyRemoteMove(move);
+}
+
+function processPendingMoves() {
+  while (pendingMoves.length > 0) {
+    const m = pendingMoves.shift();
+    applyRemoteMove(m);
+  }
+}
+
+function applyRemoteMove(move) {
+  if (move.type === 'jack') {
+    jack = { x: move.data.x, y: move.data.y, vx:0, vy:0, stopped:true, offMat:false, offSide:false, inDitch:false };
+    beginTurns();
+  } else if (move.type === 'shot') {
+    const d = move.data;
+    setBiasDir(move.player, d.biasDir);
+    delivPos = { x: d.delivX, y: bowlStart().y };
+    deliverBowl(move.player, d.angle, d.speed);
+    shotClockStart = 0;
+  } else if (move.type === 'end_ack') {
+    opponentAcked = true;
+    if (localAcked && opponentAcked) advanceEnd();
+  }
+}
+
+// ── Shot clock ───────────────────────────────────────────────────
+function getTimeControlMs(tc) {
+  const found = TIME_CONTROLS.find(t => t.value === tc);
+  return found ? found.ms : 60000;
+}
+
+function isRealtime(tc) {
+  const found = TIME_CONTROLS.find(t => t.value === tc);
+  return found ? found.realtime : true;
+}
+
+function shotClockRemaining() {
+  if (!shotClockStart || !shotClockLimit) return Infinity;
+  return Math.max(0, shotClockLimit - (Date.now() - shotClockStart));
+}
+
+function formatClock(ms) {
+  if (ms >= 86400000) { const d = Math.floor(ms / 86400000); const h = Math.floor((ms % 86400000) / 3600000); return `${d}d ${h}h`; }
+  if (ms >= 3600000) { const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return `${h}h ${m}m`; }
+  if (ms >= 60000) { const m = Math.floor(ms / 60000); const s = Math.floor((ms % 60000) / 1000); return `${m}:${String(s).padStart(2,'0')}`; }
+  return `${Math.ceil(ms / 1000)}s`;
+}
+
 // ── Splash screen ─────────────────────────────────────────────────
 function buildSplash() {
   function seg(containerId, options, getVal, setVal) {
@@ -2365,9 +2847,10 @@ function buildSplash() {
   }
 
   seg('sEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>splashCfg.ends, v=>splashCfg.ends=v);
-  seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player']], ()=>splashCfg.mode, v=>{
+  seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player'],['Online','online']], ()=>splashCfg.mode, v=>{
     splashCfg.mode=v;
     document.getElementById('aiPickWrap').style.display = v==='vs-ai'?'':'none';
+    if (v === 'online') showOnlinePanel();
   });
   const aiOpts = AI_PLAYERS.map((a,i)=>[a.name.split(' ')[0],i]);
   seg('sAI', aiOpts, ()=>splashCfg.aiLevel, v=>{
@@ -2471,6 +2954,338 @@ function buildSplash() {
   document.getElementById('btnStart').onclick = applyAndStart;
 }
 
+// ── Online panel logic ────────────────────────────────────────────
+let createCfg = {
+  ends: 6, timeControl: '1m', size: 3, biasVal: 1.0,
+  p1idx: 0, p1design: 0,
+  speedVal: 50, bendLeft: 50, bendRight: 50, bg: 'hardwood'
+};
+let onlinePanelBuilt = false;
+
+function showOnlinePanel() {
+  const panel = document.getElementById('online-panel');
+  const nameInput = document.getElementById('lobby-name');
+  nameInput.value = netDisplayName;
+  if (!onlinePanelBuilt) buildOnlinePanel();
+  panel.classList.add('show');
+  refreshLobby();
+}
+
+function hideOnlinePanel() {
+  document.getElementById('online-panel').classList.remove('show');
+  unsubscribeLobby();
+}
+
+function buildOnlinePanel() {
+  onlinePanelBuilt = true;
+  const nameInput = document.getElementById('lobby-name');
+  nameInput.oninput = () => {
+    netDisplayName = nameInput.value.trim();
+    localStorage.setItem('bowls_name', netDisplayName);
+  };
+
+  document.getElementById('online-back').onclick = hideOnlinePanel;
+  document.getElementById('btnRefreshLobby').onclick = refreshLobby;
+  document.getElementById('btnCreateGame').onclick = showCreatePanel;
+
+  subscribeLobby(() => refreshLobby());
+}
+
+async function refreshLobby() {
+  const listEl = document.getElementById('lobby-list');
+  const myEl = document.getElementById('my-games-list');
+
+  const lobbies = await listLobbies();
+  if (lobbies.length === 0) {
+    listEl.innerHTML = '<div class="lobby-empty">No games available</div>';
+  } else {
+    listEl.innerHTML = '';
+    lobbies.forEach(g => {
+      const row = document.createElement('div');
+      row.className = 'lobby-row';
+      const s = g.settings || {};
+      const tc = TIME_CONTROLS.find(t => t.value === g.time_control);
+      row.innerHTML = `<span class="lobby-host">${esc(g.host_name || 'Anon')}</span>` +
+        `<span class="lobby-tc">${tc ? tc.label : g.time_control}</span>` +
+        `<span class="lobby-ends">${s.ends || '?'} ends</span>`;
+      row.onclick = () => doJoinLobby(g.id, g);
+      listEl.appendChild(row);
+    });
+  }
+
+  const myGames = await listMyGames();
+  if (myGames.length === 0) {
+    myEl.innerHTML = '<div class="lobby-empty">No active games</div>';
+  } else {
+    myEl.innerHTML = '';
+    myGames.forEach(g => {
+      const row = document.createElement('div');
+      row.className = 'my-game-row';
+      const isHost = g.host_name === netDisplayName;
+      const opp = isHost ? (g.guest_name || '?') : g.host_name;
+      row.innerHTML = `<span class="my-game-opp">vs ${esc(opp)}</span>` +
+        `<span class="my-game-badge">Resume</span>`;
+      row.onclick = () => doResumeLobby(g);
+      myEl.appendChild(row);
+    });
+  }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function doJoinLobby(gameId, gameRow) {
+  if (!netDisplayName) { alert('Please enter a display name'); return; }
+  const game = await joinLobby(gameId);
+  if (!game) { alert('Could not join — game may have started'); refreshLobby(); return; }
+  const tc = game.time_control;
+  applyOnlineSettings(game.settings, game.seed);
+  shotClockLimit = getTimeControlMs(tc);
+  hideOnlinePanel();
+  document.getElementById('create-game-panel').classList.remove('show');
+
+  if (isRealtime(tc)) {
+    peerJoin(gameId, () => {});
+  }
+  subscribeMoves(gameId);
+  localStorage.setItem('bowls_activeGame', gameId);
+  localStorage.setItem('bowls_localPlayer', '2');
+  document.getElementById('splash').classList.add('hidden');
+  startGame();
+}
+
+async function doResumeLobby(game) {
+  onlineGameId = game.id;
+  const isHost = game.host_name === netDisplayName;
+  localPlayer = isHost ? 1 : 2;
+  rngSeed = game.seed;
+  applyOnlineSettings(game.settings, game.seed);
+  shotClockLimit = getTimeControlMs(game.time_control);
+  hideOnlinePanel();
+
+  subscribeMoves(game.id);
+  if (isRealtime(game.time_control)) {
+    if (isHost) peerHost(game.id, () => {});
+    else peerJoin(game.id, () => {});
+  }
+  localStorage.setItem('bowls_activeGame', game.id);
+  localStorage.setItem('bowls_localPlayer', String(localPlayer));
+  document.getElementById('splash').classList.add('hidden');
+
+  const moves = await fetchMoves(game.id);
+  startGame();
+  replayMoves(moves);
+}
+
+function replayMoves(moves) {
+  for (const m of moves) {
+    moveNum = m.move_num;
+    if (m.type === 'jack') {
+      jack = { x: m.data.x, y: m.data.y, vx:0, vy:0, stopped:true, offMat:false, offSide:false, inDitch:false };
+    }
+  }
+}
+
+function applyOnlineSettings(s, seed) {
+  if (!s) return;
+  rngSeed = seed;
+  splashCfg.ends = s.ends || 6;
+  splashCfg.mode = 'online';
+  splashCfg.size = s.size != null ? s.size : 3;
+  splashCfg.biasVal = s.biasVal || 1.0;
+  splashCfg.speedVal = s.speedVal != null ? s.speedVal : 50;
+  splashCfg.bendLeft = s.bendLeft != null ? s.bendLeft : 50;
+  splashCfg.bendRight = s.bendRight != null ? s.bendRight : 50;
+  splashCfg.bg = s.bg || 'hardwood';
+  if (s.p1Color != null) splashCfg.p1idx = s.p1Color;
+  if (s.p1Design != null) splashCfg.p1design = s.p1Design;
+  if (s.p2Color != null) splashCfg.p2idx = s.p2Color;
+  if (s.p2Design != null) splashCfg.p2design = s.p2Design;
+  mode = 'online';
+  ENDS = splashCfg.ends;
+  RB = 10 + splashCfg.size;
+  biasMult = splashCfg.biasVal;
+  bgStyle = splashCfg.bg;
+  friction = 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
+  biasMultLeft = (splashCfg.bendLeft / 50) ** 2 * 0.15;
+  biasMultRight = (splashCfg.bendRight / 50) ** 2 * 0.15;
+  const col = BOWL_COLOURS[splashCfg.p1idx];
+  C.p1 = col.main; C.p1d = col.dark;
+  const col2 = BOWL_COLOURS[splashCfg.p2idx];
+  C.p2 = col2.main; C.p2d = col2.dark;
+  document.getElementById('lbl2').textContent = 'P2';
+}
+
+// ── Create game panel ────────────────────────────────────────────
+let createPanelBuilt = false;
+
+function showCreatePanel() {
+  if (!netDisplayName) { alert('Please enter a display name'); return; }
+  const panel = document.getElementById('create-game-panel');
+  if (!createPanelBuilt) buildCreatePanel();
+  document.getElementById('waiting-view').classList.remove('show');
+  panel.classList.add('show');
+}
+
+function hideCreatePanel() {
+  document.getElementById('create-game-panel').classList.remove('show');
+}
+
+function buildCreatePanel() {
+  createPanelBuilt = true;
+
+  function cseg(containerId, options, getVal, setVal) {
+    const el = document.getElementById(containerId);
+    options.forEach(([label, val]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (val === getVal()) b.classList.add('sel');
+      b.onclick = () => {
+        setVal(val);
+        el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+      };
+      el.appendChild(b);
+    });
+  }
+
+  cseg('cEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>createCfg.ends, v=>createCfg.ends=v);
+  cseg('cTime', TIME_CONTROLS.map(t => [t.label, t.value]), ()=>createCfg.timeControl, v=>createCfg.timeControl=v);
+  cseg('cBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>createCfg.biasVal, v=>createCfg.biasVal=v);
+
+  const szSlider = document.getElementById('cSizeSlider');
+  const szLbl = document.getElementById('cSizeLbl');
+  szSlider.value = createCfg.size;
+  szSlider.oninput = () => { createCfg.size = +szSlider.value; szLbl.textContent = szSlider.value; };
+
+  // P1 colour swatches
+  const p1El = document.getElementById('cP1');
+  BOWL_COLOURS.forEach((col, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'sw' + (i === createCfg.p1idx ? ' sel' : '');
+    sw.style.background = col.main;
+    sw.title = col.name;
+    sw.onclick = () => {
+      createCfg.p1idx = i;
+      p1El.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+    };
+    p1El.appendChild(sw);
+  });
+
+  cseg('cD1', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>createCfg.p1design, v=>createCfg.p1design=v);
+
+  // Surface
+  const spdS = document.getElementById('cSpeedSlider'), spdL = document.getElementById('cSpeedLbl');
+  const blS = document.getElementById('cBendLeftSlider'), blL = document.getElementById('cBendLeftLbl');
+  const brS = document.getElementById('cBendRightSlider'), brL = document.getElementById('cBendRightLbl');
+  spdS.oninput = () => { createCfg.speedVal = +spdS.value; spdL.textContent = spdS.value; };
+  blS.oninput = () => { createCfg.bendLeft = +blS.value; blL.textContent = blS.value; };
+  brS.oninput = () => { createCfg.bendRight = +brS.value; brL.textContent = brS.value; };
+
+  const surfPresets = [
+    ['Fast', { speedVal:75, bendLeft:25, bendRight:25 }],
+    ['Medium', { speedVal:50, bendLeft:50, bendRight:50 }],
+    ['Slow', { speedVal:25, bendLeft:75, bendRight:75 }],
+  ];
+  const cSurf = document.getElementById('cSurface');
+  surfPresets.forEach(([label, vals]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => {
+      Object.assign(createCfg, vals);
+      spdS.value = vals.speedVal; spdL.textContent = vals.speedVal;
+      blS.value = vals.bendLeft; blL.textContent = vals.bendLeft;
+      brS.value = vals.bendRight; brL.textContent = vals.bendRight;
+      cSurf.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    cSurf.appendChild(b);
+  });
+
+  // Background
+  const BG_OPTS = [
+    ['hardwood','Hardwood','bg-hardwood'],['green-carpet','Green Carpet','bg-green-carpet'],
+    ['blue-carpet','Blue Carpet','bg-blue-carpet'],['red-carpet','Red Carpet','bg-red-carpet'],
+  ];
+  const bgEl = document.getElementById('cBg');
+  BG_OPTS.forEach(([val, label, cls]) => {
+    const d = document.createElement('div');
+    d.className = 'bg-opt ' + cls + (val === createCfg.bg ? ' sel' : '');
+    d.textContent = label;
+    d.onclick = () => {
+      createCfg.bg = val;
+      bgEl.querySelectorAll('.bg-opt').forEach(x => x.classList.remove('sel'));
+      d.classList.add('sel');
+    };
+    bgEl.appendChild(d);
+  });
+
+  document.getElementById('create-back').onclick = hideCreatePanel;
+  document.getElementById('btnSubmitCreate').onclick = doCreateGame;
+  document.getElementById('btnCancelCreate').onclick = doCancelCreate;
+}
+
+async function doCreateGame() {
+  const settings = {
+    ends: createCfg.ends, size: createCfg.size, biasVal: createCfg.biasVal,
+    speedVal: createCfg.speedVal, bendLeft: createCfg.bendLeft, bendRight: createCfg.bendRight,
+    bg: createCfg.bg, p1Color: createCfg.p1idx, p1Design: createCfg.p1design,
+  };
+  const code = await createLobby(settings, createCfg.timeControl);
+  if (!code) { alert('Could not create game'); return; }
+
+  document.getElementById('waiting-code').textContent = code;
+  document.getElementById('waiting-view').classList.add('show');
+  document.getElementById('btnSubmitCreate').style.display = 'none';
+
+  shotClockLimit = getTimeControlMs(createCfg.timeControl);
+
+  if (isRealtime(createCfg.timeControl)) {
+    peerHost(code, () => onGuestJoined());
+  }
+
+  subscribeLobby(async () => {
+    if (!sb) return;
+    const { data } = await sb.from('games').select('*').eq('id', code).single();
+    if (data && data.status === 'active' && data.guest_name) {
+      onGuestJoined(data);
+    }
+  });
+}
+
+function onGuestJoined(game) {
+  if (!game && sb) {
+    sb.from('games').select('*').eq('id', onlineGameId).single().then(({ data }) => {
+      if (data) finishJoinAsHost(data);
+    });
+    return;
+  }
+  finishJoinAsHost(game);
+}
+
+function finishJoinAsHost(game) {
+  const settings = game.settings || {};
+  settings.p2Color = settings.p2Color != null ? settings.p2Color : 2;
+  settings.p2Design = settings.p2Design != null ? settings.p2Design : 0;
+  applyOnlineSettings(settings, game.seed);
+  hideCreatePanel();
+  hideOnlinePanel();
+  subscribeMoves(game.id);
+  localStorage.setItem('bowls_activeGame', game.id);
+  localStorage.setItem('bowls_localPlayer', '1');
+  document.getElementById('splash').classList.add('hidden');
+  startGame();
+}
+
+async function doCancelCreate() {
+  if (onlineGameId) {
+    await deleteLobby(onlineGameId);
+  }
+  cleanupNet();
+  document.getElementById('waiting-view').classList.remove('show');
+  document.getElementById('btnSubmitCreate').style.display = '';
+  hideCreatePanel();
+}
+
 function applyAndStart() {
   ENDS     = splashCfg.ends;
   mode     = splashCfg.mode;
@@ -2499,7 +3314,10 @@ function applyAndStart() {
 
 function showSplash() {
   clearTimeout(aiTimer);
+  cleanupNet();
   state = 'idle'; syncFireBtn();
+  localStorage.removeItem('bowls_activeGame');
+  localStorage.removeItem('bowls_localPlayer');
   document.getElementById('splash').classList.remove('hidden');
 }
 
