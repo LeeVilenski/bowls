@@ -445,7 +445,7 @@ function applyBias(obj, bias) {
   if (!movingForward) return;
   const nx = obj.vx/spd, ny = obj.vy/spd;
   const sign = bias === 'right' ? 1 : -1;
-  const bm = bias === 'left' ? biasMultLeft : biasMultRight;
+  const bm = (bias === 'left' ? biasMultLeft : biasMultRight) * biasMult;
   obj.vx += -ny * sign * BIAS_K * bm * spd;
   obj.vy +=  nx * sign * BIAS_K * bm * spd;
 }
