@@ -1546,6 +1546,9 @@ function drawAim() {
     ctx.fillText(Math.round(pct*100)+'%', bss.x, bss.y); ctx.textBaseline = 'alphabetic';
   }
 
+}
+
+function drawAimUI() {
   // Bias arrows — ◀ L and R ▶ fixed at canvas centre, above FIRE/HEAD buttons
   const bd = curBiasDir();
   const arrowY = H - 115;
