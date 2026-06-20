@@ -164,6 +164,26 @@ button:active { opacity: .7; }
 
 
     <div class="spl-card">
+      <div class="spl-head">Surface</div>
+      <div class="spl-row"><span class="spl-lbl">Preset</span><div class="seg" id="sSurface"></div></div>
+      <div class="spl-row">
+        <span class="spl-lbl">Speed</span>
+        <input type="range" id="sSpeedSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="sSpeedLbl">50</span>
+      </div>
+      <div class="spl-row">
+        <span class="spl-lbl">Bend ◀</span>
+        <input type="range" id="sBendLeftSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="sBendLeftLbl">50</span>
+      </div>
+      <div class="spl-row">
+        <span class="spl-lbl">Bend ▶</span>
+        <input type="range" id="sBendRightSlider" min="0" max="100" step="1" value="50">
+        <span class="rval" id="sBendRightLbl">50</span>
+      </div>
+    </div>
+
+    <div class="spl-card">
       <div class="spl-head">Background</div>
       <div class="bg-grid" id="sBg"></div>
     </div>
