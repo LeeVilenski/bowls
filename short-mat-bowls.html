@@ -334,6 +334,7 @@ let lastJackHitter = null;   // player who last struck the jack
 
 let mouse    = { x: 0, y: 0, down: false };
 let aimActive = false;
+let headOverlay = false;
 
 // ── Swipe control state ───────────────────────────────────────────
 let aimAngle     = null;   // null = recalculate default toward jack
@@ -359,7 +360,7 @@ function swipeDistPct() {
 
 let fireModeActive = false;
 let ffModeActive = false;
-function resetAim() { aimAngle = null; aimLiveSpeed = 0; fireModeActive = false; ffModeActive = false; delivPos = null; syncFireBtn(); syncFFBtn(); }
+function resetAim() { aimAngle = null; aimLiveSpeed = 0; fireModeActive = false; ffModeActive = false; headOverlay = false; delivPos = null; syncFireBtn(); syncFFBtn(); }
 
 // ── Position helpers ──────────────────────────────────────────────
 // All helpers respect the current delivDir (1=bowl from bottom, -1=from top)
@@ -803,11 +804,6 @@ function updateCamera() {
       cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
     }
 
-  } else if (cam.phase === 'show-head') {
-    cam.x = lerp(cam.x, cam.tx, 0.06);
-    cam.y = lerp(cam.y, cam.ty, 0.06);
-    cam.zoom = lerp(cam.zoom, cam.tz, 0.05);
-
   } else if (cam.phase === 'return') {
     cam.x = lerp(cam.x, W/2, 0.07);
     cam.y = lerp(cam.y, H/2, 0.07);
@@ -959,6 +955,7 @@ function draw() {
   ctx.restore();
   if (state==='aim') drawAimUI();
   drawSidePanels();
+  if (headOverlay) drawHeadOverlay();
   drawOverlayUI();
 }
 
@@ -975,14 +972,13 @@ function drawOverlayUI() {
     ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(fireModeActive ? 'FIRE ●' : 'FIRE', fx, fy);
 
-    // Show Head button (right side) — toggles zoom to jack area
+    // Show Head button (right side) — toggles overhead top-down view
     const hx = W - btnW/2 - 6, hy = btnY;
-    const headActive = cam.phase === 'show-head';
-    ctx.fillStyle = headActive ? '#0d9488' : 'rgba(13,94,88,0.7)';
+    ctx.fillStyle = headOverlay ? '#0d9488' : 'rgba(13,94,88,0.7)';
     ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
-    ctx.fillStyle = headActive ? '#fff' : '#5eead4';
+    ctx.fillStyle = headOverlay ? '#fff' : '#5eead4';
     ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(headActive ? '⬇ MAT' : '👁 HEAD', hx, hy);
+    ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
   }
 
   // FF button (right side) — only during moving
@@ -1688,6 +1684,246 @@ function drawDistances() {
   }
 }
 
+function drawHeadOverlay() {
+  const liveBowls = bowls.filter(b => !b.offMat);
+
+  // View area — full canvas minus space for buttons and side panels
+  const viewX = 42, viewY = 20;
+  const viewW = W - 84, viewH = H - 160;
+
+  // Fixed region: just past the far dead line up to the far fender (the head end)
+  const matMinX = MAT.x, matMaxX = MAT.x + MAT.w;
+  const matMinY = MAT.y;
+  const matMaxY = MAT.y + MAT.h * L.DEAD + 20;
+
+  // Scale to fit, preserving aspect ratio
+  const scaleX = viewW / (matMaxX - matMinX);
+  const scaleY = viewH / (matMaxY - matMinY);
+  const scale = Math.min(scaleX, scaleY);
+  const cxScr = viewX + viewW / 2, cyScr = viewY + viewH / 2;
+  const cxMat = (matMinX + matMaxX) / 2, cyMat = (matMinY + matMaxY) / 2;
+
+  function toScr(mx, my) {
+    return { x: cxScr + (mx - cxMat) * scale, y: cyScr + (my - cyMat) * scale };
+  }
+
+  // Backdrop
+  ctx.fillStyle = 'rgba(0,0,0,0.88)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(viewX - 2, viewY - 2, viewW + 4, viewH + 4, 8);
+  ctx.clip();
+
+  // Fill entire view with mat colour to avoid letterbox gaps
+  ctx.fillStyle = C.mat;
+  ctx.fillRect(viewX - 2, viewY - 2, viewW + 4, viewH + 4);
+
+  // Mat surface
+  const mTL = toScr(matMinX, matMinY), mBR = toScr(matMaxX, matMaxY);
+
+  // Alternating green stripes
+  const stripeH = MAT.h / 16;
+  for (let i = 0; i < 16; i += 2) {
+    const s0 = toScr(matMinX, matMinY + i * stripeH);
+    const s1 = toScr(matMaxX, matMinY + (i + 1) * stripeH);
+    ctx.fillStyle = C.matAlt;
+    ctx.fillRect(s0.x, s0.y, s1.x - s0.x, s1.y - s0.y);
+  }
+
+  // Overhead line helper
+  function hLine(my, color, width, dash) {
+    const l = toScr(matMinX, my), r = toScr(matMaxX, my);
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.stroke();
+    if (dash) ctx.setLineDash([]);
+  }
+  function vLine(mx, my1, my2, color, width) {
+    const a = toScr(mx, my1), b = toScr(mx, my2);
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+
+  const cx = MAT.x + MAT.w / 2;
+  const tDitch = MAT.y + L.DITCH * MAT.h;
+  const tDead  = MAT.y + L.DEAD * MAT.h;
+  const tJackN = MAT.y + L.JACK_N * MAT.h;
+  const tJackF = MAT.y + L.JACK_F * MAT.h;
+
+  // Ditch zone tint
+  const dFS = toScr(matMinX, matMinY), dFE = toScr(matMaxX, tDitch);
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.fillRect(dFS.x, dFS.y, dFE.x - dFS.x, dFE.y - dFS.y);
+
+  // Floor area above fender — mirrors drawFloor() patterns
+  {
+    const fx = viewX - 2, fy = viewY - 2, fw = viewW + 4, fh = mTL.y - viewY;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(fx, fy, fw, fh); ctx.clip();
+    if (bgStyle === 'hardwood') {
+      const plankH = 18, cols = ['#8B5C20','#7A5018','#96622A','#8A5A1E'];
+      for (let y = fy; y < fy + fh; y += plankH) {
+        ctx.fillStyle = cols[Math.floor((y - fy) / plankH) % cols.length];
+        ctx.fillRect(fx, y, fw, plankH);
+        ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+        for (let g = 3; g < plankH; g += 5) {
+          ctx.beginPath(); ctx.moveTo(fx, y + g); ctx.lineTo(fx + fw, y + g); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,0.30)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(fx, y); ctx.lineTo(fx + fw, y); ctx.stroke();
+      }
+    } else {
+      const CC = {
+        'green-carpet':  ['#1a5c2a','#1d6430'],
+        'blue-carpet':   ['#12305e','#163568'],
+        'red-carpet':    ['#5c1414','#681818'],
+      };
+      const [c1, c2] = CC[bgStyle] || CC['green-carpet'];
+      for (let y = fy; y < fy + fh; y += 8) {
+        ctx.fillStyle = Math.floor((y - fy) / 8) % 2 === 0 ? c1 : c2;
+        ctx.fillRect(fx, y, fw, 8);
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+      for (let x = fx - fh; x < fx + fw + fh; x += 5) {
+        ctx.beginPath(); ctx.moveTo(x, fy); ctx.lineTo(x + fh, fy + fh); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // Fender board at top
+  const fL = toScr(matMinX - 4, matMinY), fR = toScr(matMaxX + 4, matMinY);
+  const boardH = 6;
+  const fGrad = ctx.createLinearGradient(0, fL.y - boardH, 0, fL.y);
+  fGrad.addColorStop(0, '#f0ece2'); fGrad.addColorStop(1, '#d8d4ca');
+  ctx.fillStyle = fGrad;
+  ctx.fillRect(fL.x, fL.y - boardH, fR.x - fL.x, boardH);
+  ctx.strokeStyle = 'rgba(100,90,70,0.5)'; ctx.lineWidth = 1;
+  ctx.strokeRect(fL.x, fL.y - boardH, fR.x - fL.x, boardH);
+
+  // Fender side arms (from fender to ditch line)
+  for (const armX of [matMinX - 2, matMaxX + 2]) {
+    const aT = toScr(armX - 2, matMinY), aB = toScr(armX + 2, tDitch);
+    const armGrad = ctx.createLinearGradient(aT.x, 0, aB.x, 0);
+    armGrad.addColorStop(0, '#d8d4ca'); armGrad.addColorStop(0.5, '#f0ece2'); armGrad.addColorStop(1, '#d8d4ca');
+    ctx.fillStyle = armGrad;
+    ctx.fillRect(aT.x, aT.y, aB.x - aT.x, aB.y - aT.y);
+    ctx.strokeStyle = 'rgba(100,90,70,0.4)'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(aT.x, aT.y, aB.x - aT.x, aB.y - aT.y);
+  }
+
+  // Ditch line
+  hLine(tDitch, C.line, 1.5);
+
+  // Dead line
+  hLine(tDead, C.line, 2);
+
+  // Delivery bracket lines (from ditch toward centre)
+  const delivLen = L.DELIV_LEN * MAT.h;
+  vLine(cx - 54, tDitch, tDitch + delivLen, 'rgba(255,255,255,0.5)', 1);
+  vLine(cx + 54, tDitch, tDitch + delivLen, 'rgba(255,255,255,0.5)', 1);
+
+  // Jack line (vertical at centre)
+  const isFarEnd = delivDir === 1;
+  const jackCol = isFarEnd ? 'rgba(255,220,50,0.85)' : 'rgba(255,220,50,0.3)';
+  vLine(cx, tJackF, tJackN, jackCol, isFarEnd ? 2 : 1.5);
+  // Jack line serifs
+  const sw = isFarEnd ? 10 : 6;
+  for (const jy of [tJackN, tJackF]) {
+    const sp = toScr(cx, jy);
+    ctx.strokeStyle = jackCol; ctx.lineWidth = isFarEnd ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(sp.x - sw/2, sp.y); ctx.lineTo(sp.x + sw/2, sp.y); ctx.stroke();
+  }
+
+  // Centre block
+  const fTL = toScr(FENDER.x, FENDER.y);
+  const fBR = toScr(FENDER.x + FENDER.w, FENDER.y + FENDER.h);
+  const bGrad = ctx.createLinearGradient(0, fTL.y, 0, fBR.y);
+  bGrad.addColorStop(0, '#f0ece2'); bGrad.addColorStop(1, '#d8d4ca');
+  ctx.fillStyle = bGrad;
+  ctx.fillRect(fTL.x, fTL.y, fBR.x - fTL.x, fBR.y - fTL.y);
+  ctx.strokeStyle = 'rgba(100,90,70,0.5)'; ctx.lineWidth = 1;
+  ctx.strokeRect(fTL.x, fTL.y, fBR.x - fTL.x, fBR.y - fTL.y);
+
+  // Mat side borders only (left and right edges)
+  ctx.strokeStyle = C.border; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(mTL.x, mTL.y); ctx.lineTo(mTL.x, mBR.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mBR.x, mTL.y); ctx.lineTo(mBR.x, mBR.y); ctx.stroke();
+
+  // Distance lines from bowls to jack
+  if (jack && !jack.offMat) {
+    const dists = liveBowls
+      .map(b => ({ b, d: Math.hypot(b.x - jack.x, b.y - jack.y) }))
+      .sort((a, b) => a.d - b.d);
+    const jp = toScr(jack.x, jack.y);
+
+    for (const e of dists) {
+      const bp = toScr(e.b.x, e.b.y);
+      ctx.beginPath();
+      ctx.moveTo(bp.x, bp.y);
+      ctx.lineTo(jp.x, jp.y);
+      ctx.strokeStyle = e.b.player === 1 ? 'rgba(96,165,250,0.4)' : 'rgba(248,113,113,0.4)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 2]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Distance label at midpoint
+      const lx = (bp.x + jp.x) / 2, ly = (bp.y + jp.y) / 2;
+      const distMM = (e.d / MAT.h * 13000).toFixed(0);
+      ctx.font = '9px Segoe UI';
+      const tw = ctx.measureText(distMM + 'mm').width;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(lx - tw/2 - 2, ly - 12, tw + 4, 12);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(distMM + 'mm', lx, ly);
+    }
+
+    // Draw jack
+    const jr = Math.max(3, RJ * scale);
+    const jg = ctx.createRadialGradient(jp.x - jr*0.3, jp.y - jr*0.3, jr*0.05, jp.x, jp.y, jr);
+    jg.addColorStop(0, '#fef9c3'); jg.addColorStop(0.5, '#fde047'); jg.addColorStop(1, '#a16207');
+    ctx.beginPath(); ctx.arc(jp.x, jp.y, jr, 0, Math.PI * 2);
+    ctx.fillStyle = jg; ctx.fill();
+    ctx.strokeStyle = '#92400e'; ctx.lineWidth = 1; ctx.stroke();
+
+    // Draw bowls
+    const br = Math.max(4, RB * scale);
+    for (const e of dists) {
+      const bp = toScr(e.b.x, e.b.y);
+      const pc = e.b.player === 1 ? C.p1 : C.p2;
+      const pcd = e.b.player === 1 ? C.p1d : C.p2d;
+
+      ctx.beginPath(); ctx.arc(bp.x + 1, bp.y + 1, br, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
+
+      const bg = ctx.createRadialGradient(bp.x - br*0.3, bp.y - br*0.3, br*0.05, bp.x, bp.y, br);
+      bg.addColorStop(0, pc); bg.addColorStop(1, pcd);
+      ctx.beginPath(); ctx.arc(bp.x, bp.y, br, 0, Math.PI * 2);
+      ctx.fillStyle = bg; ctx.fill();
+      ctx.strokeStyle = pcd; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // Closest bowl marker
+    if (dists.length) {
+      const closest = toScr(dists[0].b.x, dists[0].b.y);
+      ctx.fillStyle = '#fbbf24'; ctx.font = `bold ${Math.max(10, br)}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('★', closest.x, closest.y - br - 2);
+    }
+  }
+
+  ctx.restore();
+
+  // Title
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('OVERHEAD VIEW', W / 2, viewY + viewH + 6);
+}
+
 // ── Main loop ─────────────────────────────────────────────────────
 function loop() {
   if (state==='moving') {
@@ -1737,19 +1973,10 @@ function handlePointerDown(p) {
       fireModeActive = !fireModeActive;
       mouse.down = false; return;
     }
-    // Head button (right side during aim)
+    // Head button (right side during aim) — toggles overhead top-down view
     const hx = W - btnW/2 - 6;
     if (p.x >= hx - btnW/2 && p.x <= hx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
-      if (cam.phase === 'show-head') {
-        cam.phase = 'return';
-        cam.tx = W/2; cam.ty = H/2; cam.tz = 1;
-      } else if (jack && !jack.offMat) {
-        const js = m2s(jack.x, jack.y);
-        cam.phase = 'show-head';
-        cam.tx = W/2;
-        cam.ty = js.y;
-        cam.tz = 1.8;
-      }
+      headOverlay = !headOverlay;
       mouse.down = false; return;
     }
   }
