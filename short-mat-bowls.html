@@ -2816,7 +2816,7 @@ function cleanupNet() {
 function onRemoteMove(move) {
   if (move.move_num <= moveNum) return;
   moveNum = move.move_num;
-  if (state === 'moving') {
+  if (state === 'moving' || state === 'camera-return') {
     pendingMoves.push(move);
     return;
   }
