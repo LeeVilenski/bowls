@@ -580,10 +580,11 @@ function simPath(sx, sy, angle, speed, bias, bMult) {
     const movingForward = delivDir === 1 ? vy < 0 : vy > 0;
     if (movingForward && bias) {
       const sign = bias === 'right' ? 1 : -1;
-      vx += -ny * sign * BIAS_K * bMult * spd;
-      vy +=  nx * sign * BIAS_K * bMult * spd;
+      const bm = bias === 'left' ? biasMultLeft : biasMultRight;
+      vx += -ny * sign * BIAS_K * bm * spd;
+      vy +=  nx * sign * BIAS_K * bm * spd;
     }
-    vx *= FRICTION; vy *= FRICTION;
+    vx *= friction; vy *= friction;
     x += vx; y += vy;
     if (x < MAT.x || x > MAT.x+MAT.w || y < MAT.y || y > MAT.y+MAT.h) break;
     if (x-RB < FENDER.x+FENDER.w && x+RB > FENDER.x &&
