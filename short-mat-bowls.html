@@ -457,6 +457,18 @@ function stepObj(obj, bias) {
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.22) {
     obj.stopped = true; obj.vx = obj.vy = 0; if (obj.delivering) obj.delivering = false;
+    if (obj !== jack && obj.bias) {
+      const bm = (obj.bias === 'left' ? biasMultLeft : biasMultRight) * biasMult;
+      // Higher bias = more likely to topple (weighted side pulls bowl over)
+      let toppleChance = 0.3 + bm * 0.5;
+      // Contact on the bias side keeps the bowl upright
+      if (obj.lastHitNx !== undefined) {
+        const biasSign = obj.bias === 'right' ? 1 : -1;
+        const hitOnBiasSide = obj.lastHitNx * biasSign > 0;
+        toppleChance += hitOnBiasSide ? -0.35 : 0.25;
+      }
+      obj.restTarget = Math.random() < Math.max(0.05, Math.min(0.95, toppleChance)) ? 1 : 0;
+    }
     const farDitchY = yFromFar(L.DITCH);
     const farDeadY  = yFromFar(L.DEAD);
     const r_obj = obj === jack ? RJ : RB;
@@ -486,7 +498,7 @@ function stepObj(obj, bias) {
     if (!obj.trail) obj.trail = [];
     obj.trail.unshift({x: obj.x, y: obj.y});
     if (obj.trail.length > 6) obj.trail.pop();
-    obj.restProgress = 0; // reset rest-tilt while moving
+    obj.restProgress = 0; obj.restTarget = undefined; obj.lastHitNx = undefined;
   }
 
   if (bias) applyBias(obj, bias);
@@ -579,6 +591,8 @@ function collide(a, b, ra, rb, rest, ma=1, mb=1) {
     a.vx -= imp/ma*nx; a.vy -= imp/ma*ny;
     b.vx += imp/mb*nx; b.vy += imp/mb*ny;
     a.stopped = false; b.stopped = false;
+    if (a.bias) a.lastHitNx = -nx;
+    if (b.bias) b.lastHitNx = nx;
   }
   // Mass-weighted separation so heavier object barely budges
   const ov = minD - dist;
@@ -713,7 +727,7 @@ function aiPlaceJack() {
   beginTurns();
 }
 
-function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `${endLabel()}`; }
+function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End ${endNum}/${ENDS}`; }
 function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 
 function promptPlayer(p) {
@@ -2035,10 +2049,16 @@ function loop() {
       if (allStopped()) { onAllStopped(); break; }
     }
   }
-  // Animate rest-tilt for stopped bowls (bowl settling onto its side)
+  // Animate rest-tilt for stopped bowls (toward restTarget: 0=upright, 1=on side)
   for (const b of bowls) {
     if (b.stopped && !b.offMat) {
-      b.restProgress = Math.min(1, (b.restProgress || 0) + 0.04);
+      const target = b.restTarget !== undefined ? b.restTarget : 1;
+      const cur = b.restProgress || 0;
+      if (Math.abs(cur - target) > 0.005) {
+        b.restProgress = cur + (target - cur) * 0.08;
+      } else {
+        b.restProgress = target;
+      }
     }
   }
   if (state==='moving' || state==='camera-return' || (state==='aim' && cam.phase!=='idle')) {
