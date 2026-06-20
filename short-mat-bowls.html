@@ -336,7 +336,7 @@ function swipeDistPct() {
 
 let fireModeActive = false;
 let ffModeActive = false;
-function resetAim() { aimAngle = null; aimLiveSpeed = 0; fireModeActive = false; ffModeActive = false; syncFireBtn(); syncFFBtn(); }
+function resetAim() { aimAngle = null; aimLiveSpeed = 0; fireModeActive = false; ffModeActive = false; delivPos = null; syncFireBtn(); syncFFBtn(); }
 
 // ── Position helpers ──────────────────────────────────────────────
 // All helpers respect the current delivDir (1=bowl from bottom, -1=from top)
@@ -353,9 +353,21 @@ function yFromFar(frac) {
     : MAT.y + MAT.h * (1 - frac);  // far end is bottom
 }
 
+function doormatBounds() {
+  const mw = Math.round(356 / 1830 * MAT.w);
+  const cx = MAT.x + MAT.w / 2;
+  const [y1, y2] = delivDir === 1
+    ? [MAT.y + (1 - L.MAT_LEN) * MAT.h, MAT.y + MAT.h]
+    : [MAT.y, MAT.y + L.MAT_LEN * MAT.h];
+  return { x1: cx - mw / 2, x2: cx + mw / 2, y1: Math.min(y1, y2), y2: Math.max(y1, y2) };
+}
+
+let delivPos = null;
+
 function bowlStart() {
-  // Bowl delivered from the ditch line (player stands on delivery mat just inside fender)
-  return { x: MAT.x + MAT.w / 2, y: yFromNear(L.DITCH) };
+  if (delivPos) return { x: delivPos.x, y: delivPos.y };
+  const dm = doormatBounds();
+  return { x: (dm.x1 + dm.x2) / 2, y: delivDir === 1 ? dm.y1 : dm.y2 };
 }
 
 // Jack y-range on the far jack line (jack line runs along the mat = vertical on screen)
@@ -594,25 +606,32 @@ let aiLevel = 1;
 function aiPickShot() {
   if (!jack || jack.offMat) return null;
   const ai  = AI_PLAYERS[aiLevel];
-  const bs  = bowlStart();
+  const dm  = doormatBounds();
+  const defaultBS = bowlStart();
   const jx  = jack.x, jy = jack.y;
-  const base = Math.atan2(jy - bs.y, jx - bs.x);
 
-  let bestAngle = base, bestPower = 0.6*MAX_SPD, bestDist = Infinity, bestBias = biasDirs[1];
+  let bestAngle = 0, bestPower = 0.6*MAX_SPD, bestDist = Infinity, bestBias = biasDirs[1];
+  let bestX = defaultBS.x;
+  const bsY = defaultBS.y;
+  const posSteps = [dm.x1, (dm.x1 + dm.x2) / 2, dm.x2];
 
-  for (const tryBias of ['left', 'right']) {
-    for (let da = -55; da <= 55; da += ai.stepDeg) {
-      const angle = base + da * Math.PI/180;
-      for (const pct of ai.powers) {
-        const spd = pct * MAX_SPD;
-        const path = simPath(bs.x, bs.y, angle, spd, tryBias, biasMult);
-        const end  = path[path.length-1];
-        const d    = Math.hypot(end.x - jx, end.y - jy);
-        if (d < bestDist) { bestDist = d; bestAngle = angle; bestPower = spd; bestBias = tryBias; }
+  for (const startX of posSteps) {
+    const base = Math.atan2(jy - bsY, jx - startX);
+    for (const tryBias of ['left', 'right']) {
+      for (let da = -55; da <= 55; da += ai.stepDeg) {
+        const angle = base + da * Math.PI/180;
+        for (const pct of ai.powers) {
+          const spd = pct * MAX_SPD;
+          const path = simPath(startX, bsY, angle, spd, tryBias, biasMult);
+          const end  = path[path.length-1];
+          const d    = Math.hypot(end.x - jx, end.y - jy);
+          if (d < bestDist) { bestDist = d; bestAngle = angle; bestPower = spd; bestBias = tryBias; bestX = startX; }
+        }
       }
     }
   }
   setBiasDir(2, bestBias);
+  delivPos = { x: bestX, y: bsY };
 
   return {
     angle: bestAngle + (Math.random()-0.5)*ai.jitter,
@@ -1467,6 +1486,14 @@ function drawAim() {
   // aimLiveSpeed is already a 0-1 distance fraction; show 50% when idle
   const pct = aimLiveSpeed > 0 ? aimLiveSpeed : 0.5;
 
+  // Delivery position marker on doormat
+  ctx.beginPath(); ctx.arc(bss.x, bss.y, 6, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,230,50,0.9)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(bss.x - 10, bss.y); ctx.lineTo(bss.x + 10, bss.y);
+  ctx.moveTo(bss.x, bss.y - 10); ctx.lineTo(bss.x, bss.y + 10);
+  ctx.strokeStyle = 'rgba(255,230,50,0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
+
   // Direction arrow — shaft + arrowhead projected into mat space
   const adx = Math.cos(angle), ady = Math.sin(angle);
   const tip = m2s(bsm.x + adx * 55, bsm.y + ady * 55);
@@ -1510,11 +1537,11 @@ function drawAim() {
     ctx.fillText(label, ax, arrowY); ctx.textBaseline = 'alphabetic';
   }
 
-  // "Swipe up" hint when no swipe is in progress
+  // Hint text
   if (aimLiveSpeed === 0) {
     ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px Segoe UI';
     ctx.textAlign = 'center';
-    ctx.fillText('↑ swipe up to deliver', bss.x, bss.y + 68);
+    ctx.fillText('tap mat to position · ↑ swipe to deliver', bss.x, bss.y + 68);
   }
 }
 
@@ -1778,8 +1805,16 @@ function handlePointerUp() {
       const ceiling = fireModeActive ? MAX_SPD * FIRE_MULT : MAX_SPD;
       deliverBowl(playerForTurn(turnIdx), aimAngle ?? defaultAimAngle(), MIN_SPD + pct * (ceiling - MIN_SPD));
       resetAim();
+    } else {
+      const mm = s2m(swipeStartX, swipeStartY);
+      if (mm) {
+        const dm = doormatBounds();
+        if (mm.x >= dm.x1 && mm.x <= dm.x2 && mm.y >= dm.y1 && mm.y <= dm.y2) {
+          delivPos = { x: mm.x, y: mm.y };
+          aimAngle = null;
+        }
+      }
     }
-    // else: too short — keep aim, player tries again
   }
   aimLiveSpeed = 0;
   mouse.down = false;
