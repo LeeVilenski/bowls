@@ -1966,7 +1966,7 @@ function buildSplash() {
     surfacePresets.forEach(([label, vals]) => {
       const b = document.createElement('button');
       b.textContent = label;
-      if (label === 'Medium') b.classList.add('sel');
+      if (label === 'Medium' && splashCfg.speedVal === 50 && splashCfg.bendLeft === 50 && splashCfg.bendRight === 50) b.classList.add('sel');
       b.onclick = () => {
         Object.assign(splashCfg, vals);
         syncSurfaceSliders();
