@@ -697,7 +697,7 @@ function startEnd() {
     const who = jackOwner===1
       ? '<span style="color:#60a5fa">Player 1</span>'
       : '<span style="color:#f87171">Player 2</span>';
-    msg(`End ${endNum}/${ENDS} — ${who}: click along the glowing jack line (far end) to place the jack`);
+    msg(`${endLabel()} — ${who}: click along the glowing jack line (far end) to place the jack`);
   }
 }
 
@@ -713,12 +713,13 @@ function aiPlaceJack() {
   beginTurns();
 }
 
+function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `${endLabel()}`; }
 function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 
 function promptPlayer(p) {
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
-    msg(`End ${endNum}/${ENDS} — <span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
+    msg(`${endLabel()} — <span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
     aiTimer = setTimeout(() => {
       if (state !== 'ai-turn') return;
       const shot = aiPickShot();
@@ -729,7 +730,7 @@ function promptPlayer(p) {
     state = 'aim'; syncFireBtn();
     const col  = p===1 ? '#60a5fa' : '#f87171';
     const name = p===1 ? 'Player 1' : 'Player 2';
-    msg(`End ${endNum}/${ENDS} — <span style="color:${col}">${name}</span>: drag from the delivery mark`);
+    msg(`${endLabel()} — <span style="color:${col}">${name}</span>: drag from the delivery mark`);
   }
 }
 
@@ -867,11 +868,11 @@ function handleJackOffSide() {
     const oCol  = opp === 1 ? '#60a5fa' : '#f87171';
     const oName = opp === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
     state = 'end-result';
-    msg(`End ${endNum} — <span style="color:${hCol}">${hName}</span> knocked the jack off the side for the 3rd time! <span style="color:${oCol}">${oName}</span> wins 3 points. Click to continue.`);
+    msg(`${endLabel()} — <span style="color:${hCol}">${hName}</span> knocked the jack off the side for the 3rd time! <span style="color:${oCol}">${oName}</span> wins 3 points. Click to continue.`);
   } else {
     const rem = 3 - jackOffCounts[idx];
     state = 'jack-off-side';
-    msg(`End ${endNum} — Jack knocked off the side by <span style="color:${hCol}">${hName}</span> (warning ${jackOffCounts[idx]}/3 — ${rem} left). End restarted. Click to continue.`);
+    msg(`${endLabel()} — Jack knocked off the side by <span style="color:${hCol}">${hName}</span> (warning ${jackOffCounts[idx]}/3 — ${rem} left). End restarted. Click to continue.`);
   }
 }
 
@@ -883,16 +884,16 @@ function finishEnd() {
     updateHUD();
     const col  = res.winner===1 ? '#60a5fa' : '#f87171';
     const name = res.winner===1 ? 'Player 1' : (mode==='vs-ai' ? 'AI' : 'Player 2');
-    msg(`End ${endNum} — <span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Click to continue.`);
+    msg(`${endLabel()} — <span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Click to continue.`);
     jackOwner = res.winner;
   } else {
-    msg(`End ${endNum} — Dead end (no jack in play). Click to continue.`);
+    msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
   }
 }
 
 function advanceEnd() {
   endNum++;
-  if (endNum > ENDS) { gameOver(); return; }
+  if (endNum > ENDS && scores[0] !== scores[1]) { gameOver(); return; }
   startEnd();
 }
 
