@@ -738,6 +738,7 @@ function deliverBowl(player, angle, speed) {
               player, bias:biasDirs[player-1], stopped:false, offMat:false, toucher:false, inDitch:false,
               rotAngle:0, trail:[], restProgress:0, delivering:true,
               design:splashCfg[`p${player}design`]});
+  resetAim();
   state = 'moving'; syncFireBtn(); syncFFBtn();
   cam.phase = 'tracking';
   cam.pendingNext = false;
