@@ -297,6 +297,9 @@ let biasDirs = ['right', 'right']; // per-player bias direction, remembered acro
 function curBiasDir()          { return biasDirs[playerForTurn(turnIdx) - 1]; }
 function setBiasDir(p, dir)    { biasDirs[p - 1] = dir; }
 let biasMult = 0.15;
+let biasMultLeft = 0.15;
+let biasMultRight = 0.15;
+let friction = FRICTION;
 
 let bowls    = [];
 let jack     = null;
