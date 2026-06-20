@@ -957,6 +957,7 @@ function draw() {
   for (const b of bowls) drawBowl(b);
   if (state==='aim') drawAim();
   ctx.restore();
+  if (state==='aim') drawAimUI();
   drawSidePanels();
   drawOverlayUI();
 }
