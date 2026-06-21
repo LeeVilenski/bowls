@@ -2200,7 +2200,7 @@ function drawAimUI() {
 
   // Hint text
   if (aimLiveSpeed === 0) {
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px Segoe UI';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = 'bold 18px Segoe UI';
     ctx.textAlign = 'center';
     ctx.fillText('tap mat to position · ↑ swipe to deliver', P.cx, H - 85);
   }
@@ -2300,7 +2300,7 @@ function drawSidePanels() {
       const label = forfeits > 0 ? `${txt} (${forfeits}/3)` : txt;
       const blockTopY = m2s(MAT.x, FENDER.y).y;
       const clockY = blockTopY - 30;
-      ctx.font = '11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.font = 'bold 18px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillStyle = urgent ? '#ef4444' : 'rgba(255,255,255,0.5)';
       ctx.fillText(label, W/2, msgText && state !== 'moving' ? clockY - 30 : clockY);
     }
