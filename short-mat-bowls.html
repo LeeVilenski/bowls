@@ -1258,6 +1258,7 @@ function finishEnd() {
     if (p1Bowls.length === BPP && p1Bowls.every(b => b.toucher)) unlockAch('perfection');
   } else {
     msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
+    unlockAch('dead_end');
   }
 }
 
@@ -3588,8 +3589,19 @@ const ACHIEVEMENTS = [
   { id:'lose_jack',     icon:'🤯', name:'How Did That Happen', desc:'Lose three shots by removing the jack' },
   { id:'play_10',       icon:'🎳', name:'Regular',             desc:'Play 10 games' },
   { id:'play_50',       icon:'🏅', name:'Dedicated',           desc:'Play 50 games' },
+  { id:'play_100',      icon:'🎖️', name:'Centurion',           desc:'Play 100 games' },
   { id:'score_100',     icon:'💯', name:'Century',             desc:'Score 100 shots across all games' },
+  { id:'score_500',     icon:'📊', name:'500 Club',            desc:'Score 500 shots across all games' },
   { id:'beat_master',   icon:'🧠', name:'Master Class',        desc:'Beat a Master AI opponent' },
+  { id:'win_25',        icon:'💪', name:'Unstoppable',         desc:'Win 25 games' },
+  { id:'win_50',        icon:'🏆', name:'Legend',              desc:'Win 50 games' },
+  { id:'streak_3',      icon:'3️⃣', name:'Hat Trick',           desc:'Win 3 games in a row' },
+  { id:'streak_5',      icon:'5️⃣', name:'On Fire',             desc:'Win 5 games in a row' },
+  { id:'dead_end',      icon:'💀', name:'Dead End',            desc:'Play an end where nobody scores' },
+  { id:'online_first',  icon:'🌐', name:'Going Online',        desc:'Play your first online game' },
+  { id:'online_10',     icon:'📡', name:'Connected',           desc:'Play 10 online games' },
+  { id:'online_win',    icon:'🥇', name:'Online Victor',       desc:'Win your first online game' },
+  { id:'online_win_10', icon:'⭐', name:'Rising Star',         desc:'Win 10 online games' },
 ];
 
 const ACH_KEY = 'bowls_achievements';
@@ -3600,7 +3612,7 @@ function loadAch() {
 }
 function saveAch(data) { localStorage.setItem(ACH_KEY, JSON.stringify(data)); }
 function loadStats() {
-  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0 };
+  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0 };
   try { return Object.assign(def, JSON.parse(localStorage.getItem(STATS_KEY))); }
   catch { return def; }
 }
@@ -3650,6 +3662,7 @@ function checkAchievements(event, data) {
     }
     saveStats(stats);
     if (stats.totalPts >= 100) unlockAch('score_100');
+    if (stats.totalPts >= 500) unlockAch('score_500');
 
     const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
     const deficit = oppScore - myScore;
@@ -3666,21 +3679,37 @@ function checkAchievements(event, data) {
     if (mode === 'online') stats.onlineGames++;
     if (won) {
       stats.wins++;
+      stats.winStreak++;
       if (mode === 'online') stats.onlineWins++;
       const margin = myScore - oppScore;
       if (margin > stats.bestMargin) stats.bestMargin = margin;
       unlockAch('first_win');
       if (stats.wins >= 3) unlockAch('win_3');
       if (stats.wins >= 10) unlockAch('win_10');
+      if (stats.wins >= 25) unlockAch('win_25');
+      if (stats.wins >= 50) unlockAch('win_50');
+      if (stats.winStreak >= 3) unlockAch('streak_3');
+      if (stats.winStreak >= 5) unlockAch('streak_5');
       if (oppScore === 0) unlockAch('shutout');
       if (stats.maxBehind >= 3) unlockAch('comeback');
       if (endNum > ENDS) unlockAch('extra_ends');
       if (mode === 'vs-ai' && aiLevel === 3) unlockAch('beat_master');
+    } else {
+      stats.winStreak = 0;
+    }
+    if (mode === 'online') {
+      unlockAch('online_first');
+      if (stats.onlineGames >= 10) unlockAch('online_10');
+      if (won) {
+        unlockAch('online_win');
+        if (stats.onlineWins >= 10) unlockAch('online_win_10');
+      }
     }
     stats.maxBehind = 0;
     saveStats(stats);
     if (stats.games >= 10) unlockAch('play_10');
     if (stats.games >= 50) unlockAch('play_50');
+    if (stats.games >= 100) unlockAch('play_100');
   }
 }
 
