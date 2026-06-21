@@ -124,12 +124,48 @@ button:active { opacity: .7; }
   color: #fff; border-radius: 12px; border: none; width: 100%;
   box-shadow: 0 4px 20px rgba(109,40,217,0.35); letter-spacing: 0.3px;
 }
-#btnAch {
+#btnAch, #btnProfile {
   padding: 10px; font-size: 13px; font-weight: 700;
   background: #1e293b; color: #94a3b8; border-radius: 10px;
   border: 1px solid #334155; width: 100%; margin-top: -4px;
 }
-#btnAch:hover { background: #334155; color: #e2e8f0; }
+#btnAch:hover, #btnProfile:hover { background: #334155; color: #e2e8f0; }
+
+#profile-panel {
+  position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#profile-panel.show { display: flex; }
+#profile-inner { width: 100%; max-width: 440px; }
+#profile-back {
+  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
+}
+.profile-title { font-size: 20px; font-weight: 800; margin-bottom: 14px; }
+#profile-name {
+  width: 100%; padding: 10px 14px; font-size: 14px; font-weight: 600;
+  background: #111827; color: #e2e8f0; border: 1px solid #334155;
+  border-radius: 8px; box-sizing: border-box;
+}
+.stat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid #1e293b;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-lbl { font-size: 12px; color: #94a3b8; flex-shrink: 0; }
+.stat-val { font-size: 14px; font-weight: 700; color: #e2e8f0; text-align: right; }
+.stat-bar-wrap {
+  flex: 1; height: 8px; background: #1e293b; border-radius: 4px;
+  margin: 0 12px; overflow: hidden; min-width: 60px;
+}
+.stat-bar {
+  height: 100%; border-radius: 4px; transition: width 0.4s ease;
+}
+.stat-bar.green { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.stat-bar.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+.stat-bar.purple { background: linear-gradient(90deg, #a855f7, #7c3aed); }
 
 /* Achievement panel */
 #ach-panel {
@@ -230,14 +266,14 @@ button:active { opacity: .7; }
 }
 
 /* Create game sub-view */
-#create-game-panel {
+#create-game-panel, #join-bowl-panel {
   position: fixed; inset: 0; z-index: 260; background: #0a0f1e;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: none; flex-direction: column; align-items: center;
   padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
 }
-#create-game-panel.show { display: flex; }
-#create-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
+#create-game-panel.show, #join-bowl-panel.show { display: flex; }
+#create-inner, #join-bowl-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
 #create-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; align-self: flex-start;
@@ -253,12 +289,12 @@ button:active { opacity: .7; }
 #waiting-msg { font-size: 13px; color: #94a3b8; }
 .pulse { animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-#btnCancelCreate {
+#btnCancelCreate, #btnJoinCancel {
   padding: 10px 20px; font-size: 12px; font-weight: 600;
   background: #7f1d1d; color: #fca5a5; border-radius: 8px; border: 1px solid #991b1b;
 }
 
-#btnSubmitCreate {
+#btnSubmitCreate, #btnJoinConfirm {
   padding: 14px; font-size: 15px; font-weight: 800;
   background: linear-gradient(135deg,#1d4ed8,#6d28d9);
   color: #fff; border-radius: 12px; border: none; width: 100%;
@@ -340,7 +376,29 @@ button:active { opacity: .7; }
     </div>
 
     <button id="btnStart">Start Game</button>
+    <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
+    <button id="btnProfile">👤 Profile</button>
     <button id="btnAch">🏆 Achievements</button>
+  </div>
+</div>
+
+<div id="profile-panel">
+  <div id="profile-inner">
+    <button id="profile-back">&larr; Back</button>
+    <div class="profile-title">👤 Player Profile</div>
+    <div class="spl-card">
+      <div class="spl-head">Identity</div>
+      <div class="spl-row"><span class="spl-lbl">Name</span><input type="text" id="profile-name" maxlength="20" placeholder="Enter name..."></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Default Bowls</div>
+      <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="profP1"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="profD1"></div></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Statistics</div>
+      <div id="profile-stats"></div>
+    </div>
   </div>
 </div>
 
@@ -428,6 +486,18 @@ button:active { opacity: .7; }
       <div id="waiting-msg" class="pulse">Waiting for opponent...</div>
       <button id="btnCancelCreate">Cancel</button>
     </div>
+  </div>
+</div>
+<div id="join-bowl-panel">
+  <div id="join-bowl-inner">
+    <div class="online-title">Choose Your Bowls</div>
+    <div class="spl-card">
+      <div class="spl-head">Your Bowls</div>
+      <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="jP2"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="jD2"></div></div>
+    </div>
+    <button id="btnJoinConfirm">Join Game</button>
+    <button id="btnJoinCancel">Cancel</button>
   </div>
 </div>
 
@@ -954,6 +1024,8 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
+  shotClockForfeits=[0,0]; shotClockExpired=false;
+  endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
 
@@ -988,6 +1060,7 @@ function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 
 function promptPlayer(p) {
   shotClockStart = mode === 'online' ? Date.now() : 0;
+  shotClockExpired = false;
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -1126,7 +1199,7 @@ function _doOnAllStopped() {
   }
   turnIdx++;
   if (mode === 'online') processPendingMoves();
-  if (state === 'moving') return;
+  if (state === 'moving' || state === 'game-over') return;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
 }
@@ -1160,6 +1233,7 @@ function handleJackOffSide() {
     scores[opp - 1] += 3;
     jackOwner = opp;
     updateHUD();
+    endHistory.push({ end: endNum, winner: opp, pts: 3 });
     if (hitter === 1) checkAchievements('lose_jack');
     const oCol  = opp === 1 ? '#60a5fa' : '#f87171';
     const oName = opp === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
@@ -1176,6 +1250,7 @@ function finishEnd() {
   state = 'end-result';
   const res = scoreEnd();
   if (res) {
+    endHistory.push({ end: endNum, winner: res.winner, pts: res.pts });
     scores[res.winner-1] += res.pts;
     updateHUD();
     const col  = res.winner===1 ? '#60a5fa' : '#f87171';
@@ -1187,6 +1262,9 @@ function finishEnd() {
     if (p1Bowls.length === BPP && p1Bowls.every(b => b.toucher)) unlockAch('perfection');
   } else {
     msg(`Dead end — no jack in play. Tap to continue`);
+    endHistory.push({ end: endNum, winner: 0, pts: 0 });
+    msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
+    unlockAch('dead_end');
   }
 }
 
@@ -1213,9 +1291,10 @@ function gameOver() {
     else if (scores[1]>scores[0]) res=`<span style="color:#f87171">${n2} wins</span> ${scores[1]}–${scores[0]}`;
     else                          res=`Draw! ${scores[0]}–${scores[1]}`;
   }
-  if (mode === 'online' && sb) {
-    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
-    localStorage.removeItem('bowls_activeGame');
+  if (mode === 'online' && sb && onlineGameId) {
+    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId).then(() => {
+      localStorage.removeItem('bowls_activeGame');
+    });
   }
   msg(`Game over — ${res}`);
 }
@@ -1225,10 +1304,11 @@ function doConcede() {
   finishConcede(localPlayer);
 }
 
-function finishConcede(concedingPlayer) {
+async function finishConcede(concedingPlayer) {
   state = 'game-over';
-  if (mode === 'online' && sb) {
-    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+  checkAchievements('game_over', { concede: true, concedingPlayer });
+  if (mode === 'online' && sb && onlineGameId) {
+    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
   }
   if (concedingPlayer === localPlayer) {
@@ -1290,6 +1370,7 @@ function draw() {
   drawSidePanels();
   if (headOverlay) drawHeadOverlay();
   drawOverlayUI();
+  drawGameMenu();
 }
 
 function drawOverlayUI() {
@@ -1348,6 +1429,200 @@ function drawOverlayUI() {
     for (let i = 0; i < lines.length; i++)
       ctx.fillText(lines[i], W / 2, topY + i * lineHeight);
   }
+}
+
+// ── Game Menu overlay ────────────────────────────────────────────
+const ALL_MENU_ITEMS = [
+  { id: 'resume',  label: '▶  Resume Game',  bg: '#1e3a8a', fg: '#93c5fd' },
+  { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
+  { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
+  { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
+  { id: 'concede', label: '🏳  Concede',      bg: '#7f1d1d', fg: '#fca5a5' },
+];
+const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
+
+function visibleMenuItems() {
+  return ALL_MENU_ITEMS.filter(item => {
+    if (item.id === 'concede' && state === 'game-over') return false;
+    if (item.id === 'exit' && mode === 'online') return false;
+    if (item.id === 'exit' && state === 'game-over') return false;
+    return true;
+  });
+}
+
+function menuItemY(i, count) {
+  const totalH = count * MENU_BTN_H + (count - 1) * MENU_BTN_GAP;
+  const startY = H / 2 - totalH / 2 + 40;
+  return startY + i * (MENU_BTN_H + MENU_BTN_GAP);
+}
+
+function drawGameMenu() {
+  if (!gameMenuOpen) return;
+
+  const items = visibleMenuItems();
+
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 20px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('GAME MENU', W / 2, menuItemY(0, items.length) - 50);
+
+  const n2 = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name : (mode === 'online' ? 'Opponent' : 'Player 2');
+  ctx.fillStyle = '#64748b';
+  ctx.font = '12px Segoe UI';
+  ctx.fillText(`${scores[0]} – ${scores[1]}  ·  End ${endNum}/${ENDS}  ·  P1 vs ${n2}`, W / 2, menuItemY(0, items.length) - 28);
+
+  const resultsIdx = items.findIndex(m => m.id === 'results');
+  const showingResults = gameMenuOpen === 'results';
+
+  for (let i = 0; i < items.length; i++) {
+    if (showingResults && i > resultsIdx) continue;
+    const item = items[i];
+    const bx = W / 2 - MENU_BTN_W / 2, by = menuItemY(i, items.length);
+    ctx.fillStyle = item.bg;
+    ctx.beginPath(); ctx.roundRect(bx, by, MENU_BTN_W, MENU_BTN_H, MENU_BTN_R); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(bx, by, MENU_BTN_W, MENU_BTN_H, MENU_BTN_R); ctx.stroke();
+    ctx.fillStyle = showingResults && item.id === 'results' ? '#60a5fa' : item.fg;
+    ctx.font = 'bold 15px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(item.id === 'concede' && concedeConfirm ? '⚠  Are you sure?' : item.label, W / 2, by + MENU_BTN_H / 2);
+  }
+
+  if (showingResults) drawEndResultsTable();
+}
+
+function drawEndResultsTable() {
+  const items = visibleMenuItems();
+  const tableX = W / 2 - MENU_BTN_W / 2;
+  const resultsIdx = items.findIndex(m => m.id === 'results');
+  const tableY = menuItemY(resultsIdx, items.length) + MENU_BTN_H + 6;
+  const n2 = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0] : (mode === 'online' ? 'Opp' : 'P2');
+
+  const rowH = 26;
+  const rows = endHistory.length || 0;
+  const headerH = 28;
+  const totalH = headerH + Math.max(rows, 1) * rowH + 10;
+
+  ctx.fillStyle = 'rgba(17,24,39,0.95)';
+  ctx.beginPath(); ctx.roundRect(tableX, tableY, MENU_BTN_W, totalH, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(tableX, tableY, MENU_BTN_W, totalH, 8); ctx.stroke();
+
+  const cols = [tableX + 50, tableX + 170, tableX + 290];
+  ctx.fillStyle = '#475569'; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('END', cols[0], tableY + headerH / 2);
+  ctx.fillText('P1', cols[1], tableY + headerH / 2);
+  ctx.fillText(n2.toUpperCase(), cols[2], tableY + headerH / 2);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(tableX + 10, tableY + headerH); ctx.lineTo(tableX + MENU_BTN_W - 10, tableY + headerH); ctx.stroke();
+
+  if (rows === 0) {
+    ctx.fillStyle = '#64748b'; ctx.font = '11px Segoe UI';
+    ctx.fillText('No ends completed yet', W / 2, tableY + headerH + rowH / 2);
+  } else {
+    let runP1 = 0, runP2 = 0;
+    for (let i = 0; i < rows; i++) {
+      const e = endHistory[i];
+      const ry = tableY + headerH + i * rowH + rowH / 2;
+      ctx.fillStyle = '#94a3b8'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillText(e.end > ENDS ? `E+${e.end - ENDS}` : `${e.end}`, cols[0], ry);
+      const p1pts = e.winner === 1 ? e.pts : 0;
+      const p2pts = e.winner === 2 ? e.pts : 0;
+      runP1 += p1pts; runP2 += p2pts;
+      ctx.fillStyle = e.winner === 1 ? '#60a5fa' : (e.winner === 0 ? '#64748b' : '#94a3b8');
+      ctx.font = e.winner === 1 ? 'bold 13px Segoe UI' : '12px Segoe UI';
+      ctx.fillText(e.winner === 0 ? '–' : p1pts, cols[1], ry);
+      ctx.fillStyle = e.winner === 2 ? '#f87171' : (e.winner === 0 ? '#64748b' : '#94a3b8');
+      ctx.font = e.winner === 2 ? 'bold 13px Segoe UI' : '12px Segoe UI';
+      ctx.fillText(e.winner === 0 ? '–' : p2pts, cols[2], ry);
+    }
+    const totY = tableY + headerH + rows * rowH + rowH / 2 - 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tableX + 10, totY - rowH / 2); ctx.lineTo(tableX + MENU_BTN_W - 10, totY - rowH / 2); ctx.stroke();
+    ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 11px Segoe UI';
+    ctx.fillText('TOTAL', cols[0], totY);
+    ctx.fillStyle = '#60a5fa'; ctx.fillText(runP1, cols[1], totY);
+    ctx.fillStyle = '#f87171'; ctx.fillText(runP2, cols[2], totY);
+  }
+}
+
+function hitGameMenuItem(p) {
+  const items = visibleMenuItems();
+  const resultsIdx = items.findIndex(m => m.id === 'results');
+  const showingResults = gameMenuOpen === 'results';
+  for (let i = 0; i < items.length; i++) {
+    if (showingResults && i > resultsIdx) continue;
+    const bx = W / 2 - MENU_BTN_W / 2, by = menuItemY(i, items.length);
+    if (p.x >= bx && p.x <= bx + MENU_BTN_W && p.y >= by && p.y <= by + MENU_BTN_H) {
+      return items[i].id;
+    }
+  }
+  return null;
+}
+
+function handleGameMenuTap(p) {
+  const id = hitGameMenuItem(p);
+  if (!id) { gameMenuOpen = false; concedeConfirm = false; return; }
+  if (id === 'resume') { gameMenuOpen = false; concedeConfirm = false; return; }
+  if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
+  if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
+  if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
+  if (id === 'concede') {
+    if (concedeConfirm) {
+      concedeConfirm = false;
+      gameMenuOpen = false;
+      if (mode === 'online') doConcede();
+      else { finishConcede(1); }
+    } else {
+      concedeConfirm = true;
+      clearTimeout(concedeConfirmTimer);
+      concedeConfirmTimer = setTimeout(() => { concedeConfirm = false; }, 3000);
+    }
+    return;
+  }
+}
+
+function exitToMenu() {
+  suspendedGame = {
+    mode, state: state === 'idle' ? 'idle' : state, bowls: JSON.parse(JSON.stringify(bowls)),
+    jack: jack ? JSON.parse(JSON.stringify(jack)) : null,
+    scores: [...scores], endNum, jackOwner, turnIdx, delivDir, endHistory: [...endHistory],
+    biasDirs: [...biasDirs], aiLevel, jackOffCounts: [...jackOffCounts],
+    splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
+  };
+  clearTimeout(aiTimer);
+  gameMenuOpen = false;
+  concedeConfirm = false; clearTimeout(concedeConfirmTimer);
+  state = 'idle'; syncFireBtn();
+  document.getElementById('splash').classList.remove('hidden');
+  syncResumeBtn();
+}
+
+function resumeGame() {
+  if (!suspendedGame) return;
+  const sg = suspendedGame; suspendedGame = null;
+  mode = sg.mode; bowls = sg.bowls; jack = sg.jack;
+  scores = sg.scores; endNum = sg.endNum; jackOwner = sg.jackOwner;
+  turnIdx = sg.turnIdx; delivDir = sg.delivDir; endHistory = sg.endHistory;
+  biasDirs = sg.biasDirs; aiLevel = sg.aiLevel; jackOffCounts = sg.jackOffCounts;
+  ENDS = sg.ENDS_val; rngSeed = sg.rngSeed; seededRng = mulberry32(rngSeed);
+  Object.assign(splashCfg, sg.splashCfg);
+  C.p1 = BOWL_COLOURS[splashCfg.p1idx].main; C.p1d = BOWL_COLOURS[splashCfg.p1idx].dark;
+  C.p2 = BOWL_COLOURS[splashCfg.p2idx].main; C.p2d = BOWL_COLOURS[splashCfg.p2idx].dark;
+  resetCam(); resetAim(); updateHUD();
+  document.getElementById('splash').classList.add('hidden');
+  document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
+  state = sg.state;
+  if (state === 'aim') promptPlayer(playerForTurn(turnIdx));
+  else if (state === 'ai-turn') promptPlayer(playerForTurn(turnIdx));
+  syncResumeBtn();
+}
+
+function syncResumeBtn() {
+  const btn = document.getElementById('btnResume');
+  if (btn) btn.style.display = suspendedGame ? '' : 'none';
 }
 
 function drawMat() {
@@ -1956,9 +2231,9 @@ function drawSidePanels() {
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p1d; ctx.lineWidth=1.5; ctx.stroke();
   }
-  // Mode button / Concede button
-  if (mode === 'online' && state !== 'idle' && state !== 'game-over') {
-    drawPanelBtn(SC, PANEL_BTN.y, concedeConfirm ? 'Sure?' : 'Give', '#7f1d1d', '#fca5a5');
+  // Menu button (replaces old mode/concede buttons)
+  if (state !== 'idle') {
+    drawPanelBtn(SC, PANEL_BTN.y, '☰', '#1e293b', '#e2e8f0');
   } else {
     const modeLabel = mode==='online'?'Online':(mode==='vs-ai'?'vs AI':'2P');
     drawPanelBtn(SC, PANEL_BTN.y, modeLabel, '#4c1d95', '#c4b5fd');
@@ -1979,8 +2254,13 @@ function drawSidePanels() {
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p2d; ctx.lineWidth=1.5; ctx.stroke();
   }
-  // New game button
-  drawPanelBtn(W-SC, PANEL_BTN.y, 'New', '#1e3a8a', '#93c5fd');
+  // End indicator / New button
+  if (state !== 'idle' && state !== 'game-over') {
+    const endLbl = endNum > ENDS ? 'E+' : `E${endNum}`;
+    drawPanelBtn(W-SC, PANEL_BTN.y, endLbl, '#334155', '#94a3b8');
+  } else {
+    drawPanelBtn(W-SC, PANEL_BTN.y, 'New', '#1e3a8a', '#93c5fd');
+  }
 
   // Active player dot
   if (state==='aim'||state==='ai-turn') {
@@ -2003,7 +2283,9 @@ function drawSidePanels() {
     const txt = formatClock(rem);
     ctx.fillStyle = rem < 10000 ? '#ef4444' : '#94a3b8';
     ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
-    ctx.fillText(txt, W/2, 26);
+    const p = playerForTurn(turnIdx);
+    const forfeits = shotClockForfeits[p - 1];
+    ctx.fillText(forfeits > 0 ? `${txt} (${forfeits}/3)` : txt, W/2, 26);
   }
 
   // Shot holder indicator — above Fire (P1) or Head (P2) button
@@ -2419,7 +2701,40 @@ function drawHeadOverlay() {
 }
 
 // ── Main loop ─────────────────────────────────────────────────────
+function handleShotClockExpiry() {
+  if (shotClockExpired) return;
+  if (playerForTurn(turnIdx) !== localPlayer) return;
+  shotClockExpired = true;
+  shotClockForfeits[localPlayer - 1]++;
+  sendMove('timeout', localPlayer, {});
+  if (shotClockForfeits[localPlayer - 1] >= 3) {
+    finishClockForfeit(localPlayer);
+    return;
+  }
+  msg(`<span style="color:#ef4444">Time's up!</span> Shot forfeited (${shotClockForfeits[localPlayer-1]}/3). ${3 - shotClockForfeits[localPlayer-1]} remaining before loss.`);
+  shotClockStart = 0;
+  turnIdx++;
+  if (turnIdx >= BPP * 2) { finishEnd(); return; }
+  promptPlayer(playerForTurn(turnIdx));
+}
+
+function finishClockForfeit(forfeitingPlayer) {
+  state = 'game-over';
+  if (mode === 'online' && sb) {
+    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+    localStorage.removeItem('bowls_activeGame');
+  }
+  if (forfeitingPlayer === localPlayer) {
+    msg(`Game over — <span style="color:#ef4444">You lost on time</span> (3 shot forfeits). ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+  } else {
+    msg(`Game over — <span style="color:#22c55e">Opponent lost on time!</span> (3 shot forfeits). ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+  }
+}
+
 function loop() {
+  if (mode === 'online' && shotClockStart && shotClockLimit && state === 'aim' && shotClockRemaining() <= 0) {
+    handleShotClockExpiry();
+  }
   if (state==='moving') {
     const steps = ffModeActive ? 3 : 1;
     for (let s = 0; s < steps; s++) {
@@ -2465,6 +2780,12 @@ function hitPanelBtn(p, cx) {
 function handlePointerDown(p) {
   mouse = { x: p.x, y: p.y, down: true };
 
+  // Game menu intercepts all taps when open
+  if (gameMenuOpen) {
+    handleGameMenuTap(p);
+    mouse.down = false; return;
+  }
+
   // Overlay button hit-tests
   const btnW = 156, btnH = 84, btnY = H - 80;
   if (state === 'aim') {
@@ -2491,16 +2812,8 @@ function handlePointerDown(p) {
   // Canvas-drawn panel buttons
   const SP=38, SC=19;
   if (hitPanelBtn(p, SC)) {
-    if (mode === 'online' && state !== 'idle' && state !== 'game-over') {
-      if (concedeConfirm) {
-        concedeConfirm = false;
-        clearTimeout(concedeConfirmTimer);
-        doConcede();
-      } else {
-        concedeConfirm = true;
-        clearTimeout(concedeConfirmTimer);
-        concedeConfirmTimer = setTimeout(() => { concedeConfirm = false; }, 3000);
-      }
+    if (state !== 'idle') {
+      gameMenuOpen = true; concedeConfirm = false;
       mouse.down = false; return;
     } else if (mode !== 'online') {
       mode = mode==='vs-ai'?'vs-player':'vs-ai';
@@ -2509,7 +2822,9 @@ function handlePointerDown(p) {
     }
   }
   if (hitPanelBtn(p, W-SC)) {
-    showSplash();
+    if (state === 'idle' || state === 'game-over') {
+      showSplash();
+    }
     mouse.down = false; return;
   }
 
@@ -2645,6 +2960,8 @@ let onlineGameId = '';
 let moveNum = 0;
 let shotClockLimit = 0;
 let shotClockStart = 0;
+let shotClockForfeits = [0, 0];
+let shotClockExpired = false;
 let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
@@ -2655,6 +2972,9 @@ let reconnectTimer = null;
 let pendingMoves = [];
 let concedeConfirm = false;
 let concedeConfirmTimer = null;
+let gameMenuOpen = false;
+let endHistory = [];
+let suspendedGame = null;
 
 const TIME_CONTROLS = [
   { label:'30 seconds', value:'30s',  ms:30000,     realtime:true },
@@ -2694,7 +3014,9 @@ async function createLobby(settings, timeControl) {
 
 async function listLobbies() {
   if (!initSupabase()) return [];
-  const { data, error } = await sb.from('games').select('*').eq('status', 'waiting').order('created_at', { ascending: false });
+  let q = sb.from('games').select('*').eq('status', 'waiting');
+  if (netDisplayName) q = q.neq('host_name', netDisplayName);
+  const { data, error } = await q.order('created_at', { ascending: false });
   if (error) { console.error('listLobbies', error); return []; }
   return data || [];
 }
@@ -2707,9 +3029,12 @@ async function listMyGames() {
   return data || [];
 }
 
-async function joinLobby(gameId) {
+async function joinLobby(gameId, p2Bowls) {
   if (!initSupabase()) return false;
-  const { data, error } = await sb.from('games').update({ guest_name: netDisplayName, status: 'active' })
+  const { data: current } = await sb.from('games').select('settings,host_name').eq('id', gameId).single();
+  if (current && current.host_name === netDisplayName) return false;
+  const mergedSettings = { ...(current && current.settings || {}), ...p2Bowls };
+  const { data, error } = await sb.from('games').update({ guest_name: netDisplayName, status: 'active', settings: mergedSettings })
     .eq('id', gameId).eq('status', 'waiting').select().single();
   if (error || !data) { console.error('joinLobby', error); return false; }
   onlineGameId = gameId;
@@ -2830,6 +3155,11 @@ function cleanupNet() {
 function onRemoteMove(move) {
   if (move.move_num <= moveNum) return;
   moveNum = move.move_num;
+  if (move.type === 'concede') {
+    pendingMoves = [];
+    finishConcede(move.player);
+    return;
+  }
   if (state === 'moving' || state === 'camera-return') {
     pendingMoves.push(move);
     return;
@@ -2841,6 +3171,7 @@ function processPendingMoves() {
   while (pendingMoves.length > 0) {
     const m = pendingMoves.shift();
     applyRemoteMove(m);
+    if (state === 'game-over') { pendingMoves = []; return; }
   }
 }
 
@@ -2854,6 +3185,17 @@ function applyRemoteMove(move) {
     delivPos = { x: d.delivX, y: bowlStart().y };
     deliverBowl(move.player, d.angle, d.speed);
     shotClockStart = 0;
+  } else if (move.type === 'timeout') {
+    shotClockForfeits[move.player - 1]++;
+    shotClockStart = 0;
+    if (shotClockForfeits[move.player - 1] >= 3) {
+      finishClockForfeit(move.player);
+      return;
+    }
+    msg(`Opponent timed out — shot forfeited (${shotClockForfeits[move.player-1]}/3).`);
+    turnIdx++;
+    if (turnIdx >= BPP * 2) { finishEnd(); return; }
+    promptPlayer(playerForTurn(turnIdx));
   } else if (move.type === 'end_ack') {
     opponentAcked = true;
     if (localAcked && opponentAcked) advanceEnd();
@@ -3007,7 +3349,8 @@ function buildSplash() {
     bgEl.appendChild(d);
   });
 
-  document.getElementById('btnStart').onclick = applyAndStart;
+  document.getElementById('btnStart').onclick = () => { suspendedGame = null; syncResumeBtn(); applyAndStart(); };
+  document.getElementById('btnResume').onclick = resumeGame;
 }
 
 // ── Online panel logic ────────────────────────────────────────────
@@ -3089,13 +3432,67 @@ async function refreshLobby() {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-async function doJoinLobby(gameId, gameRow) {
+let joinBowlCfg = { p2idx: 2, p2design: 0 };
+let joinBowlPanelBuilt = false;
+let pendingJoinGameId = null;
+
+function buildJoinBowlPanel() {
+  if (joinBowlPanelBuilt) return;
+  joinBowlPanelBuilt = true;
+  const p2El = document.getElementById('jP2');
+  BOWL_COLOURS.forEach((col, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'sw' + (i === joinBowlCfg.p2idx ? ' sel' : '');
+    sw.style.background = col.main;
+    sw.title = col.name;
+    sw.onclick = () => {
+      joinBowlCfg.p2idx = i;
+      p2El.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+    };
+    p2El.appendChild(sw);
+  });
+  const d2El = document.getElementById('jD2');
+  BOWL_DESIGNS.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    if (i === joinBowlCfg.p2design) b.classList.add('sel');
+    b.onclick = () => {
+      joinBowlCfg.p2design = i;
+      d2El.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    d2El.appendChild(b);
+  });
+  document.getElementById('btnJoinConfirm').onclick = confirmJoinLobby;
+  document.getElementById('btnJoinCancel').onclick = () => {
+    pendingJoinGameId = null;
+    document.getElementById('join-bowl-panel').classList.remove('show');
+  };
+}
+
+function doJoinLobby(gameId, gameRow) {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
-  const game = await joinLobby(gameId);
-  if (!game) { alert('Could not join — game may have started'); refreshLobby(); return; }
+  pendingJoinGameId = gameId;
+  if (!joinBowlPanelBuilt) {
+    const prof = loadProfile();
+    if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
+    if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
+  }
+  buildJoinBowlPanel();
+  document.getElementById('join-bowl-panel').classList.add('show');
+}
+
+async function confirmJoinLobby() {
+  const gameId = pendingJoinGameId;
+  if (!gameId) return;
+  pendingJoinGameId = null;
+  const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
+  if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
+
   const tc = game.time_control;
   applyOnlineSettings(game.settings, game.seed);
   shotClockLimit = getTimeControlMs(tc);
+  document.getElementById('join-bowl-panel').classList.remove('show');
   hideOnlinePanel();
   document.getElementById('create-game-panel').classList.remove('show');
 
@@ -3128,13 +3525,17 @@ async function doResumeLobby(game) {
   document.getElementById('splash').classList.add('hidden');
 
   const moves = await fetchMoves(game.id);
+  console.log('[resume] fetched', moves.length, 'moves for game', game.id);
   startGame();
   replayMoves(moves);
 }
 
 function replayMoves(moves) {
+  console.log('[replay] replaying', moves.length, 'moves');
   for (const m of moves) {
+    if (typeof m.data === 'string') m.data = JSON.parse(m.data);
     moveNum = m.move_num;
+    console.log('[replay] move', m.move_num, m.type, 'player', m.player);
     if (m.type === 'jack') {
       jack = { x: m.data.x, y: m.data.y, vx:0, vy:0, stopped:true, offMat:false, offSide:false, inDitch:false };
       beginTurns();
@@ -3187,15 +3588,35 @@ function replayMoves(moves) {
         bowls = []; jack = null; turnIdx = 0; lastJackHitter = null;
         localAcked = false; opponentAcked = false; pendingMoves = [];
       }
+    } else if (m.type === 'timeout') {
+      shotClockForfeits[m.player - 1]++;
+      if (shotClockForfeits[m.player - 1] >= 3) {
+        finishClockForfeit(m.player);
+        return;
+      }
+      turnIdx++;
+      if (turnIdx >= BPP * 2) {
+        const res = scoreEnd();
+        if (res) {
+          scores[res.winner-1] += res.pts;
+          jackOwner = res.winner;
+          updateHUD();
+        }
+      }
     } else if (m.type === 'concede') {
       finishConcede(m.player);
       return;
     }
   }
   resetCam();
+  if (state === 'game-over') return;
   if (jack && turnIdx < BPP * 2) {
     promptPlayer(playerForTurn(turnIdx));
-  } else if (!jack && state !== 'game-over') {
+    const lastMove = moves[moves.length - 1];
+    if (lastMove && lastMove.created_at) {
+      shotClockStart = new Date(lastMove.created_at).getTime();
+    }
+  } else if (!jack) {
     state = 'place-jack'; syncFireBtn();
   }
 }
@@ -3236,7 +3657,12 @@ let createPanelBuilt = false;
 function showCreatePanel() {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
   const panel = document.getElementById('create-game-panel');
-  if (!createPanelBuilt) buildCreatePanel();
+  if (!createPanelBuilt) {
+    const prof = loadProfile();
+    if (prof.p1idx != null) createCfg.p1idx = prof.p1idx;
+    if (prof.p1design != null) createCfg.p1design = prof.p1design;
+    buildCreatePanel();
+  }
   document.getElementById('waiting-view').classList.remove('show');
   panel.classList.add('show');
 }
@@ -3378,14 +3804,15 @@ function onGuestJoined(game) {
 }
 
 let hostGameStarted = false;
-function finishJoinAsHost(game) {
+async function finishJoinAsHost(game) {
   if (hostGameStarted) return;
   hostGameStarted = true;
   unsubscribeLobby();
-  const settings = game.settings || {};
+  const { data: fresh } = await sb.from('games').select('*').eq('id', game.id).single();
+  const settings = (fresh || game).settings || {};
   settings.p2Color = settings.p2Color != null ? settings.p2Color : 2;
   settings.p2Design = settings.p2Design != null ? settings.p2Design : 0;
-  applyOnlineSettings(settings, game.seed);
+  applyOnlineSettings(settings, (fresh || game).seed);
   hideCreatePanel();
   hideOnlinePanel();
   subscribeMoves(game.id);
@@ -3436,10 +3863,13 @@ function showSplash() {
   clearTimeout(aiTimer);
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
+  gameMenuOpen = false;
+  suspendedGame = null;
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
   document.getElementById('splash').classList.remove('hidden');
+  syncResumeBtn();
 }
 
 // ── Achievement system ────────────────────────────────────────────
@@ -3458,8 +3888,19 @@ const ACHIEVEMENTS = [
   { id:'lose_jack',     icon:'🤯', name:'How Did That Happen', desc:'Lose three shots by removing the jack' },
   { id:'play_10',       icon:'🎳', name:'Regular',             desc:'Play 10 games' },
   { id:'play_50',       icon:'🏅', name:'Dedicated',           desc:'Play 50 games' },
+  { id:'play_100',      icon:'🎖️', name:'Centurion',           desc:'Play 100 games' },
   { id:'score_100',     icon:'💯', name:'Century',             desc:'Score 100 shots across all games' },
+  { id:'score_500',     icon:'📊', name:'500 Club',            desc:'Score 500 shots across all games' },
   { id:'beat_master',   icon:'🧠', name:'Master Class',        desc:'Beat a Master AI opponent' },
+  { id:'win_25',        icon:'💪', name:'Unstoppable',         desc:'Win 25 games' },
+  { id:'win_50',        icon:'🏆', name:'Legend',              desc:'Win 50 games' },
+  { id:'streak_3',      icon:'3️⃣', name:'Hat Trick',           desc:'Win 3 games in a row' },
+  { id:'streak_5',      icon:'5️⃣', name:'On Fire',             desc:'Win 5 games in a row' },
+  { id:'dead_end',      icon:'💀', name:'Dead End',            desc:'Play an end where nobody scores' },
+  { id:'online_first',  icon:'🌐', name:'Going Online',        desc:'Play your first online game' },
+  { id:'online_10',     icon:'📡', name:'Connected',           desc:'Play 10 online games' },
+  { id:'online_win',    icon:'🥇', name:'Online Victor',       desc:'Win your first online game' },
+  { id:'online_win_10', icon:'⭐', name:'Rising Star',         desc:'Win 10 online games' },
 ];
 
 const ACH_KEY = 'bowls_achievements';
@@ -3470,8 +3911,9 @@ function loadAch() {
 }
 function saveAch(data) { localStorage.setItem(ACH_KEY, JSON.stringify(data)); }
 function loadStats() {
-  try { return JSON.parse(localStorage.getItem(STATS_KEY)) || { wins:0, games:0, totalPts:0, maxBehind:0 }; }
-  catch { return { wins:0, games:0, totalPts:0, maxBehind:0 }; }
+  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0 };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem(STATS_KEY))); }
+  catch { return def; }
 }
 function saveStats(s) { localStorage.setItem(STATS_KEY, JSON.stringify(s)); }
 
@@ -3503,19 +3945,26 @@ function showNextToast() {
   }, 3000);
 }
 
+function myPlayerIdx() {
+  return mode === 'online' ? localPlayer : 1;
+}
+
 function checkAchievements(event, data) {
   const stats = loadStats();
+  const me = myPlayerIdx();
 
   if (event === 'end_scored' && data) {
-    if (data.winner === 1) {
+    if (data.winner === me) {
       if (data.pts === 4) unlockAch('perfect_end');
+      stats.totalPts += data.pts;
+      stats.endsWon++;
     }
-    stats.totalPts += data.winner === 1 ? data.pts : 0;
     saveStats(stats);
     if (stats.totalPts >= 100) unlockAch('score_100');
+    if (stats.totalPts >= 500) unlockAch('score_500');
 
-    // Track max deficit for comeback detection
-    const deficit = scores[1] - scores[0];
+    const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
+    const deficit = oppScore - myScore;
     if (deficit > stats.maxBehind) { stats.maxBehind = deficit; saveStats(stats); }
   }
 
@@ -3524,21 +3973,42 @@ function checkAchievements(event, data) {
 
   if (event === 'game_over') {
     stats.games++;
-    const won = scores[0] > scores[1];
+    const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
+    const won = (data && data.concede) ? (data.concedingPlayer !== me) : (myScore > oppScore);
+    if (mode === 'online') stats.onlineGames++;
     if (won) {
       stats.wins++;
+      stats.winStreak++;
+      if (mode === 'online') stats.onlineWins++;
+      const margin = myScore - oppScore;
+      if (margin > stats.bestMargin) stats.bestMargin = margin;
       unlockAch('first_win');
       if (stats.wins >= 3) unlockAch('win_3');
       if (stats.wins >= 10) unlockAch('win_10');
-      if (scores[1] === 0) unlockAch('shutout');
+      if (stats.wins >= 25) unlockAch('win_25');
+      if (stats.wins >= 50) unlockAch('win_50');
+      if (stats.winStreak >= 3) unlockAch('streak_3');
+      if (stats.winStreak >= 5) unlockAch('streak_5');
+      if (oppScore === 0) unlockAch('shutout');
       if (stats.maxBehind >= 3) unlockAch('comeback');
       if (endNum > ENDS) unlockAch('extra_ends');
       if (mode === 'vs-ai' && aiLevel === 3) unlockAch('beat_master');
+    } else {
+      stats.winStreak = 0;
+    }
+    if (mode === 'online') {
+      unlockAch('online_first');
+      if (stats.onlineGames >= 10) unlockAch('online_10');
+      if (won) {
+        unlockAch('online_win');
+        if (stats.onlineWins >= 10) unlockAch('online_win_10');
+      }
     }
     stats.maxBehind = 0;
     saveStats(stats);
     if (stats.games >= 10) unlockAch('play_10');
     if (stats.games >= 50) unlockAch('play_50');
+    if (stats.games >= 100) unlockAch('play_100');
   }
 }
 
@@ -3569,7 +4039,128 @@ document.getElementById('ach-back').onclick = () => {
   document.getElementById('ach-panel').classList.remove('show');
 };
 
+// ── Profile ──────────────────────────────────────────────────────
+const PROFILE_KEY = 'bowls_profile';
+
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || {}; } catch { return {}; }
+}
+function saveProfile(p) { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); }
+
+let profileBuilt = false;
+
+function buildProfilePanel() {
+  if (profileBuilt) return;
+  profileBuilt = true;
+
+  const nameInput = document.getElementById('profile-name');
+  nameInput.value = localStorage.getItem('bowls_name') || '';
+  nameInput.oninput = () => {
+    const v = nameInput.value.trim();
+    localStorage.setItem('bowls_name', v);
+    netDisplayName = v;
+    const lobbyInput = document.getElementById('lobby-name');
+    if (lobbyInput) lobbyInput.value = v;
+  };
+
+  const prof = loadProfile();
+  const p1idx = prof.p1idx != null ? prof.p1idx : 0;
+  const p1design = prof.p1design != null ? prof.p1design : 0;
+
+  const p1El = document.getElementById('profP1');
+  BOWL_COLOURS.forEach((col, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'sw' + (i === p1idx ? ' sel' : '');
+    sw.style.background = col.main;
+    sw.title = col.name;
+    sw.onclick = () => {
+      const p = loadProfile();
+      p.p1idx = i;
+      saveProfile(p);
+      p1El.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+    };
+    p1El.appendChild(sw);
+  });
+
+  const d1El = document.getElementById('profD1');
+  BOWL_DESIGNS.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    if (i === p1design) b.classList.add('sel');
+    b.onclick = () => {
+      const p = loadProfile();
+      p.p1design = i;
+      saveProfile(p);
+      d1El.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    d1El.appendChild(b);
+  });
+}
+
+function renderProfileStats() {
+  const s = loadStats();
+  const el = document.getElementById('profile-stats');
+  const winPct = s.games > 0 ? Math.round(s.wins / s.games * 100) : 0;
+  const losses = s.games - s.wins;
+  const localGames = s.games - s.onlineGames;
+  const localWins = s.wins - s.onlineWins;
+  const localLosses = localGames - localWins;
+  const onlineLosses = s.onlineGames - s.onlineWins;
+  const maxPts = Math.max(s.totalPts, 1);
+
+  el.innerHTML =
+    statBar('Win Rate', winPct + '%', winPct, 'green') +
+    statRow('Games Played', s.games) +
+    statRow('Wins / Losses', s.wins + ' / ' + losses) +
+    statBar('Shots Scored', s.totalPts, Math.min(s.totalPts / maxPts * 100, 100), 'blue') +
+    statBar('Online', s.onlineWins + 'W – ' + onlineLosses + 'L',
+      s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0, 'purple') +
+    statBar('Local', localWins + 'W – ' + localLosses + 'L',
+      localGames > 0 ? Math.round(localWins / localGames * 100) : 0, 'green') +
+    statRow('Ends Won', s.endsWon) +
+    statRow('Best Margin', s.bestMargin);
+}
+
+function statBar(label, valText, pct, color) {
+  return `<div class="stat-row"><span class="stat-lbl">${label}</span>` +
+    `<div class="stat-bar-wrap"><div class="stat-bar ${color}" style="width:${pct}%"></div></div>` +
+    `<span class="stat-val">${valText}</span></div>`;
+}
+
+function statRow(label, val) {
+  return `<div class="stat-row"><span class="stat-lbl">${label}</span>` +
+    `<span class="stat-val">${val}</span></div>`;
+}
+
+function showProfilePanel() {
+  buildProfilePanel();
+  renderProfileStats();
+  document.getElementById('profile-panel').classList.add('show');
+}
+
+document.getElementById('btnProfile').onclick = showProfilePanel;
+document.getElementById('profile-back').onclick = () => {
+  document.getElementById('profile-panel').classList.remove('show');
+  applyProfileToSplash();
+};
+
+function applyProfileToSplash() {
+  const prof = loadProfile();
+  if (prof.p1idx != null) {
+    splashCfg.p1idx = prof.p1idx;
+    const sP1 = document.getElementById('sP1');
+    if (sP1) sP1.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === prof.p1idx));
+  }
+  if (prof.p1design != null) {
+    splashCfg.p1design = prof.p1design;
+    const sD1 = document.getElementById('sD1');
+    if (sD1) sD1.querySelectorAll('button').forEach((b, j) => b.classList.toggle('sel', j === prof.p1design));
+  }
+}
+
 buildSplash();
+applyProfileToSplash();
 showSplash();
 
 requestAnimationFrame(loop);
