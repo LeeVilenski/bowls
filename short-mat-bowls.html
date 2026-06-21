@@ -131,6 +131,18 @@ button:active { opacity: .7; }
 }
 #btnAch:hover, #btnProfile:hover { background: #334155; color: #e2e8f0; }
 
+#game-settings-panel {
+  position: fixed; inset: 0; z-index: 250; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#game-settings-panel.show { display: flex; }
+#game-settings-inner {
+  width: 100%; max-width: 440px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
 #profile-panel {
   position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -139,7 +151,7 @@ button:active { opacity: .7; }
 }
 #profile-panel.show { display: flex; }
 #profile-inner { width: 100%; max-width: 440px; }
-#profile-back {
+#game-settings-back, #profile-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
 }
@@ -166,6 +178,41 @@ button:active { opacity: .7; }
 .stat-bar.green { background: linear-gradient(90deg, #22c55e, #16a34a); }
 .stat-bar.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 .stat-bar.purple { background: linear-gradient(90deg, #a855f7, #7c3aed); }
+
+.hist-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
+.hist-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; }
+.hist-row:last-child { border-bottom: none; }
+.hist-result { font-size: 14px; font-weight: 800; width: 22px; text-align: center; border-radius: 4px; padding: 2px 0; }
+.hist-win { color: #22c55e; }
+.hist-loss { color: #ef4444; }
+.hist-detail { font-size: 13px; color: #e2e8f0; line-height: 1.4; }
+.hist-detail small { color: #94a3b8; }
+
+/* XP / Rating */
+.xp-card { margin-bottom: 4px; }
+.xp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.xp-level { font-size: 18px; font-weight: 800; color: #fbbf24; }
+.xp-rating { font-size: 13px; color: #a78bfa; font-weight: 700; }
+.xp-bar-outer {
+  height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden; margin-bottom: 4px;
+}
+.xp-bar-inner {
+  height: 100%; border-radius: 5px; transition: width 0.5s ease;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+.xp-label { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; }
+#xp-toast {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  background: #1e293b; border: 1px solid #fbbf24; border-radius: 10px;
+  padding: 10px 18px; z-index: 500; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s; text-align: center; min-width: 160px;
+}
+#xp-toast.show { opacity: 1; }
+#xp-toast .xp-gain { font-size: 18px; font-weight: 800; color: #fbbf24; }
+#xp-toast .xp-detail { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+#xp-toast .elo-change { font-size: 13px; font-weight: 700; margin-top: 4px; }
+.elo-up { color: #22c55e; }
+.elo-down { color: #ef4444; }
 
 /* Achievement panel */
 #ach-panel {
@@ -331,9 +378,25 @@ button:active { opacity: .7; }
     <div class="spl-title">Short Mat <em>Bowls</em></div>
 
     <div class="spl-card">
+      <div class="spl-head">Mode</div>
+      <div class="spl-row"><div class="seg" id="sMode"></div></div>
+    </div>
+
+    <button id="btnStart">Start Game</button>
+    <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
+    <button id="btnProfile">👤 Profile</button>
+    <button id="btnAch">🏆 Achievements</button>
+  </div>
+</div>
+
+<div id="game-settings-panel">
+  <div id="game-settings-inner">
+    <button id="game-settings-back">&larr; Back</button>
+    <div class="spl-title" style="font-size:20px">Game Settings</div>
+
+    <div class="spl-card">
       <div class="spl-head">Game</div>
       <div class="spl-row"><span class="spl-lbl">Ends</span><div class="seg" id="sEnds"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Mode</span><div class="seg" id="sMode"></div></div>
       <div id="aiPickWrap">
         <div class="spl-row"><span class="spl-lbl">Opponent</span><div class="seg" id="sAI"></div></div>
         <div id="aiBio" style="font-size:10px;color:#94a3b8;margin-top:2px;padding:0 4px;line-height:1.3"></div>
@@ -341,19 +404,11 @@ button:active { opacity: .7; }
     </div>
 
     <div class="spl-card">
-      <div class="spl-head">Bowls</div>
-      <div class="spl-row">
-        <span class="spl-lbl">Size</span>
-        <input type="range" id="sSizeSlider" min="0" max="5" step="1" value="3">
-        <span class="rval" id="sSizeLbl">3</span>
-      </div>
+      <div class="spl-head" id="p2BowlsHead">Player 2 Bowls</div>
+      <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="sP2"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="sD2"></div></div>
       <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="sBias"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Player 1</span><div class="swatches" id="sP1"></div></div>
-      <div class="spl-row"><span class="spl-lbl">P1 Style</span><div class="seg" id="sD1"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Player 2</span><div class="swatches" id="sP2"></div></div>
-      <div class="spl-row"><span class="spl-lbl">P2 Style</span><div class="seg" id="sD2"></div></div>
     </div>
-
 
     <div class="spl-card">
       <div class="spl-head">Surface</div>
@@ -380,17 +435,22 @@ button:active { opacity: .7; }
       <div class="bg-grid" id="sBg"></div>
     </div>
 
-    <button id="btnStart">Start Game</button>
-    <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
-    <button id="btnProfile">👤 Profile</button>
-    <button id="btnAch">🏆 Achievements</button>
+    <button id="btnStartGame" style="padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#1d4ed8,#6d28d9);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(109,40,217,0.35);letter-spacing:0.3px">Start Game</button>
   </div>
 </div>
+
+<div id="xp-toast"><div class="xp-gain"></div><div class="xp-detail"></div><div class="elo-change"></div></div>
 
 <div id="profile-panel">
   <div id="profile-inner">
     <button id="profile-back">&larr; Back</button>
     <div class="profile-title">👤 Player Profile</div>
+    <div class="spl-card xp-card">
+      <div class="spl-head">Ranking</div>
+      <div class="xp-header"><span class="xp-level" id="xp-level-display">Level 1</span><span class="xp-rating" id="xp-rating-display">Rating: 1000</span></div>
+      <div class="xp-bar-outer"><div class="xp-bar-inner" id="xp-bar"></div></div>
+      <div class="xp-label"><span id="xp-current">0 XP</span><span id="xp-next">100 XP to next</span></div>
+    </div>
     <div class="spl-card">
       <div class="spl-head">Identity</div>
       <div class="spl-row"><span class="spl-lbl">Name</span><input type="text" id="profile-name" maxlength="20" placeholder="Enter name..."></div>
@@ -399,10 +459,20 @@ button:active { opacity: .7; }
       <div class="spl-head">Default Bowls</div>
       <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="profP1"></div></div>
       <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="profD1"></div></div>
+      <div class="spl-row">
+        <span class="spl-lbl">Size</span>
+        <input type="range" id="profSize" min="0" max="5" step="1" value="3">
+        <span class="rval" id="profSizeLbl">3</span>
+      </div>
+      <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="profBias"></div></div>
     </div>
     <div class="spl-card">
       <div class="spl-head">Statistics</div>
       <div id="profile-stats"></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Match History</div>
+      <div id="profile-history"></div>
     </div>
   </div>
 </div>
@@ -452,15 +522,8 @@ button:active { opacity: .7; }
       <div class="spl-row"><span class="spl-lbl">Time</span><div class="seg" id="cTime"></div></div>
     </div>
     <div class="spl-card">
-      <div class="spl-head">Bowls</div>
-      <div class="spl-row">
-        <span class="spl-lbl">Size</span>
-        <input type="range" id="cSizeSlider" min="0" max="5" step="1" value="3">
-        <span class="rval" id="cSizeLbl">3</span>
-      </div>
-      <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="cBias"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Your colour</span><div class="swatches" id="cP1"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="cD1"></div></div>
+      <div class="spl-head">Your Bowls</div>
+      <div class="spl-row" style="font-size:11px;color:#64748b;">Using defaults from your Profile</div>
     </div>
     <div class="spl-card">
       <div class="spl-head">Surface</div>
@@ -522,6 +585,7 @@ const NEAR_BOARD = { x: MAT.x - 4, y: MAT.y + MAT.h,   w: MAT.w + 8, h: BOARD_H 
 // Centre block — hitting it → bowl dead
 const FW = 40, FH = 24; // 3in wide × 15in long on a 6ft×40ft mat
 const FENDER = { x: MAT.x + MAT.w/2 - FW/2, y: MAT.y + MAT.h/2 - FH/2, w: FW, h: FH };
+let blockAnim = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, va: 0, active: false, resetting: false };
 
 // ── Symmetric mat layout — from ESMBA Laws (13000mm mat, 1830mm wide) ────────
 // DITCH line:  300mm from each fender      → 300/13000  = 0.023
@@ -757,7 +821,9 @@ function playerForTurn(t) {
 
 function allStopped() {
   if (jack && !jack.stopped && !jack.offMat && !jack.offSide) return false;
-  return bowls.every(b => b.stopped || b.offMat);
+  if (!bowls.every(b => b.stopped || b.offMat)) return false;
+  if (blockAnim.active && !blockAnim.resetting) return false;
+  return true;
 }
 
 let msgText = '';
@@ -869,14 +935,47 @@ function stepObj(obj, bias) {
     return;
   }
 
-  // Centre block — hitting the block kills the bowl / jack
-  const fx1 = FENDER.x, fx2 = FENDER.x + FENDER.w;
-  const fy1 = FENDER.y, fy2 = FENDER.y + FENDER.h;
-  if (obj.x - r < fx2 && obj.x + r > fx1 && obj.y - r < fy2 && obj.y + r > fy1) {
-    obj.offMat = true; obj.stopped = true;
-    // Small visual nudge so dead bowl doesn't overlap the block
-    if (obj.y < fy1 + FH/2) obj.y = fy1 - r - 2;
-    else                     obj.y = fy2 + r + 2;
+  // Centre block — use animated position for collision (with tunneling detection)
+  const bax = FENDER.x + blockAnim.x, bay = FENDER.y + blockAnim.y;
+  const fx1 = bax, fx2 = bax + FENDER.w;
+  const fy1 = bay, fy2 = bay + FENDER.h;
+  const inBlock = obj.x - r < fx2 && obj.x + r > fx1 && obj.y - r < fy2 && obj.y + r > fy1;
+  const prevY = obj.y - obj.vy, prevX = obj.x - obj.vx;
+  const tunneled = !inBlock && !obj._inBlock &&
+    prevX + r > fx1 && prevX - r < fx2 &&
+    ((prevY - r >= fy2 && obj.y - r < fy2) || (prevY + r <= fy1 && obj.y + r > fy1));
+  if ((inBlock && !obj._inBlock) || tunneled) {
+    if (!obj.hitBlock) {
+      obj.hitBlock = true;
+      obj.hitBlockTime = performance.now();
+    }
+    const bcx = bax + FW / 2;
+    const lateralOffset = (obj.x - bcx) / (FW / 2);
+    blockAnim.vx += obj.vx * 0.6;
+    blockAnim.vy += obj.vy * 0.6;
+    blockAnim.va -= lateralOffset * Math.abs(obj.vy) * 0.015;
+    blockAnim.active = true;
+    blockAnim.resetting = false;
+    obj.vx *= 0.5;
+    obj.vy *= 0.5;
+  }
+  obj._inBlock = inBlock;
+}
+
+function restorePreShot(bowlIdx) {
+  if (bowlIdx < _preShotPositions.length) {
+    const saved = _preShotPositions[bowlIdx];
+    const b = bowls[bowlIdx];
+    b.x = saved.x; b.y = saved.y; b.vx = saved.vx; b.vy = saved.vy;
+    b.stopped = saved.stopped; b.offMat = saved.offMat; b.inDitch = saved.inDitch;
+  }
+}
+function restoreJackPreShot() {
+  if (_preShotJack && jack) {
+    jack.x = _preShotJack.x; jack.y = _preShotJack.y;
+    jack.vx = _preShotJack.vx; jack.vy = _preShotJack.vy;
+    jack.stopped = _preShotJack.stopped; jack.offMat = _preShotJack.offMat;
+    jack.inDitch = _preShotJack.inDitch; jack.offSide = _preShotJack.offSide;
   }
 }
 
@@ -887,12 +986,16 @@ function stepCollisions() {
     for (let j = i+1; j < bowls.length; j++) {
       const b = bowls[j];
       if (b.offMat) continue;
+      const avxBefore = a.vx, avyBefore = a.vy;
       collide(a, b, RB, RB, 0.75);
+      const collided = a.vx !== avxBefore || a.vy !== avyBefore;
+      if (collided) {
+        if (a.hitBlock) { restorePreShot(j); a.offMat = true; a.stopped = true; }
+        if (b.hitBlock) { restorePreShot(i); b.offMat = true; b.stopped = true; }
+      }
     }
     if (jack && !jack.offMat && !jack.offSide) {
       if (jack.inDitch && !a.toucher) {
-        // Jack is in ditch and bowl is not a pre-existing toucher:
-        // contact kills the bowl immediately (like hitting the fender)
         const dist = Math.hypot(jack.x - a.x, jack.y - a.y);
         if (dist < RB + RJ) a.offMat = true;
       } else {
@@ -900,7 +1003,12 @@ function stepCollisions() {
         collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
         if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) {
           lastJackHitter = a.player;
-          if (!jack.inDitch && a.delivering) { a.toucher = true; if (a.player === 1) checkAchievements('toucher'); }
+          if (!jack.inDitch && a.delivering) { a.toucher = true; if (a.player === myPlayerIdx()) checkAchievements('toucher'); }
+          if (a.hitBlock) { restoreJackPreShot(); a.offMat = true; a.stopped = true; }
+          else {
+            lastJackHitter = a.player;
+            if (!jack.inDitch && a.delivering) { a.toucher = true; if (a.player === 1) checkAchievements('toucher'); }
+          }
         }
       }
     }
@@ -1067,7 +1175,7 @@ function promptPlayer(p) {
   shotClockStart = mode === 'online' ? serverNow() : 0;
   shotClockExpired = false;
   if (mode === 'online' && netConn && netConn.open) {
-    netConn.send({ type: 'CLOCK_START' });
+    netConn.send({ type: 'CLOCK_START', ts: serverNow() });
   }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
@@ -1090,8 +1198,12 @@ function promptPlayer(p) {
 }
 
 let _preShot = {};
+let _preShotPositions = [];
+let _preShotJack = null;
 function deliverBowl(player, angle, speed) {
   const bs = bowlStart();
+  _preShotPositions = bowls.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, stopped: b.stopped, offMat: b.offMat, inDitch: b.inDitch }));
+  _preShotJack = jack ? { x: jack.x, y: jack.y, vx: jack.vx, vy: jack.vy, stopped: jack.stopped, offMat: jack.offMat, inDitch: jack.inDitch, offSide: jack.offSide } : null;
   _preShot = {
     player,
     fired: fireModeActive,
@@ -1195,7 +1307,7 @@ function applyCameraTransform() {
 
 function _doOnAllStopped() {
   // Post-shot achievement checks
-  if (_preShot.player === 1) {
+  if (_preShot.player === myPlayerIdx()) {
     // "Playing Up!" — fired shot removed 2+ opponent bowls
     if (_preShot.fired) {
       const liveNow = bowls.filter(b => !b.offMat).length;
@@ -1242,7 +1354,7 @@ function handleJackOffSide() {
     jackOwner = opp;
     updateHUD();
     endHistory.push({ end: endNum, winner: opp, pts: 3 });
-    if (hitter === 1) checkAchievements('lose_jack');
+    if (hitter === myPlayerIdx()) checkAchievements('lose_jack');
     const oCol  = opp === 1 ? '#60a5fa' : '#f87171';
     const oName = opp === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
     state = 'end-result';
@@ -1266,8 +1378,8 @@ function finishEnd() {
     msg(`<span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Tap to continue`);
     jackOwner = res.winner;
     checkAchievements('end_scored', res);
-    const p1Bowls = bowls.filter(b => b.player === 1 && !b.offMat);
-    if (p1Bowls.length === BPP && p1Bowls.every(b => b.toucher)) unlockAch('perfection');
+    const myBowls = bowls.filter(b => b.player === myPlayerIdx() && !b.offMat);
+    if (myBowls.length === BPP && myBowls.every(b => b.toucher)) unlockAch('perfection');
   } else {
     msg(`Dead end — no jack in play. Tap to continue`);
     endHistory.push({ end: endNum, winner: 0, pts: 0 });
@@ -1285,6 +1397,9 @@ function advanceEnd() {
 function gameOver() {
   state = 'game-over';
   checkAchievements('game_over');
+  const me = myPlayerIdx();
+  const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
+  recordCurrentGame(won, false);
   const n2 = mode==='vs-ai' ? 'AI' : (mode==='online' ? 'Opponent' : 'Player 2');
   let res;
   if (mode === 'online') {
@@ -1304,6 +1419,7 @@ function gameOver() {
       localStorage.removeItem('bowls_activeGame');
     });
   }
+  awardXP(won, false);
   msg(`Game over — ${res}`);
 }
 
@@ -1315,10 +1431,14 @@ function doConcede() {
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
   checkAchievements('game_over', { concede: true, concedingPlayer });
+  const me = myPlayerIdx();
+  const conWon = concedingPlayer !== me;
+  recordCurrentGame(conWon, true);
   if (mode === 'online' && sb && onlineGameId) {
     await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
   }
+  awardXP(conWon, true);
   if (concedingPlayer === localPlayer) {
     msg(`Game over — <span style="color:#ef4444">You conceded</span>. ${scores[0]}–${scores[1]}`);
   } else {
@@ -1454,9 +1574,7 @@ function visibleMenuItems() {
   return ALL_MENU_ITEMS.filter(item => {
     if (item.id === 'concede' && state === 'game-over') return false;
     if (item.id === 'exit' && mode === 'online') return false;
-    if (item.id === 'exit' && state === 'game-over') return false;
     if (item.id === 'leave' && mode !== 'online') return false;
-    if (item.id === 'leave' && state === 'game-over') return false;
     return true;
   });
 }
@@ -1826,11 +1944,14 @@ function drawMat() {
     ctx.lineTo(ibr.x,ibr.y); ctx.lineTo(ibl.x,ibl.y); ctx.closePath(); ctx.fill();
   }
 
-  // Centre block (projected quad)
-  const bx1=cx-FW/2, bx2=cx+FW/2;
-  const by1=FENDER.y, by2=FENDER.y+FENDER.h;
-  const btl=m2s(bx1,by1), btr=m2s(bx2,by1);
-  const bbr=m2s(bx2,by2), bbl=m2s(bx1,by2);
+  // Centre block (projected quad) — with animation offset/rotation
+  const blockCx = cx + blockAnim.x, blockCy = FENDER.y + FH/2 + blockAnim.y;
+  const cosA = Math.cos(blockAnim.angle), sinA = Math.sin(blockAnim.angle);
+  function blockCorner(dx, dy) {
+    return m2s(blockCx + dx * cosA - dy * sinA, blockCy + dx * sinA + dy * cosA);
+  }
+  const btl=blockCorner(-FW/2,-FH/2), btr=blockCorner(FW/2,-FH/2);
+  const bbr=blockCorner(FW/2,FH/2), bbl=blockCorner(-FW/2,FH/2);
   ctx.fillStyle='rgba(0,0,0,0.3)';
   ctx.beginPath(); ctx.moveTo(btl.x+2,btl.y+2); ctx.lineTo(btr.x+2,btr.y+2);
   ctx.lineTo(bbr.x+2,bbr.y+2); ctx.lineTo(bbl.x+2,bbl.y+2); ctx.closePath(); ctx.fill();
@@ -1840,19 +1961,20 @@ function drawMat() {
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bbr.x,bbr.y); ctx.lineTo(bbl.x,bbl.y); ctx.closePath(); ctx.fill();
   // Top-edge highlight strip
-  const bth1=m2s(bx1,by1+5), bth2=m2s(bx2,by1+5);
+  const bth1=blockCorner(-FW/2,-FH/2+5), bth2=blockCorner(FW/2,-FH/2+5);
   ctx.fillStyle='rgba(255,255,255,0.3)';
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bth2.x,bth2.y); ctx.lineTo(bth1.x,bth1.y); ctx.closePath(); ctx.fill();
   ctx.strokeStyle='rgba(100,90,70,0.6)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bbr.x,bbr.y); ctx.lineTo(bbl.x,bbl.y); ctx.closePath(); ctx.stroke();
-  const bm=m2s(cx,(by1+by2)/2);
+  const bm=m2s(blockCx,blockCy);
 
-  // Gap hints either side of block
+  // Gap hints either side of block (fixed at original position)
+  const gBx1 = cx - FW/2, gBx2 = cx + FW/2;
   const gY=FENDER.y+FENDER.h/2;
-  const gL=m2s(MAT.x+4,gY), gBL=m2s(bx1-4,gY);
-  const gBR=m2s(bx2+4,gY), gR=m2s(MAT.x+MAT.w-4,gY);
+  const gL=m2s(MAT.x+4,gY), gBL=m2s(gBx1-4,gY);
+  const gBR=m2s(gBx2+4,gY), gR=m2s(MAT.x+MAT.w-4,gY);
   ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
   ctx.beginPath(); ctx.moveTo(gL.x,gL.y); ctx.lineTo(gBL.x,gBL.y); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(gBR.x,gBR.y); ctx.lineTo(gR.x,gR.y); ctx.stroke();
@@ -2724,6 +2846,7 @@ function handleShotClockExpiry() {
   if (playerForTurn(turnIdx) !== localPlayer) return;
   shotClockExpired = true;
   shotClockForfeits[localPlayer - 1]++;
+  bowls.push({ player: localPlayer, x: -999, y: -999, vx: 0, vy: 0, stopped: true, offMat: true, forfeited: true });
   sendMove('timeout', localPlayer, {});
   if (shotClockForfeits[localPlayer - 1] >= 3) {
     finishClockForfeit(localPlayer);
@@ -2754,6 +2877,10 @@ function handleRemoteTimeout() {
 
 function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
+  const me = myPlayerIdx();
+  const fWon = forfeitingPlayer !== me;
+  recordCurrentGame(fWon, false);
+  awardXP(fWon, true);
   if (mode === 'online' && sb) {
     sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
@@ -2782,6 +2909,13 @@ function loop() {
       if (allStopped()) { onAllStopped(); break; }
     }
   }
+  // Remove hitBlock bowls after 2 seconds
+  const now = performance.now();
+  for (const b of bowls) {
+    if (b.hitBlock && !b.offMat && now - b.hitBlockTime > 2000) {
+      b.offMat = true; b.stopped = true;
+    }
+  }
   // Animate rest-tilt for stopped bowls (toward restTarget: 0=upright, 1=on side)
   for (const b of bowls) {
     if (b.stopped && !b.offMat) {
@@ -2791,6 +2925,28 @@ function loop() {
         b.restProgress = cur + (target - cur) * 0.08;
       } else {
         b.restProgress = target;
+      }
+    }
+  }
+  // Animate centre block knock
+  if (blockAnim.active) {
+    if (blockAnim.resetting) {
+      blockAnim.x += (0 - blockAnim.x) * 0.08;
+      blockAnim.y += (0 - blockAnim.y) * 0.08;
+      blockAnim.angle += (0 - blockAnim.angle) * 0.08;
+      if (Math.abs(blockAnim.x) < 0.1 && Math.abs(blockAnim.y) < 0.1 && Math.abs(blockAnim.angle) < 0.001) {
+        blockAnim = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, va: 0, active: false, resetting: false };
+      }
+    } else {
+      blockAnim.vx *= 0.96; blockAnim.vy *= 0.96; blockAnim.va *= 0.95;
+      blockAnim.x += blockAnim.vx; blockAnim.y += blockAnim.vy;
+      blockAnim.angle += blockAnim.va;
+      const maxOff = 80;
+      blockAnim.x = Math.max(-maxOff, Math.min(maxOff, blockAnim.x));
+      blockAnim.y = Math.max(-maxOff, Math.min(maxOff, blockAnim.y));
+      if (Math.hypot(blockAnim.vx, blockAnim.vy) < 0.05 && Math.abs(blockAnim.va) < 0.001) {
+        blockAnim.vx = 0; blockAnim.vy = 0; blockAnim.va = 0;
+        blockAnim.resetting = true;
       }
     }
   }
@@ -2995,6 +3151,7 @@ let sb = null;
 let netPeer = null, netConn = null;
 let localPlayer = 0;
 let onlineGameId = '';
+let onlineOpponentName = '';
 let moveNum = 0;
 let shotClockLimit = 0;
 let shotClockStart = 0;
@@ -3182,7 +3339,7 @@ function setupConn(conn) {
       onRemoteMove(msg.move);
       return;
     }
-    if (msg.type === 'CLOCK_START') { shotClockStart = serverNow(); shotClockExpired = false; return; }
+    if (msg.type === 'CLOCK_START') { shotClockStart = msg.ts ? msg.ts : serverNow(); shotClockExpired = false; return; }
     if (msg.type === 'LEAVE') { msgText = 'Opponent left the match.'; return; }
   });
   conn.on('close', () => onPeerDisconnect());
@@ -3211,6 +3368,7 @@ function cleanupNet() {
   if (netPeer) { netPeer.destroy(); netPeer = null; }
   peerLatencyMs = -1;
   onlineGameId = '';
+  onlineOpponentName = '';
   localPlayer = 0;
   moveNum = 0;
   hostGameStarted = false;
@@ -3251,7 +3409,9 @@ function applyRemoteMove(move) {
     deliverBowl(move.player, d.angle, d.speed);
     shotClockStart = 0;
   } else if (move.type === 'timeout') {
+    if (shotClockExpired) return;
     shotClockForfeits[move.player - 1]++;
+    bowls.push({ player: move.player, x: -999, y: -999, vx: 0, vy: 0, stopped: true, offMat: true, forfeited: true });
     shotClockStart = 0;
     shotClockExpired = true;
     if (shotClockForfeits[move.player - 1] >= 3) {
@@ -3296,63 +3456,84 @@ function formatClock(ms) {
 }
 
 // ── Splash screen ─────────────────────────────────────────────────
+function seg(containerId, options, getVal, setVal) {
+  const el = document.getElementById(containerId);
+  options.forEach(([label, val]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (val === getVal()) b.classList.add('sel');
+    b.onclick = () => {
+      setVal(val);
+      el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    el.appendChild(b);
+  });
+}
+
+function buildSwatches(id, getIdx, setIdx) {
+  const el = document.getElementById(id);
+  BOWL_COLOURS.forEach((col, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'sw' + (i === getIdx() ? ' sel' : '');
+    sw.style.background = col.main;
+    sw.title = col.name;
+    sw.onclick = () => {
+      setIdx(i);
+      el.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+    };
+    el.appendChild(sw);
+  });
+}
+
 function buildSplash() {
-  function seg(containerId, options, getVal, setVal) {
-    const el = document.getElementById(containerId);
-    options.forEach(([label, val]) => {
-      const b = document.createElement('button');
-      b.textContent = label;
-      if (val === getVal()) b.classList.add('sel');
-      b.onclick = () => {
-        setVal(val);
-        el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
-        b.classList.add('sel');
-      };
-      el.appendChild(b);
-    });
-  }
+  seg('sMode', [['1 Player','vs-ai'],['2 Players','vs-player'],['Online','online']], ()=>splashCfg.mode, v=>{
+    splashCfg.mode=v;
+  });
+
+  document.getElementById('btnStart').onclick = () => {
+    if (splashCfg.mode === 'online') {
+      showOnlinePanel();
+    } else {
+      applyProfileToSplash();
+      showGameSettingsPanel();
+    }
+  };
+  document.getElementById('btnResume').onclick = resumeGame;
+}
+
+let gameSettingsBuilt = false;
+
+function showGameSettingsPanel() {
+  if (!gameSettingsBuilt) buildGameSettingsPanel();
+  const isAI = splashCfg.mode === 'vs-ai';
+  document.getElementById('aiPickWrap').style.display = isAI ? '' : 'none';
+  document.getElementById('p2BowlsHead').textContent = isAI
+    ? AI_PLAYERS[splashCfg.aiLevel].name + ' Bowls'
+    : 'Player 2 Bowls';
+  document.getElementById('game-settings-panel').classList.add('show');
+}
+
+function hideGameSettingsPanel() {
+  document.getElementById('game-settings-panel').classList.remove('show');
+}
+
+function buildGameSettingsPanel() {
+  gameSettingsBuilt = true;
 
   seg('sEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>splashCfg.ends, v=>splashCfg.ends=v);
-  seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player'],['Online','online']], ()=>splashCfg.mode, v=>{
-    splashCfg.mode=v;
-    document.getElementById('aiPickWrap').style.display = v==='vs-ai'?'':'none';
-    if (v === 'online') showOnlinePanel();
-  });
   const aiOpts = AI_PLAYERS.map((a,i)=>[a.name.split(' ')[0],i]);
   seg('sAI', aiOpts, ()=>splashCfg.aiLevel, v=>{
     splashCfg.aiLevel=v;
     document.getElementById('aiBio').textContent = AI_PLAYERS[v].bio;
+    document.getElementById('p2BowlsHead').textContent = AI_PLAYERS[v].name + ' Bowls';
   });
   document.getElementById('aiBio').textContent = AI_PLAYERS[splashCfg.aiLevel].bio;
-  document.getElementById('aiPickWrap').style.display = splashCfg.mode==='vs-ai'?'':'none';
-  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
 
-  const szSlider = document.getElementById('sSizeSlider');
-  const szLbl    = document.getElementById('sSizeLbl');
-  szSlider.value = splashCfg.size;
-  szLbl.textContent = splashCfg.size;
-  szSlider.oninput = () => { splashCfg.size = +szSlider.value; szLbl.textContent = splashCfg.size; };
-
-  function buildSwatches(id, getIdx, setIdx) {
-    const el = document.getElementById(id);
-    BOWL_COLOURS.forEach((col, i) => {
-      const sw = document.createElement('div');
-      sw.className = 'sw' + (i === getIdx() ? ' sel' : '');
-      sw.style.background = col.main;
-      sw.title = col.name;
-      sw.onclick = () => {
-        setIdx(i);
-        el.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
-      };
-      el.appendChild(sw);
-    });
-  }
-  buildSwatches('sP1', ()=>splashCfg.p1idx, i=>splashCfg.p1idx=i);
-  seg('sD1', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p1design, v=>splashCfg.p1design=v);
   buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
   seg('sD2', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p2design, v=>splashCfg.p2design=v);
+  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
 
-  // Surface presets & sliders
   const spdSlider = document.getElementById('sSpeedSlider');
   const spdLbl = document.getElementById('sSpeedLbl');
   const bendLSlider = document.getElementById('sBendLeftSlider');
@@ -3417,8 +3598,12 @@ function buildSplash() {
     bgEl.appendChild(d);
   });
 
-  document.getElementById('btnStart').onclick = () => { suspendedGame = null; syncResumeBtn(); applyAndStart(); };
-  document.getElementById('btnResume').onclick = resumeGame;
+  document.getElementById('game-settings-back').onclick = hideGameSettingsPanel;
+  document.getElementById('btnStartGame').onclick = () => {
+    suspendedGame = null; syncResumeBtn();
+    hideGameSettingsPanel();
+    applyAndStart();
+  };
 }
 
 // ── Online panel logic ────────────────────────────────────────────
@@ -3441,6 +3626,11 @@ function showOnlinePanel() {
 function hideOnlinePanel() {
   document.getElementById('online-panel').classList.remove('show');
   unsubscribeLobby();
+  splashCfg.mode = 'vs-ai';
+  const seg = document.getElementById('sMode');
+  seg.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('sel', b.textContent === '1 Player');
+  });
 }
 
 function buildOnlinePanel() {
@@ -3556,14 +3746,11 @@ function buildJoinBowlPanel() {
 
 function doJoinLobby(gameId, gameRow) {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
+  const prof = loadProfile();
+  if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
+  if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
   pendingJoinGameId = gameId;
-  if (!joinBowlPanelBuilt) {
-    const prof = loadProfile();
-    if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
-    if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
-  }
-  buildJoinBowlPanel();
-  document.getElementById('join-bowl-panel').classList.add('show');
+  confirmJoinLobby();
 }
 
 async function confirmJoinLobby() {
@@ -3573,6 +3760,7 @@ async function confirmJoinLobby() {
   const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
   if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
 
+  onlineOpponentName = game.host_name || 'Opponent';
   const tc = game.time_control;
   applyOnlineSettings(game.settings, game.seed);
   shotClockLimit = getTimeControlMs(tc);
@@ -3594,6 +3782,7 @@ async function doResumeLobby(game) {
   onlineGameId = game.id;
   const isHost = game.host_name === netDisplayName;
   localPlayer = isHost ? 1 : 2;
+  onlineOpponentName = isHost ? (game.guest_name || 'Opponent') : (game.host_name || 'Opponent');
   rngSeed = game.seed;
   applyOnlineSettings(game.settings, game.seed);
   shotClockLimit = getTimeControlMs(game.time_control);
@@ -3674,6 +3863,7 @@ function replayMoves(moves) {
       }
     } else if (m.type === 'timeout') {
       shotClockForfeits[m.player - 1]++;
+      bowls.push({ player: m.player, x: -999, y: -999, vx: 0, vy: 0, stopped: true, offMat: true, forfeited: true });
       if (shotClockForfeits[m.player - 1] >= 3) {
         finishClockForfeit(m.player);
         return;
@@ -3742,13 +3932,13 @@ let createPanelBuilt = false;
 
 function showCreatePanel() {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
+  const prof = loadProfile();
+  if (prof.p1idx != null) createCfg.p1idx = prof.p1idx;
+  if (prof.p1design != null) createCfg.p1design = prof.p1design;
+  if (prof.size != null) createCfg.size = prof.size;
+  if (prof.biasVal != null) createCfg.biasVal = prof.biasVal;
   const panel = document.getElementById('create-game-panel');
-  if (!createPanelBuilt) {
-    const prof = loadProfile();
-    if (prof.p1idx != null) createCfg.p1idx = prof.p1idx;
-    if (prof.p1design != null) createCfg.p1design = prof.p1design;
-    buildCreatePanel();
-  }
+  if (!createPanelBuilt) buildCreatePanel();
   document.getElementById('waiting-view').classList.remove('show');
   panel.classList.add('show');
 }
@@ -3777,28 +3967,6 @@ function buildCreatePanel() {
 
   cseg('cEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>createCfg.ends, v=>createCfg.ends=v);
   cseg('cTime', TIME_CONTROLS.map(t => [t.label, t.value]), ()=>createCfg.timeControl, v=>createCfg.timeControl=v);
-  cseg('cBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>createCfg.biasVal, v=>createCfg.biasVal=v);
-
-  const szSlider = document.getElementById('cSizeSlider');
-  const szLbl = document.getElementById('cSizeLbl');
-  szSlider.value = createCfg.size;
-  szSlider.oninput = () => { createCfg.size = +szSlider.value; szLbl.textContent = szSlider.value; };
-
-  // P1 colour swatches
-  const p1El = document.getElementById('cP1');
-  BOWL_COLOURS.forEach((col, i) => {
-    const sw = document.createElement('div');
-    sw.className = 'sw' + (i === createCfg.p1idx ? ' sel' : '');
-    sw.style.background = col.main;
-    sw.title = col.name;
-    sw.onclick = () => {
-      createCfg.p1idx = i;
-      p1El.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
-    };
-    p1El.appendChild(sw);
-  });
-
-  cseg('cD1', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>createCfg.p1design, v=>createCfg.p1design=v);
 
   // Surface
   const spdS = document.getElementById('cSpeedSlider'), spdL = document.getElementById('cSpeedLbl');
@@ -3895,6 +4063,7 @@ async function finishJoinAsHost(game) {
   hostGameStarted = true;
   unsubscribeLobby();
   const { data: fresh } = await sb.from('games').select('*').eq('id', game.id).single();
+  onlineOpponentName = (fresh || game).guest_name || 'Opponent';
   const settings = (fresh || game).settings || {};
   settings.p2Color = settings.p2Color != null ? settings.p2Color : 2;
   settings.p2Design = settings.p2Design != null ? settings.p2Design : 0;
@@ -3961,6 +4130,7 @@ function showSplash() {
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
+  hideGameSettingsPanel();
   document.getElementById('splash').classList.remove('hidden');
   syncResumeBtn();
 }
@@ -4105,6 +4275,45 @@ function checkAchievements(event, data) {
   }
 }
 
+// ── Match History ─────────────────────────────────────────────────
+const HISTORY_KEY = 'bowls_history';
+const MAX_HISTORY = 50;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
+}
+function saveHistory(h) { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); }
+
+function recordGame(result) {
+  const h = loadHistory();
+  h.unshift(result);
+  if (h.length > MAX_HISTORY) h.length = MAX_HISTORY;
+  saveHistory(h);
+}
+
+function getOpponentName() {
+  if (mode === 'vs-ai') return AI_PLAYERS[aiLevel].name;
+  if (mode === 'online') return onlineOpponentName || 'Opponent';
+  return 'Player 2';
+}
+
+function recordCurrentGame(won, conceded) {
+  const me = myPlayerIdx();
+  const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
+  const endsPlayed = conceded ? endNum : endNum - 1;
+  recordGame({
+    date: Date.now(),
+    opponent: getOpponentName(),
+    mode,
+    myScore,
+    oppScore,
+    ends: endsPlayed,
+    totalEnds: ENDS,
+    won,
+    conceded: !!conceded
+  });
+}
+
 function renderAchPanel() {
   const data = loadAch();
   const unlocked = Object.keys(data).length;
@@ -4189,6 +4398,34 @@ function buildProfilePanel() {
     };
     d1El.appendChild(b);
   });
+
+  const profSize = prof.size != null ? prof.size : 3;
+  const profSzSlider = document.getElementById('profSize');
+  const profSzLbl = document.getElementById('profSizeLbl');
+  profSzSlider.value = profSize;
+  profSzLbl.textContent = profSize;
+  profSzSlider.oninput = () => {
+    const p = loadProfile();
+    p.size = +profSzSlider.value;
+    saveProfile(p);
+    profSzLbl.textContent = profSzSlider.value;
+  };
+
+  const profBiasVal = prof.biasVal != null ? prof.biasVal : 1.0;
+  const profBiasEl = document.getElementById('profBias');
+  [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]].forEach(([label, val]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (val === profBiasVal) b.classList.add('sel');
+    b.onclick = () => {
+      const p = loadProfile();
+      p.biasVal = val;
+      saveProfile(p);
+      profBiasEl.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    profBiasEl.appendChild(b);
+  });
 }
 
 function renderProfileStats() {
@@ -4226,9 +4463,152 @@ function statRow(label, val) {
     `<span class="stat-val">${val}</span></div>`;
 }
 
+function renderMatchHistory() {
+  const el = document.getElementById('profile-history');
+  const history = loadHistory();
+  if (!history.length) { el.innerHTML = '<div class="hist-empty">No games played yet</div>'; return; }
+  el.innerHTML = history.slice(0, 20).map(g => {
+    const d = new Date(g.date);
+    const dateStr = d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+    const result = g.won ? 'W' : 'L';
+    const resultClass = g.won ? 'hist-win' : 'hist-loss';
+    const score = `${g.myScore}–${g.oppScore}`;
+    const modeLabel = g.mode === 'vs-ai' ? '🤖' : g.mode === 'online' ? '🌐' : '👥';
+    const endsPlayed = g.conceded ? '(conceded)' : `${g.ends}/${g.totalEnds} ends`;
+    return `<div class="hist-row"><span class="hist-result ${resultClass}">${result}</span>` +
+      `<span class="hist-detail"><strong>${modeLabel} vs ${g.opponent}</strong><br>` +
+      `<small>${score} · ${endsPlayed} · ${dateStr}</small></span></div>`;
+  }).join('');
+}
+
+// ── XP & ELO Rating System ──────────────────────────────────────
+const XP_KEY = 'bowls_xp';
+const DEVICE_ID_KEY = 'bowls_device_id';
+const XP_WIN = 100, XP_LOSS = 25, XP_END_WON = 10, XP_CONCEDE_WIN = 75, XP_CONCEDE_LOSS = 10;
+const ELO_DEFAULT = 1000, ELO_K = 32;
+
+function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+function loadXP() {
+  const def = { xp: 0, level: 1, elo: ELO_DEFAULT };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem(XP_KEY))); } catch { return def; }
+}
+function saveXP(data) { localStorage.setItem(XP_KEY, JSON.stringify(data)); }
+
+function xpForLevel(lvl) { return Math.floor(100 * Math.pow(1.2, lvl - 1)); }
+
+function calcLevel(totalXP) {
+  let lvl = 1, xpNeeded = 0;
+  while (true) {
+    const req = xpForLevel(lvl);
+    if (xpNeeded + req > totalXP) break;
+    xpNeeded += req;
+    lvl++;
+  }
+  return { level: lvl, xpIntoLevel: totalXP - xpNeeded, xpForNext: xpForLevel(lvl) };
+}
+
+function calcElo(myRating, oppRating, won) {
+  const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / 400));
+  const score = won ? 1 : 0;
+  return Math.round(myRating + ELO_K * (score - expected));
+}
+
+function countMyEndsWon() {
+  const me = myPlayerIdx();
+  return endHistory.filter(e => e.winner === me).length;
+}
+
+async function awardXP(won, conceded) {
+  const data = loadXP();
+  const oldElo = data.elo;
+  const endsWon = countMyEndsWon();
+
+  let gained = 0;
+  if (conceded) {
+    gained = won ? XP_CONCEDE_WIN : XP_CONCEDE_LOSS;
+  } else {
+    gained = won ? XP_WIN : XP_LOSS;
+  }
+  gained += endsWon * XP_END_WON;
+
+  data.xp += gained;
+  const lvlInfo = calcLevel(data.xp);
+  data.level = lvlInfo.level;
+
+  if (mode === 'online') {
+    const oppElo = await getOpponentElo();
+    data.elo = calcElo(oldElo, oppElo, won);
+  }
+
+  saveXP(data);
+  syncPlayerToServer(data);
+  showXPToast(gained, data.elo - oldElo);
+}
+
+async function getOpponentElo() {
+  if (!sb || !onlineOpponentName) return ELO_DEFAULT;
+  try {
+    const { data } = await sb.from('players').select('elo')
+      .eq('display_name', onlineOpponentName).single();
+    return data ? data.elo : ELO_DEFAULT;
+  } catch { return ELO_DEFAULT; }
+}
+
+async function syncPlayerToServer(data) {
+  if (!initSupabase()) return;
+  const deviceId = getDeviceId();
+  const row = {
+    device_id: deviceId,
+    display_name: netDisplayName || 'Anonymous',
+    xp: data.xp,
+    level: data.level,
+    elo: data.elo
+  };
+  await sb.from('players').upsert(row, { onConflict: 'device_id' }).then(({ error }) => {
+    if (error) console.error('syncPlayer', error);
+  });
+}
+
+function showXPToast(gained, eloDelta) {
+  const toast = document.getElementById('xp-toast');
+  toast.querySelector('.xp-gain').textContent = `+${gained} XP`;
+  toast.querySelector('.xp-detail').textContent = `Level ${loadXP().level}`;
+  const eloEl = toast.querySelector('.elo-change');
+  if (mode === 'online' && eloDelta !== 0) {
+    const sign = eloDelta > 0 ? '+' : '';
+    eloEl.textContent = `${sign}${eloDelta} Rating`;
+    eloEl.className = 'elo-change ' + (eloDelta > 0 ? 'elo-up' : 'elo-down');
+  } else {
+    eloEl.textContent = '';
+  }
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+function renderXPCard() {
+  const data = loadXP();
+  const lvl = calcLevel(data.xp);
+  document.getElementById('xp-level-display').textContent = `Level ${data.level}`;
+  document.getElementById('xp-rating-display').textContent = `Rating: ${data.elo}`;
+  const pct = lvl.xpForNext > 0 ? Math.round(lvl.xpIntoLevel / lvl.xpForNext * 100) : 100;
+  document.getElementById('xp-bar').style.width = pct + '%';
+  document.getElementById('xp-current').textContent = `${lvl.xpIntoLevel} / ${lvl.xpForNext} XP`;
+  document.getElementById('xp-next').textContent = `Level ${data.level + 1}`;
+}
+
 function showProfilePanel() {
   buildProfilePanel();
   renderProfileStats();
+  renderMatchHistory();
+  renderXPCard();
   document.getElementById('profile-panel').classList.add('show');
 }
 
@@ -4240,16 +4620,10 @@ document.getElementById('profile-back').onclick = () => {
 
 function applyProfileToSplash() {
   const prof = loadProfile();
-  if (prof.p1idx != null) {
-    splashCfg.p1idx = prof.p1idx;
-    const sP1 = document.getElementById('sP1');
-    if (sP1) sP1.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === prof.p1idx));
-  }
-  if (prof.p1design != null) {
-    splashCfg.p1design = prof.p1design;
-    const sD1 = document.getElementById('sD1');
-    if (sD1) sD1.querySelectorAll('button').forEach((b, j) => b.classList.toggle('sel', j === prof.p1design));
-  }
+  if (prof.p1idx != null) splashCfg.p1idx = prof.p1idx;
+  if (prof.p1design != null) splashCfg.p1design = prof.p1design;
+  if (prof.size != null) splashCfg.size = prof.size;
+  if (prof.biasVal != null) splashCfg.biasVal = prof.biasVal;
 }
 
 buildSplash();
