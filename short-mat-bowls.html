@@ -522,6 +522,7 @@ const NEAR_BOARD = { x: MAT.x - 4, y: MAT.y + MAT.h,   w: MAT.w + 8, h: BOARD_H 
 // Centre block — hitting it → bowl dead
 const FW = 40, FH = 24; // 3in wide × 15in long on a 6ft×40ft mat
 const FENDER = { x: MAT.x + MAT.w/2 - FW/2, y: MAT.y + MAT.h/2 - FH/2, w: FW, h: FH };
+let blockAnim = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, va: 0, active: false, resetting: false };
 
 // ── Symmetric mat layout — from ESMBA Laws (13000mm mat, 1830mm wide) ────────
 // DITCH line:  300mm from each fender      → 300/13000  = 0.023
@@ -757,7 +758,9 @@ function playerForTurn(t) {
 
 function allStopped() {
   if (jack && !jack.stopped && !jack.offMat && !jack.offSide) return false;
-  return bowls.every(b => b.stopped || b.offMat);
+  if (!bowls.every(b => b.stopped || b.offMat)) return false;
+  if (blockAnim.active && !blockAnim.resetting) return false;
+  return true;
 }
 
 let msgText = '';
@@ -869,14 +872,47 @@ function stepObj(obj, bias) {
     return;
   }
 
-  // Centre block — hitting the block kills the bowl / jack
-  const fx1 = FENDER.x, fx2 = FENDER.x + FENDER.w;
-  const fy1 = FENDER.y, fy2 = FENDER.y + FENDER.h;
-  if (obj.x - r < fx2 && obj.x + r > fx1 && obj.y - r < fy2 && obj.y + r > fy1) {
-    obj.offMat = true; obj.stopped = true;
-    // Small visual nudge so dead bowl doesn't overlap the block
-    if (obj.y < fy1 + FH/2) obj.y = fy1 - r - 2;
-    else                     obj.y = fy2 + r + 2;
+  // Centre block — use animated position for collision (with tunneling detection)
+  const bax = FENDER.x + blockAnim.x, bay = FENDER.y + blockAnim.y;
+  const fx1 = bax, fx2 = bax + FENDER.w;
+  const fy1 = bay, fy2 = bay + FENDER.h;
+  const inBlock = obj.x - r < fx2 && obj.x + r > fx1 && obj.y - r < fy2 && obj.y + r > fy1;
+  const prevY = obj.y - obj.vy, prevX = obj.x - obj.vx;
+  const tunneled = !inBlock && !obj._inBlock &&
+    prevX + r > fx1 && prevX - r < fx2 &&
+    ((prevY - r >= fy2 && obj.y - r < fy2) || (prevY + r <= fy1 && obj.y + r > fy1));
+  if ((inBlock && !obj._inBlock) || tunneled) {
+    if (!obj.hitBlock) {
+      obj.hitBlock = true;
+      obj.hitBlockTime = performance.now();
+    }
+    const bcx = bax + FW / 2;
+    const lateralOffset = (obj.x - bcx) / (FW / 2);
+    blockAnim.vx += obj.vx * 0.6;
+    blockAnim.vy += obj.vy * 0.6;
+    blockAnim.va -= lateralOffset * Math.abs(obj.vy) * 0.015;
+    blockAnim.active = true;
+    blockAnim.resetting = false;
+    obj.vx *= 0.5;
+    obj.vy *= 0.5;
+  }
+  obj._inBlock = inBlock;
+}
+
+function restorePreShot(bowlIdx) {
+  if (bowlIdx < _preShotPositions.length) {
+    const saved = _preShotPositions[bowlIdx];
+    const b = bowls[bowlIdx];
+    b.x = saved.x; b.y = saved.y; b.vx = saved.vx; b.vy = saved.vy;
+    b.stopped = saved.stopped; b.offMat = saved.offMat; b.inDitch = saved.inDitch;
+  }
+}
+function restoreJackPreShot() {
+  if (_preShotJack && jack) {
+    jack.x = _preShotJack.x; jack.y = _preShotJack.y;
+    jack.vx = _preShotJack.vx; jack.vy = _preShotJack.vy;
+    jack.stopped = _preShotJack.stopped; jack.offMat = _preShotJack.offMat;
+    jack.inDitch = _preShotJack.inDitch; jack.offSide = _preShotJack.offSide;
   }
 }
 
@@ -887,20 +923,27 @@ function stepCollisions() {
     for (let j = i+1; j < bowls.length; j++) {
       const b = bowls[j];
       if (b.offMat) continue;
+      const avxBefore = a.vx, avyBefore = a.vy;
       collide(a, b, RB, RB, 0.75);
+      const collided = a.vx !== avxBefore || a.vy !== avyBefore;
+      if (collided) {
+        if (a.hitBlock) { restorePreShot(j); a.offMat = true; a.stopped = true; }
+        if (b.hitBlock) { restorePreShot(i); b.offMat = true; b.stopped = true; }
+      }
     }
     if (jack && !jack.offMat && !jack.offSide) {
       if (jack.inDitch && !a.toucher) {
-        // Jack is in ditch and bowl is not a pre-existing toucher:
-        // contact kills the bowl immediately (like hitting the fender)
         const dist = Math.hypot(jack.x - a.x, jack.y - a.y);
         if (dist < RB + RJ) a.offMat = true;
       } else {
         const jvxBefore = jack.vx, jvyBefore = jack.vy;
         collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
         if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) {
-          lastJackHitter = a.player;
-          if (!jack.inDitch && a.delivering) { a.toucher = true; if (a.player === 1) checkAchievements('toucher'); }
+          if (a.hitBlock) { restoreJackPreShot(); a.offMat = true; a.stopped = true; }
+          else {
+            lastJackHitter = a.player;
+            if (!jack.inDitch && a.delivering) { a.toucher = true; if (a.player === 1) checkAchievements('toucher'); }
+          }
         }
       }
     }
@@ -1090,8 +1133,12 @@ function promptPlayer(p) {
 }
 
 let _preShot = {};
+let _preShotPositions = [];
+let _preShotJack = null;
 function deliverBowl(player, angle, speed) {
   const bs = bowlStart();
+  _preShotPositions = bowls.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, stopped: b.stopped, offMat: b.offMat, inDitch: b.inDitch }));
+  _preShotJack = jack ? { x: jack.x, y: jack.y, vx: jack.vx, vy: jack.vy, stopped: jack.stopped, offMat: jack.offMat, inDitch: jack.inDitch, offSide: jack.offSide } : null;
   _preShot = {
     player,
     fired: fireModeActive,
@@ -1826,11 +1873,14 @@ function drawMat() {
     ctx.lineTo(ibr.x,ibr.y); ctx.lineTo(ibl.x,ibl.y); ctx.closePath(); ctx.fill();
   }
 
-  // Centre block (projected quad)
-  const bx1=cx-FW/2, bx2=cx+FW/2;
-  const by1=FENDER.y, by2=FENDER.y+FENDER.h;
-  const btl=m2s(bx1,by1), btr=m2s(bx2,by1);
-  const bbr=m2s(bx2,by2), bbl=m2s(bx1,by2);
+  // Centre block (projected quad) — with animation offset/rotation
+  const blockCx = cx + blockAnim.x, blockCy = FENDER.y + FH/2 + blockAnim.y;
+  const cosA = Math.cos(blockAnim.angle), sinA = Math.sin(blockAnim.angle);
+  function blockCorner(dx, dy) {
+    return m2s(blockCx + dx * cosA - dy * sinA, blockCy + dx * sinA + dy * cosA);
+  }
+  const btl=blockCorner(-FW/2,-FH/2), btr=blockCorner(FW/2,-FH/2);
+  const bbr=blockCorner(FW/2,FH/2), bbl=blockCorner(-FW/2,FH/2);
   ctx.fillStyle='rgba(0,0,0,0.3)';
   ctx.beginPath(); ctx.moveTo(btl.x+2,btl.y+2); ctx.lineTo(btr.x+2,btr.y+2);
   ctx.lineTo(bbr.x+2,bbr.y+2); ctx.lineTo(bbl.x+2,bbl.y+2); ctx.closePath(); ctx.fill();
@@ -1840,19 +1890,20 @@ function drawMat() {
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bbr.x,bbr.y); ctx.lineTo(bbl.x,bbl.y); ctx.closePath(); ctx.fill();
   // Top-edge highlight strip
-  const bth1=m2s(bx1,by1+5), bth2=m2s(bx2,by1+5);
+  const bth1=blockCorner(-FW/2,-FH/2+5), bth2=blockCorner(FW/2,-FH/2+5);
   ctx.fillStyle='rgba(255,255,255,0.3)';
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bth2.x,bth2.y); ctx.lineTo(bth1.x,bth1.y); ctx.closePath(); ctx.fill();
   ctx.strokeStyle='rgba(100,90,70,0.6)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(btl.x,btl.y); ctx.lineTo(btr.x,btr.y);
   ctx.lineTo(bbr.x,bbr.y); ctx.lineTo(bbl.x,bbl.y); ctx.closePath(); ctx.stroke();
-  const bm=m2s(cx,(by1+by2)/2);
+  const bm=m2s(blockCx,blockCy);
 
-  // Gap hints either side of block
+  // Gap hints either side of block (fixed at original position)
+  const gBx1 = cx - FW/2, gBx2 = cx + FW/2;
   const gY=FENDER.y+FENDER.h/2;
-  const gL=m2s(MAT.x+4,gY), gBL=m2s(bx1-4,gY);
-  const gBR=m2s(bx2+4,gY), gR=m2s(MAT.x+MAT.w-4,gY);
+  const gL=m2s(MAT.x+4,gY), gBL=m2s(gBx1-4,gY);
+  const gBR=m2s(gBx2+4,gY), gR=m2s(MAT.x+MAT.w-4,gY);
   ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
   ctx.beginPath(); ctx.moveTo(gL.x,gL.y); ctx.lineTo(gBL.x,gBL.y); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(gBR.x,gBR.y); ctx.lineTo(gR.x,gR.y); ctx.stroke();
@@ -2783,6 +2834,13 @@ function loop() {
       if (allStopped()) { onAllStopped(); break; }
     }
   }
+  // Remove hitBlock bowls after 2 seconds
+  const now = performance.now();
+  for (const b of bowls) {
+    if (b.hitBlock && !b.offMat && now - b.hitBlockTime > 2000) {
+      b.offMat = true; b.stopped = true;
+    }
+  }
   // Animate rest-tilt for stopped bowls (toward restTarget: 0=upright, 1=on side)
   for (const b of bowls) {
     if (b.stopped && !b.offMat) {
@@ -2792,6 +2850,28 @@ function loop() {
         b.restProgress = cur + (target - cur) * 0.08;
       } else {
         b.restProgress = target;
+      }
+    }
+  }
+  // Animate centre block knock
+  if (blockAnim.active) {
+    if (blockAnim.resetting) {
+      blockAnim.x += (0 - blockAnim.x) * 0.08;
+      blockAnim.y += (0 - blockAnim.y) * 0.08;
+      blockAnim.angle += (0 - blockAnim.angle) * 0.08;
+      if (Math.abs(blockAnim.x) < 0.1 && Math.abs(blockAnim.y) < 0.1 && Math.abs(blockAnim.angle) < 0.001) {
+        blockAnim = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, va: 0, active: false, resetting: false };
+      }
+    } else {
+      blockAnim.vx *= 0.96; blockAnim.vy *= 0.96; blockAnim.va *= 0.95;
+      blockAnim.x += blockAnim.vx; blockAnim.y += blockAnim.vy;
+      blockAnim.angle += blockAnim.va;
+      const maxOff = 80;
+      blockAnim.x = Math.max(-maxOff, Math.min(maxOff, blockAnim.x));
+      blockAnim.y = Math.max(-maxOff, Math.min(maxOff, blockAnim.y));
+      if (Math.hypot(blockAnim.vx, blockAnim.vy) < 0.05 && Math.abs(blockAnim.va) < 0.001) {
+        blockAnim.vx = 0; blockAnim.vy = 0; blockAnim.va = 0;
+        blockAnim.resetting = true;
       }
     }
   }
