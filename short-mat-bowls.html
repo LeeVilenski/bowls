@@ -954,6 +954,7 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
+  shotClockForfeits=[0,0]; shotClockExpired=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
 
@@ -990,6 +991,7 @@ function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 
 function promptPlayer(p) {
   shotClockStart = mode === 'online' ? Date.now() : 0;
+  shotClockExpired = false;
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`${endLabel()} — <span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -1989,7 +1991,9 @@ function drawSidePanels() {
     const txt = formatClock(rem);
     ctx.fillStyle = rem < 10000 ? '#ef4444' : '#94a3b8';
     ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
-    ctx.fillText(txt, W/2, 26);
+    const p = playerForTurn(turnIdx);
+    const forfeits = shotClockForfeits[p - 1];
+    ctx.fillText(forfeits > 0 ? `${txt} (${forfeits}/3)` : txt, W/2, 26);
   }
 
   // Shot holder indicator — above Fire (P1) or Head (P2) button
@@ -2405,7 +2409,40 @@ function drawHeadOverlay() {
 }
 
 // ── Main loop ─────────────────────────────────────────────────────
+function handleShotClockExpiry() {
+  if (shotClockExpired) return;
+  if (playerForTurn(turnIdx) !== localPlayer) return;
+  shotClockExpired = true;
+  shotClockForfeits[localPlayer - 1]++;
+  sendMove('timeout', localPlayer, {});
+  if (shotClockForfeits[localPlayer - 1] >= 3) {
+    finishClockForfeit(localPlayer);
+    return;
+  }
+  msg(`<span style="color:#ef4444">Time's up!</span> Shot forfeited (${shotClockForfeits[localPlayer-1]}/3). ${3 - shotClockForfeits[localPlayer-1]} remaining before loss.`);
+  shotClockStart = 0;
+  turnIdx++;
+  if (turnIdx >= BPP * 2) { finishEnd(); return; }
+  promptPlayer(playerForTurn(turnIdx));
+}
+
+function finishClockForfeit(forfeitingPlayer) {
+  state = 'game-over';
+  if (mode === 'online' && sb) {
+    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+    localStorage.removeItem('bowls_activeGame');
+  }
+  if (forfeitingPlayer === localPlayer) {
+    msg(`Game over — <span style="color:#ef4444">You lost on time</span> (3 shot forfeits). ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+  } else {
+    msg(`Game over — <span style="color:#22c55e">Opponent lost on time!</span> (3 shot forfeits). ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+  }
+}
+
 function loop() {
+  if (mode === 'online' && shotClockStart && shotClockLimit && state === 'aim' && shotClockRemaining() <= 0) {
+    handleShotClockExpiry();
+  }
   if (state==='moving') {
     const steps = ffModeActive ? 3 : 1;
     for (let s = 0; s < steps; s++) {
@@ -2631,6 +2668,8 @@ let onlineGameId = '';
 let moveNum = 0;
 let shotClockLimit = 0;
 let shotClockStart = 0;
+let shotClockForfeits = [0, 0];
+let shotClockExpired = false;
 let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
@@ -2840,6 +2879,17 @@ function applyRemoteMove(move) {
     delivPos = { x: d.delivX, y: bowlStart().y };
     deliverBowl(move.player, d.angle, d.speed);
     shotClockStart = 0;
+  } else if (move.type === 'timeout') {
+    shotClockForfeits[move.player - 1]++;
+    shotClockStart = 0;
+    if (shotClockForfeits[move.player - 1] >= 3) {
+      finishClockForfeit(move.player);
+      return;
+    }
+    msg(`Opponent timed out — shot forfeited (${shotClockForfeits[move.player-1]}/3).`);
+    turnIdx++;
+    if (turnIdx >= BPP * 2) { finishEnd(); return; }
+    promptPlayer(playerForTurn(turnIdx));
   } else if (move.type === 'end_ack') {
     opponentAcked = true;
     if (localAcked && opponentAcked) advanceEnd();
@@ -3173,15 +3223,35 @@ function replayMoves(moves) {
         bowls = []; jack = null; turnIdx = 0; lastJackHitter = null;
         localAcked = false; opponentAcked = false; pendingMoves = [];
       }
+    } else if (m.type === 'timeout') {
+      shotClockForfeits[m.player - 1]++;
+      if (shotClockForfeits[m.player - 1] >= 3) {
+        finishClockForfeit(m.player);
+        return;
+      }
+      turnIdx++;
+      if (turnIdx >= BPP * 2) {
+        const res = scoreEnd();
+        if (res) {
+          scores[res.winner-1] += res.pts;
+          jackOwner = res.winner;
+          updateHUD();
+        }
+      }
     } else if (m.type === 'concede') {
       finishConcede(m.player);
       return;
     }
   }
   resetCam();
+  if (state === 'game-over') return;
   if (jack && turnIdx < BPP * 2) {
     promptPlayer(playerForTurn(turnIdx));
-  } else if (!jack && state !== 'game-over') {
+    const lastMove = moves[moves.length - 1];
+    if (lastMove && lastMove.created_at) {
+      shotClockStart = new Date(lastMove.created_at).getTime();
+    }
+  } else if (!jack) {
     state = 'place-jack'; syncFireBtn();
   }
 }
