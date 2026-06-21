@@ -2760,7 +2760,9 @@ async function createLobby(settings, timeControl) {
 
 async function listLobbies() {
   if (!initSupabase()) return [];
-  const { data, error } = await sb.from('games').select('*').eq('status', 'waiting').order('created_at', { ascending: false });
+  let q = sb.from('games').select('*').eq('status', 'waiting');
+  if (netDisplayName) q = q.neq('host_name', netDisplayName);
+  const { data, error } = await q.order('created_at', { ascending: false });
   if (error) { console.error('listLobbies', error); return []; }
   return data || [];
 }
@@ -2775,7 +2777,8 @@ async function listMyGames() {
 
 async function joinLobby(gameId, p2Bowls) {
   if (!initSupabase()) return false;
-  const { data: current } = await sb.from('games').select('settings').eq('id', gameId).single();
+  const { data: current } = await sb.from('games').select('settings,host_name').eq('id', gameId).single();
+  if (current && current.host_name === netDisplayName) return false;
   const mergedSettings = { ...(current && current.settings || {}), ...p2Bowls };
   const { data, error } = await sb.from('games').update({ guest_name: netDisplayName, status: 'active', settings: mergedSettings })
     .eq('id', gameId).eq('status', 'waiting').select().single();
