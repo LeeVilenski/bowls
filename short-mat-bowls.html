@@ -734,7 +734,7 @@ function stepObj(obj, bias) {
     // Anything stopping before the far dead line — short or mid-mat — is dead.
     const didNotReachScoring = delivDir === 1 ? obj.y > farDeadY : obj.y < farDeadY;
     if (obj === jack) {
-      if (inFarDitch) { obj.inDitch = true; msg('Jack in the ditch! Only touchers count.'); }
+      if (inFarDitch) { obj.inDitch = true; msg('Jack is now dead'); }
     } else {
       if (didNotReachScoring) {
         obj.offMat = true;
@@ -783,7 +783,7 @@ function stepObj(obj, bias) {
       obj.vx *= 0.80;
       if (!obj.inDitch) {
         obj.inDitch = true;
-        msg('Jack in the ditch! Only touchers count.');
+        msg('Jack is now dead');
       }
     } else if (obj.toucher) {
       obj.vx = obj.vy = 0; obj.stopped = true;
@@ -965,11 +965,9 @@ function startEnd() {
   if (jackOwner === 2 && mode === 'vs-ai') {
     aiPlaceJack();
   } else if (mode === 'online' && jackOwner !== localPlayer) {
-    msg(`${endLabel()} — <span style="color:#94a3b8">Opponent is placing the jack…</span>`);
+    msg(`<span style="color:#94a3b8">Opponent placing jack…</span>`);
   } else {
-    const who = mode === 'online' ? '<span style="color:#60a5fa">You</span>'
-      : (jackOwner===1 ? '<span style="color:#60a5fa">Player 1</span>' : '<span style="color:#f87171">Player 2</span>');
-    msg(`${endLabel()} — ${who}: click along the glowing jack line (far end) to place the jack`);
+    msg(`Place jack along yellow line`);
   }
 }
 
@@ -992,7 +990,7 @@ function promptPlayer(p) {
   shotClockStart = mode === 'online' ? Date.now() : 0;
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
-    msg(`${endLabel()} — <span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
+    msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
     aiTimer = setTimeout(() => {
       if (state !== 'ai-turn') return;
       const shot = aiPickShot();
@@ -1001,12 +999,12 @@ function promptPlayer(p) {
     }, 1100);
   } else if (mode === 'online' && p !== localPlayer) {
     state = 'aim'; syncFireBtn();
-    msg(`${endLabel()} — <span style="color:#94a3b8">Opponent's turn…</span>`);
+    msg(`<span style="color:#94a3b8">Opponent's turn…</span>`);
   } else {
     state = 'aim'; syncFireBtn();
     const col  = p===1 ? '#60a5fa' : '#f87171';
     const name = mode === 'online' ? 'Your turn' : (p===1 ? 'Player 1' : 'Player 2');
-    msg(`${endLabel()} — <span style="color:${col}">${name}</span>: drag from the delivery mark`);
+    msg(`<span style="color:${col}">${name}</span> — swipe to deliver`);
   }
 }
 
@@ -1025,7 +1023,7 @@ function deliverBowl(player, angle, speed) {
               rotAngle:0, trail:[], restProgress:0, delivering:true,
               design:splashCfg[`p${player}design`]});
   resetAim();
-  state = 'moving'; syncFireBtn(); syncFFBtn();
+  state = 'moving'; msgText = ''; syncFireBtn(); syncFFBtn();
   cam.phase = 'tracking';
   cam.pendingNext = false;
 }
@@ -1166,11 +1164,11 @@ function handleJackOffSide() {
     const oCol  = opp === 1 ? '#60a5fa' : '#f87171';
     const oName = opp === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
     state = 'end-result';
-    msg(`${endLabel()} — <span style="color:${hCol}">${hName}</span> knocked the jack off the side for the 3rd time! <span style="color:${oCol}">${oName}</span> wins 3 points. Click to continue.`);
+    msg(`<span style="color:${hCol}">${hName}</span> knocked jack off 3rd time! <span style="color:${oCol}">${oName}</span> wins 3 pts. Tap to continue`);
   } else {
     const rem = 3 - jackOffCounts[idx];
     state = 'jack-off-side';
-    msg(`${endLabel()} — Jack knocked off the side by <span style="color:${hCol}">${hName}</span> (warning ${jackOffCounts[idx]}/3 — ${rem} left). End restarted. Click to continue.`);
+    msg(`Jack off side by <span style="color:${hCol}">${hName}</span> (${jackOffCounts[idx]}/3). End restarted. Tap to continue`);
   }
 }
 
@@ -1182,13 +1180,13 @@ function finishEnd() {
     updateHUD();
     const col  = res.winner===1 ? '#60a5fa' : '#f87171';
     const name = res.winner===1 ? 'Player 1' : (mode==='vs-ai' ? 'AI' : 'Player 2');
-    msg(`${endLabel()} — <span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Click to continue.`);
+    msg(`<span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Tap to continue`);
     jackOwner = res.winner;
     checkAchievements('end_scored', res);
     const p1Bowls = bowls.filter(b => b.player === 1 && !b.offMat);
     if (p1Bowls.length === BPP && p1Bowls.every(b => b.toucher)) unlockAch('perfection');
   } else {
-    msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
+    msg(`Dead end — no jack in play. Tap to continue`);
   }
 }
 
@@ -1219,7 +1217,7 @@ function gameOver() {
     sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
   }
-  msg(`Game over — ${res}. Press New Game to play again.`);
+  msg(`Game over — ${res}`);
 }
 
 function doConcede() {
@@ -1234,9 +1232,9 @@ function finishConcede(concedingPlayer) {
     localStorage.removeItem('bowls_activeGame');
   }
   if (concedingPlayer === localPlayer) {
-    msg(`Game over — <span style="color:#ef4444">You conceded</span>. ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+    msg(`Game over — <span style="color:#ef4444">You conceded</span>. ${scores[0]}–${scores[1]}`);
   } else {
-    msg(`Game over — <span style="color:#22c55e">Opponent conceded!</span> ${scores[0]}–${scores[1]}. Press New Game to play again.`);
+    msg(`Game over — <span style="color:#22c55e">Opponent conceded!</span> ${scores[0]}–${scores[1]}`);
   }
 }
 
@@ -1326,13 +1324,29 @@ function drawOverlayUI() {
     ctx.fillText('⏩ 3×', ffx, ffy);
   }
 
-  // Message text (bottom centre)
-  if (msgText) {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(38, H - 18, W - 76, 18);
-    ctx.fillStyle = '#e2e8f0';
-    ctx.font = '10px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(msgText, W/2, H - 9, W - 84);
+  // Message text (just above the centre block, below far dead line)
+  if (msgText && state !== 'moving') {
+    const blockTopY = m2s(MAT.x, FENDER.y).y;
+    const fontSize = 22;
+    const lineHeight = fontSize * 1.3;
+    ctx.font = `bold ${fontSize}px Segoe UI`;
+    const maxW = W - 40;
+    const words = msgText.split(' ');
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    const totalH = lines.length * lineHeight;
+    const topY = blockTopY - totalH - 4;
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${fontSize}px Segoe UI`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let i = 0; i < lines.length; i++)
+      ctx.fillText(lines[i], W / 2, topY + i * lineHeight);
   }
 }
 
@@ -2512,7 +2526,7 @@ function handlePointerDown(p) {
         beginTurns();
         mouse.down = false; return;
       } else {
-        msg('Click along the glowing jack line (the vertical mark at the centre of the far end)!');
+        msg('Place jack along yellow line');
       }
     }
   } else if (state === 'aim') {
