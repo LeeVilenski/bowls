@@ -2863,6 +2863,8 @@ function handleRemoteTimeout() {
   shotClockExpired = true;
   const remotePlayer = playerForTurn(turnIdx);
   shotClockForfeits[remotePlayer - 1]++;
+  // Don't send a move — the timed-out player sends the authoritative timeout move.
+  // This is a local fallback in case their move never arrives.
   if (shotClockForfeits[remotePlayer - 1] >= 3) {
     finishClockForfeit(remotePlayer);
     return;
