@@ -2289,8 +2289,8 @@ function drawSidePanels() {
     ctx.beginPath(); ctx.arc(W/2, 10, 4, 0, Math.PI*2); ctx.fill();
   }
 
-  // Shot clock — only shown when under 60s remaining
-  if (mode === 'online' && shotClockStart && shotClockLimit) {
+  // Shot clock — only shown when under 60s remaining and bowls aren't moving
+  if (mode === 'online' && shotClockStart && shotClockLimit && state !== 'moving') {
     const rem = shotClockRemaining();
     if (rem < 60000) {
       const txt = formatClock(rem);
