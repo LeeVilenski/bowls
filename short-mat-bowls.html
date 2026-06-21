@@ -916,7 +916,7 @@ function stepCollisions() {
         collide(a, jack, RB, RJ, 0.85, 1, JACK_MASS);
         if (jack.vx !== jvxBefore || jack.vy !== jvyBefore) {
           lastJackHitter = a.player;
-          if (!jack.inDitch && a.delivering) { a.toucher = true; if (a.player === 1) checkAchievements('toucher'); }
+          if (!jack.inDitch && a.delivering) { a.toucher = true; if (a.player === myPlayerIdx()) checkAchievements('toucher'); }
         }
       }
     }
@@ -1211,7 +1211,7 @@ function applyCameraTransform() {
 
 function _doOnAllStopped() {
   // Post-shot achievement checks
-  if (_preShot.player === 1) {
+  if (_preShot.player === myPlayerIdx()) {
     // "Playing Up!" — fired shot removed 2+ opponent bowls
     if (_preShot.fired) {
       const liveNow = bowls.filter(b => !b.offMat).length;
@@ -1258,7 +1258,7 @@ function handleJackOffSide() {
     jackOwner = opp;
     updateHUD();
     endHistory.push({ end: endNum, winner: opp, pts: 3 });
-    if (hitter === 1) checkAchievements('lose_jack');
+    if (hitter === myPlayerIdx()) checkAchievements('lose_jack');
     const oCol  = opp === 1 ? '#60a5fa' : '#f87171';
     const oName = opp === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
     state = 'end-result';
@@ -1282,8 +1282,8 @@ function finishEnd() {
     msg(`<span style="color:${col}">${name}</span> scores ${res.pts} point${res.pts!==1?'s':''}! Tap to continue`);
     jackOwner = res.winner;
     checkAchievements('end_scored', res);
-    const p1Bowls = bowls.filter(b => b.player === 1 && !b.offMat);
-    if (p1Bowls.length === BPP && p1Bowls.every(b => b.toucher)) unlockAch('perfection');
+    const myBowls = bowls.filter(b => b.player === myPlayerIdx() && !b.offMat);
+    if (myBowls.length === BPP && myBowls.every(b => b.toucher)) unlockAch('perfection');
   } else {
     msg(`Dead end — no jack in play. Tap to continue`);
     endHistory.push({ end: endNum, winner: 0, pts: 0 });
