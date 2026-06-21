@@ -1175,7 +1175,7 @@ function promptPlayer(p) {
   shotClockStart = mode === 'online' ? serverNow() : 0;
   shotClockExpired = false;
   if (mode === 'online' && netConn && netConn.open) {
-    netConn.send({ type: 'CLOCK_START' });
+    netConn.send({ type: 'CLOCK_START', ts: serverNow() });
   }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
@@ -2846,6 +2846,7 @@ function handleShotClockExpiry() {
   if (playerForTurn(turnIdx) !== localPlayer) return;
   shotClockExpired = true;
   shotClockForfeits[localPlayer - 1]++;
+  bowls.push({ player: localPlayer, x: -999, y: -999, vx: 0, vy: 0, stopped: true, offMat: true, forfeited: true });
   sendMove('timeout', localPlayer, {});
   if (shotClockForfeits[localPlayer - 1] >= 3) {
     finishClockForfeit(localPlayer);
@@ -3339,7 +3340,7 @@ function setupConn(conn) {
       }
       onRemoteMove(msg.move);
     }
-    if (msg.type === 'CLOCK_START') { shotClockStart = Date.now(); shotClockExpired = false; return; }
+    if (msg.type === 'CLOCK_START') { shotClockStart = msg.ts ? msg.ts : serverNow(); shotClockExpired = false; return; }
     if (msg.type === 'LEAVE') { msgText = 'Opponent left the match.'; return; }
     if (msg.type === 'MOVE') { onRemoteMove(msg.move); }
   });
@@ -3412,6 +3413,7 @@ function applyRemoteMove(move) {
   } else if (move.type === 'timeout') {
     if (shotClockExpired) return;
     shotClockForfeits[move.player - 1]++;
+    bowls.push({ player: move.player, x: -999, y: -999, vx: 0, vy: 0, stopped: true, offMat: true, forfeited: true });
     shotClockStart = 0;
     shotClockExpired = true;
     if (shotClockForfeits[move.player - 1] >= 3) {
@@ -3863,6 +3865,7 @@ function replayMoves(moves) {
       }
     } else if (m.type === 'timeout') {
       shotClockForfeits[m.player - 1]++;
+      bowls.push({ player: m.player, x: -999, y: -999, vx: 0, vy: 0, stopped: true, offMat: true, forfeited: true });
       if (shotClockForfeits[m.player - 1] >= 3) {
         finishClockForfeit(m.player);
         return;
