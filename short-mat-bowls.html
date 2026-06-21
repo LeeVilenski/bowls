@@ -1029,7 +1029,7 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
-  shotClockForfeits=[0,0]; shotClockExpired=false;
+  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1064,7 +1064,7 @@ function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End
 function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 
 function promptPlayer(p) {
-  shotClockStart = mode === 'online' ? Date.now() : 0;
+  shotClockStart = mode === 'online' ? serverNow() : 0;
   shotClockExpired = false;
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
@@ -2284,7 +2284,7 @@ function drawSidePanels() {
 
   // Shot clock — only shown when under 60s remaining and bowls aren't moving
   if (mode === 'online' && shotClockStart && shotClockLimit && state !== 'moving') {
-    const rem = shotClockRemaining();
+    const rem = Math.max(0, shotClockRemaining());
     if (rem < 60000) {
       const txt = formatClock(rem);
       const urgent = rem < 10000;
@@ -2729,6 +2729,23 @@ function handleShotClockExpiry() {
   promptPlayer(playerForTurn(turnIdx));
 }
 
+function handleRemoteTimeout() {
+  if (shotClockExpired) return;
+  shotClockExpired = true;
+  const remotePlayer = playerForTurn(turnIdx);
+  shotClockForfeits[remotePlayer - 1]++;
+  sendMove('timeout', remotePlayer, {});
+  if (shotClockForfeits[remotePlayer - 1] >= 3) {
+    finishClockForfeit(remotePlayer);
+    return;
+  }
+  msg(`Opponent timed out — shot forfeited (${shotClockForfeits[remotePlayer-1]}/3).`);
+  shotClockStart = 0;
+  turnIdx++;
+  if (turnIdx >= BPP * 2) { finishEnd(); return; }
+  promptPlayer(playerForTurn(turnIdx));
+}
+
 function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
   if (mode === 'online' && sb) {
@@ -2744,7 +2761,11 @@ function finishClockForfeit(forfeitingPlayer) {
 
 function loop() {
   if (mode === 'online' && shotClockStart && shotClockLimit && state === 'aim' && shotClockRemaining() <= 0) {
-    handleShotClockExpiry();
+    if (playerForTurn(turnIdx) === localPlayer) {
+      handleShotClockExpiry();
+    } else if (shotClockRemaining() <= -TIMEOUT_GRACE_MS && !shotClockExpired) {
+      handleRemoteTimeout();
+    }
   }
   if (state==='moving') {
     const steps = ffModeActive ? 3 : 1;
@@ -2973,6 +2994,8 @@ let shotClockLimit = 0;
 let shotClockStart = 0;
 let shotClockForfeits = [0, 0];
 let shotClockExpired = false;
+let serverTimeOffset = 0;
+const TIMEOUT_GRACE_MS = 3000;
 let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
@@ -3069,9 +3092,13 @@ async function sendMove(type, player, data) {
   if (!sb) return;
   moveNum++;
   const row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
-  await sb.from('moves').insert(row);
+  const { data: inserted } = await sb.from('moves').insert(row).select('created_at').single();
+  if (inserted && inserted.created_at) {
+    const srvTs = new Date(inserted.created_at).getTime();
+    serverTimeOffset = srvTs - Date.now();
+  }
   if (netConn && netConn.open) {
-    netConn.send({ type: 'MOVE', move: row });
+    netConn.send({ type: 'MOVE', move: row, serverTime: serverNow() });
   }
 }
 
@@ -3086,7 +3113,14 @@ function subscribeMoves(gameId) {
   if (!sb || moveSubscription) return;
   moveSubscription = sb.channel(`moves:${gameId}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves', filter: `game_id=eq.${gameId}` },
-      (payload) => { if (payload.new.player !== localPlayer) onRemoteMove(payload.new); })
+      (payload) => {
+        if (payload.new.player !== localPlayer) {
+          if (payload.new.created_at) {
+            serverTimeOffset = new Date(payload.new.created_at).getTime() - Date.now();
+          }
+          onRemoteMove(payload.new);
+        }
+      })
     .subscribe();
 }
 
@@ -3135,7 +3169,12 @@ function setupConn(conn) {
   conn.on('data', (msg) => {
     if (msg.type === 'PING') { conn.send({ type: 'PONG', t: msg.t }); return; }
     if (msg.type === 'PONG') { peerLatencyMs = Date.now() - msg.t; return; }
-    if (msg.type === 'MOVE') { onRemoteMove(msg.move); }
+    if (msg.type === 'MOVE') {
+      if (msg.serverTime) {
+        serverTimeOffset = msg.serverTime - Date.now();
+      }
+      onRemoteMove(msg.move);
+    }
   });
   conn.on('close', () => onPeerDisconnect());
   conn.on('error', () => onPeerDisconnect());
@@ -3232,9 +3271,11 @@ function isRealtime(tc) {
   return found ? found.realtime : true;
 }
 
+function serverNow() { return Date.now() + serverTimeOffset; }
+
 function shotClockRemaining() {
   if (!shotClockStart || !shotClockLimit) return Infinity;
-  return Math.max(0, shotClockLimit - (Date.now() - shotClockStart));
+  return shotClockLimit - (serverNow() - shotClockStart);
 }
 
 function formatClock(ms) {
@@ -3647,7 +3688,9 @@ function replayMoves(moves) {
     promptPlayer(playerForTurn(turnIdx));
     const lastMove = moves[moves.length - 1];
     if (lastMove && lastMove.created_at) {
-      shotClockStart = new Date(lastMove.created_at).getTime();
+      const srvTs = new Date(lastMove.created_at).getTime();
+      serverTimeOffset = srvTs - Date.now();
+      shotClockStart = srvTs;
     }
   } else if (!jack) {
     state = 'place-jack'; syncFireBtn();
