@@ -1197,7 +1197,7 @@ function _doOnAllStopped() {
   }
   turnIdx++;
   if (mode === 'online') processPendingMoves();
-  if (state === 'moving') return;
+  if (state === 'moving' || state === 'game-over') return;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
 }
@@ -1300,6 +1300,7 @@ function doConcede() {
 
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
+  checkAchievements('game_over', { concede: true, concedingPlayer });
   if (mode === 'online' && sb && onlineGameId) {
     await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
@@ -2897,6 +2898,11 @@ function cleanupNet() {
 function onRemoteMove(move) {
   if (move.move_num <= moveNum) return;
   moveNum = move.move_num;
+  if (move.type === 'concede') {
+    pendingMoves = [];
+    finishConcede(move.player);
+    return;
+  }
   if (state === 'moving' || state === 'camera-return') {
     pendingMoves.push(move);
     return;
@@ -2908,6 +2914,7 @@ function processPendingMoves() {
   while (pendingMoves.length > 0) {
     const m = pendingMoves.shift();
     applyRemoteMove(m);
+    if (state === 'game-over') { pendingMoves = []; return; }
   }
 }
 
@@ -3675,7 +3682,7 @@ function checkAchievements(event, data) {
   if (event === 'game_over') {
     stats.games++;
     const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
-    const won = myScore > oppScore;
+    const won = (data && data.concede) ? (data.concedingPlayer !== me) : (myScore > oppScore);
     if (mode === 'online') stats.onlineGames++;
     if (won) {
       stats.wins++;
