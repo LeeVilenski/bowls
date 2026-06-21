@@ -255,6 +255,11 @@ button:active { opacity: .7; }
   background: #22c55e; color: #fff;
 }
 .my-game-badge.waiting { background: #475569; }
+.my-game-turn { font-size: 10px; font-weight: 700; }
+.my-game-turn.you { color: #22c55e; }
+.my-game-turn.them { color: #94a3b8; }
+.my-game-clock { font-size: 10px; color: #64748b; font-variant-numeric: tabular-nums; }
+.my-game-clock.urgent { color: #ef4444; }
 #btnCreateGame {
   padding: 12px; font-size: 14px; font-weight: 800;
   background: linear-gradient(135deg,#1d4ed8,#6d28d9);
@@ -2277,15 +2282,21 @@ function drawSidePanels() {
     ctx.beginPath(); ctx.arc(W/2, 10, 4, 0, Math.PI*2); ctx.fill();
   }
 
-  // Shot clock
+  // Shot clock — only shown when under 60s remaining
   if (mode === 'online' && shotClockStart && shotClockLimit) {
     const rem = shotClockRemaining();
-    const txt = formatClock(rem);
-    ctx.fillStyle = rem < 10000 ? '#ef4444' : '#94a3b8';
-    ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
-    const p = playerForTurn(turnIdx);
-    const forfeits = shotClockForfeits[p - 1];
-    ctx.fillText(forfeits > 0 ? `${txt} (${forfeits}/3)` : txt, W/2, 26);
+    if (rem < 60000) {
+      const txt = formatClock(rem);
+      const urgent = rem < 10000;
+      const p = playerForTurn(turnIdx);
+      const forfeits = shotClockForfeits[p - 1];
+      const label = forfeits > 0 ? `${txt} (${forfeits}/3)` : txt;
+      const blockTopY = m2s(MAT.x, FENDER.y).y;
+      const clockY = blockTopY - 30;
+      ctx.font = 'bold 18px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = urgent ? '#ef4444' : '#e2e8f0';
+      ctx.fillText(label, W/2, msgText && state !== 'moving' ? clockY - 30 : clockY);
+    }
   }
 
   // Shot holder indicator — above Fire (P1) or Head (P2) button
@@ -3026,7 +3037,13 @@ async function listMyGames() {
   const { data, error } = await sb.from('games').select('*').eq('status', 'active')
     .or(`host_name.eq.${netDisplayName},guest_name.eq.${netDisplayName}`);
   if (error) { console.error('listMyGames', error); return []; }
-  return data || [];
+  const games = data || [];
+  for (const g of games) {
+    const { data: moves } = await sb.from('moves').select('player,created_at,type')
+      .eq('game_id', g.id).order('move_num', { ascending: false }).limit(1);
+    g._lastMove = moves && moves[0] ? moves[0] : null;
+  }
+  return games;
 }
 
 async function joinLobby(gameId, p2Bowls) {
@@ -3422,7 +3439,23 @@ async function refreshLobby() {
       row.className = 'my-game-row';
       const isHost = g.host_name === netDisplayName;
       const opp = isHost ? (g.guest_name || '?') : g.host_name;
+      const lm = g._lastMove;
+      const localP = isHost ? 1 : 2;
+      const lastPlayer = lm ? lm.player : 0;
+      const yourTurn = !lm || lastPlayer !== localP;
+      const turnLabel = yourTurn ? 'Your turn' : 'Their turn';
+      const turnClass = yourTurn ? 'my-game-turn you' : 'my-game-turn them';
+      let clockHtml = '';
+      if (g.time_control) {
+        const tcMs = getTimeControlMs(g.time_control);
+        const since = lm ? lm.created_at : g.created_at;
+        const elapsed = Date.now() - new Date(since).getTime();
+        const rem = Math.max(0, tcMs - elapsed);
+        clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}">${formatClock(rem)}</span>`;
+      }
       row.innerHTML = `<span class="my-game-opp">vs ${esc(opp)}</span>` +
+        `<span class="${turnClass}">${turnLabel}</span>` +
+        clockHtml +
         `<span class="my-game-badge">Resume</span>`;
       row.onclick = () => doResumeLobby(g);
       myEl.appendChild(row);
