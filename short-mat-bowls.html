@@ -1454,9 +1454,7 @@ function visibleMenuItems() {
   return ALL_MENU_ITEMS.filter(item => {
     if (item.id === 'concede' && state === 'game-over') return false;
     if (item.id === 'exit' && mode === 'online') return false;
-    if (item.id === 'exit' && state === 'game-over') return false;
     if (item.id === 'leave' && mode !== 'online') return false;
-    if (item.id === 'leave' && state === 'game-over') return false;
     return true;
   });
 }
@@ -3557,14 +3555,11 @@ function buildJoinBowlPanel() {
 
 function doJoinLobby(gameId, gameRow) {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
+  const prof = loadProfile();
+  if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
+  if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
   pendingJoinGameId = gameId;
-  if (!joinBowlPanelBuilt) {
-    const prof = loadProfile();
-    if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
-    if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
-  }
-  buildJoinBowlPanel();
-  document.getElementById('join-bowl-panel').classList.add('show');
+  confirmJoinLobby();
 }
 
 async function confirmJoinLobby() {
