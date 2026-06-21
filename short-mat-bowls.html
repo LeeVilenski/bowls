@@ -3483,6 +3483,11 @@ function showOnlinePanel() {
 function hideOnlinePanel() {
   document.getElementById('online-panel').classList.remove('show');
   unsubscribeLobby();
+  splashCfg.mode = 'vs-ai';
+  const seg = document.getElementById('sMode');
+  seg.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('sel', b.textContent === '1 Player');
+  });
 }
 
 function buildOnlinePanel() {
