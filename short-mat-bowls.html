@@ -376,6 +376,7 @@ button:active { opacity: .7; }
     </div>
 
     <button id="btnStart">Start Game</button>
+    <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
     <button id="btnProfile">👤 Profile</button>
     <button id="btnAch">🏆 Achievements</button>
   </div>
@@ -1023,6 +1024,7 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
+  endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
 
@@ -1231,6 +1233,7 @@ function handleJackOffSide() {
     scores[opp - 1] += 3;
     jackOwner = opp;
     updateHUD();
+    endHistory.push({ end: endNum, winner: opp, pts: 3 });
     if (hitter === 1) checkAchievements('lose_jack');
     const oCol  = opp === 1 ? '#60a5fa' : '#f87171';
     const oName = opp === 1 ? 'Player 1' : (mode === 'vs-ai' ? 'AI' : 'Player 2');
@@ -1247,6 +1250,7 @@ function finishEnd() {
   state = 'end-result';
   const res = scoreEnd();
   if (res) {
+    endHistory.push({ end: endNum, winner: res.winner, pts: res.pts });
     scores[res.winner-1] += res.pts;
     updateHUD();
     const col  = res.winner===1 ? '#60a5fa' : '#f87171';
@@ -1257,6 +1261,7 @@ function finishEnd() {
     const p1Bowls = bowls.filter(b => b.player === 1 && !b.offMat);
     if (p1Bowls.length === BPP && p1Bowls.every(b => b.toucher)) unlockAch('perfection');
   } else {
+    endHistory.push({ end: endNum, winner: 0, pts: 0 });
     msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
     unlockAch('dead_end');
   }
@@ -1364,6 +1369,7 @@ function draw() {
   drawSidePanels();
   if (headOverlay) drawHeadOverlay();
   drawOverlayUI();
+  drawGameMenu();
 }
 
 function drawOverlayUI() {
@@ -1406,6 +1412,200 @@ function drawOverlayUI() {
     ctx.font = '10px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(msgText, W/2, H - 9, W - 84);
   }
+}
+
+// ── Game Menu overlay ────────────────────────────────────────────
+const ALL_MENU_ITEMS = [
+  { id: 'resume',  label: '▶  Resume Game',  bg: '#1e3a8a', fg: '#93c5fd' },
+  { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
+  { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
+  { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
+  { id: 'concede', label: '🏳  Concede',      bg: '#7f1d1d', fg: '#fca5a5' },
+];
+const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
+
+function visibleMenuItems() {
+  return ALL_MENU_ITEMS.filter(item => {
+    if (item.id === 'concede' && state === 'game-over') return false;
+    if (item.id === 'exit' && mode === 'online') return false;
+    if (item.id === 'exit' && state === 'game-over') return false;
+    return true;
+  });
+}
+
+function menuItemY(i, count) {
+  const totalH = count * MENU_BTN_H + (count - 1) * MENU_BTN_GAP;
+  const startY = H / 2 - totalH / 2 + 40;
+  return startY + i * (MENU_BTN_H + MENU_BTN_GAP);
+}
+
+function drawGameMenu() {
+  if (!gameMenuOpen) return;
+
+  const items = visibleMenuItems();
+
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 20px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('GAME MENU', W / 2, menuItemY(0, items.length) - 50);
+
+  const n2 = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name : (mode === 'online' ? 'Opponent' : 'Player 2');
+  ctx.fillStyle = '#64748b';
+  ctx.font = '12px Segoe UI';
+  ctx.fillText(`${scores[0]} – ${scores[1]}  ·  End ${endNum}/${ENDS}  ·  P1 vs ${n2}`, W / 2, menuItemY(0, items.length) - 28);
+
+  const resultsIdx = items.findIndex(m => m.id === 'results');
+  const showingResults = gameMenuOpen === 'results';
+
+  for (let i = 0; i < items.length; i++) {
+    if (showingResults && i > resultsIdx) continue;
+    const item = items[i];
+    const bx = W / 2 - MENU_BTN_W / 2, by = menuItemY(i, items.length);
+    ctx.fillStyle = item.bg;
+    ctx.beginPath(); ctx.roundRect(bx, by, MENU_BTN_W, MENU_BTN_H, MENU_BTN_R); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(bx, by, MENU_BTN_W, MENU_BTN_H, MENU_BTN_R); ctx.stroke();
+    ctx.fillStyle = showingResults && item.id === 'results' ? '#60a5fa' : item.fg;
+    ctx.font = 'bold 15px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(item.id === 'concede' && concedeConfirm ? '⚠  Are you sure?' : item.label, W / 2, by + MENU_BTN_H / 2);
+  }
+
+  if (showingResults) drawEndResultsTable();
+}
+
+function drawEndResultsTable() {
+  const items = visibleMenuItems();
+  const tableX = W / 2 - MENU_BTN_W / 2;
+  const resultsIdx = items.findIndex(m => m.id === 'results');
+  const tableY = menuItemY(resultsIdx, items.length) + MENU_BTN_H + 6;
+  const n2 = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0] : (mode === 'online' ? 'Opp' : 'P2');
+
+  const rowH = 26;
+  const rows = endHistory.length || 0;
+  const headerH = 28;
+  const totalH = headerH + Math.max(rows, 1) * rowH + 10;
+
+  ctx.fillStyle = 'rgba(17,24,39,0.95)';
+  ctx.beginPath(); ctx.roundRect(tableX, tableY, MENU_BTN_W, totalH, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(tableX, tableY, MENU_BTN_W, totalH, 8); ctx.stroke();
+
+  const cols = [tableX + 50, tableX + 170, tableX + 290];
+  ctx.fillStyle = '#475569'; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('END', cols[0], tableY + headerH / 2);
+  ctx.fillText('P1', cols[1], tableY + headerH / 2);
+  ctx.fillText(n2.toUpperCase(), cols[2], tableY + headerH / 2);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(tableX + 10, tableY + headerH); ctx.lineTo(tableX + MENU_BTN_W - 10, tableY + headerH); ctx.stroke();
+
+  if (rows === 0) {
+    ctx.fillStyle = '#64748b'; ctx.font = '11px Segoe UI';
+    ctx.fillText('No ends completed yet', W / 2, tableY + headerH + rowH / 2);
+  } else {
+    let runP1 = 0, runP2 = 0;
+    for (let i = 0; i < rows; i++) {
+      const e = endHistory[i];
+      const ry = tableY + headerH + i * rowH + rowH / 2;
+      ctx.fillStyle = '#94a3b8'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillText(e.end > ENDS ? `E+${e.end - ENDS}` : `${e.end}`, cols[0], ry);
+      const p1pts = e.winner === 1 ? e.pts : 0;
+      const p2pts = e.winner === 2 ? e.pts : 0;
+      runP1 += p1pts; runP2 += p2pts;
+      ctx.fillStyle = e.winner === 1 ? '#60a5fa' : (e.winner === 0 ? '#64748b' : '#94a3b8');
+      ctx.font = e.winner === 1 ? 'bold 13px Segoe UI' : '12px Segoe UI';
+      ctx.fillText(e.winner === 0 ? '–' : p1pts, cols[1], ry);
+      ctx.fillStyle = e.winner === 2 ? '#f87171' : (e.winner === 0 ? '#64748b' : '#94a3b8');
+      ctx.font = e.winner === 2 ? 'bold 13px Segoe UI' : '12px Segoe UI';
+      ctx.fillText(e.winner === 0 ? '–' : p2pts, cols[2], ry);
+    }
+    const totY = tableY + headerH + rows * rowH + rowH / 2 - 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tableX + 10, totY - rowH / 2); ctx.lineTo(tableX + MENU_BTN_W - 10, totY - rowH / 2); ctx.stroke();
+    ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 11px Segoe UI';
+    ctx.fillText('TOTAL', cols[0], totY);
+    ctx.fillStyle = '#60a5fa'; ctx.fillText(runP1, cols[1], totY);
+    ctx.fillStyle = '#f87171'; ctx.fillText(runP2, cols[2], totY);
+  }
+}
+
+function hitGameMenuItem(p) {
+  const items = visibleMenuItems();
+  const resultsIdx = items.findIndex(m => m.id === 'results');
+  const showingResults = gameMenuOpen === 'results';
+  for (let i = 0; i < items.length; i++) {
+    if (showingResults && i > resultsIdx) continue;
+    const bx = W / 2 - MENU_BTN_W / 2, by = menuItemY(i, items.length);
+    if (p.x >= bx && p.x <= bx + MENU_BTN_W && p.y >= by && p.y <= by + MENU_BTN_H) {
+      return items[i].id;
+    }
+  }
+  return null;
+}
+
+function handleGameMenuTap(p) {
+  const id = hitGameMenuItem(p);
+  if (!id) { gameMenuOpen = false; concedeConfirm = false; return; }
+  if (id === 'resume') { gameMenuOpen = false; concedeConfirm = false; return; }
+  if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
+  if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
+  if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
+  if (id === 'concede') {
+    if (concedeConfirm) {
+      concedeConfirm = false;
+      gameMenuOpen = false;
+      if (mode === 'online') doConcede();
+      else { finishConcede(1); }
+    } else {
+      concedeConfirm = true;
+      clearTimeout(concedeConfirmTimer);
+      concedeConfirmTimer = setTimeout(() => { concedeConfirm = false; }, 3000);
+    }
+    return;
+  }
+}
+
+function exitToMenu() {
+  suspendedGame = {
+    mode, state: state === 'idle' ? 'idle' : state, bowls: JSON.parse(JSON.stringify(bowls)),
+    jack: jack ? JSON.parse(JSON.stringify(jack)) : null,
+    scores: [...scores], endNum, jackOwner, turnIdx, delivDir, endHistory: [...endHistory],
+    biasDirs: [...biasDirs], aiLevel, jackOffCounts: [...jackOffCounts],
+    splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
+  };
+  clearTimeout(aiTimer);
+  gameMenuOpen = false;
+  concedeConfirm = false; clearTimeout(concedeConfirmTimer);
+  state = 'idle'; syncFireBtn();
+  document.getElementById('splash').classList.remove('hidden');
+  syncResumeBtn();
+}
+
+function resumeGame() {
+  if (!suspendedGame) return;
+  const sg = suspendedGame; suspendedGame = null;
+  mode = sg.mode; bowls = sg.bowls; jack = sg.jack;
+  scores = sg.scores; endNum = sg.endNum; jackOwner = sg.jackOwner;
+  turnIdx = sg.turnIdx; delivDir = sg.delivDir; endHistory = sg.endHistory;
+  biasDirs = sg.biasDirs; aiLevel = sg.aiLevel; jackOffCounts = sg.jackOffCounts;
+  ENDS = sg.ENDS_val; rngSeed = sg.rngSeed; seededRng = mulberry32(rngSeed);
+  Object.assign(splashCfg, sg.splashCfg);
+  C.p1 = BOWL_COLOURS[splashCfg.p1idx].main; C.p1d = BOWL_COLOURS[splashCfg.p1idx].dark;
+  C.p2 = BOWL_COLOURS[splashCfg.p2idx].main; C.p2d = BOWL_COLOURS[splashCfg.p2idx].dark;
+  resetCam(); resetAim(); updateHUD();
+  document.getElementById('splash').classList.add('hidden');
+  document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
+  state = sg.state;
+  if (state === 'aim') promptPlayer(playerForTurn(turnIdx));
+  else if (state === 'ai-turn') promptPlayer(playerForTurn(turnIdx));
+  syncResumeBtn();
+}
+
+function syncResumeBtn() {
+  const btn = document.getElementById('btnResume');
+  if (btn) btn.style.display = suspendedGame ? '' : 'none';
 }
 
 function drawMat() {
@@ -2014,9 +2214,9 @@ function drawSidePanels() {
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p1d; ctx.lineWidth=1.5; ctx.stroke();
   }
-  // Mode button / Concede button
-  if (mode === 'online' && state !== 'idle' && state !== 'game-over') {
-    drawPanelBtn(SC, PANEL_BTN.y, concedeConfirm ? 'Sure?' : 'Give', '#7f1d1d', '#fca5a5');
+  // Menu button (replaces old mode/concede buttons)
+  if (state !== 'idle') {
+    drawPanelBtn(SC, PANEL_BTN.y, '☰', '#1e293b', '#e2e8f0');
   } else {
     const modeLabel = mode==='online'?'Online':(mode==='vs-ai'?'vs AI':'2P');
     drawPanelBtn(SC, PANEL_BTN.y, modeLabel, '#4c1d95', '#c4b5fd');
@@ -2037,9 +2237,10 @@ function drawSidePanels() {
     ctx.globalAlpha = 1;
     ctx.strokeStyle=C.p2d; ctx.lineWidth=1.5; ctx.stroke();
   }
-  // New game / Quit button
-  if (mode === 'online' && state !== 'game-over' && state !== 'idle') {
-    drawPanelBtn(W-SC, PANEL_BTN.y, 'Quit', '#7f1d1d', '#fca5a5');
+  // End indicator / New button
+  if (state !== 'idle' && state !== 'game-over') {
+    const endLbl = endNum > ENDS ? 'E+' : `E${endNum}`;
+    drawPanelBtn(W-SC, PANEL_BTN.y, endLbl, '#334155', '#94a3b8');
   } else {
     drawPanelBtn(W-SC, PANEL_BTN.y, 'New', '#1e3a8a', '#93c5fd');
   }
@@ -2527,6 +2728,12 @@ function hitPanelBtn(p, cx) {
 function handlePointerDown(p) {
   mouse = { x: p.x, y: p.y, down: true };
 
+  // Game menu intercepts all taps when open
+  if (gameMenuOpen) {
+    handleGameMenuTap(p);
+    mouse.down = false; return;
+  }
+
   // Overlay button hit-tests
   const btnW = 156, btnH = 84, btnY = H - 80;
   if (state === 'aim') {
@@ -2553,16 +2760,8 @@ function handlePointerDown(p) {
   // Canvas-drawn panel buttons
   const SP=38, SC=19;
   if (hitPanelBtn(p, SC)) {
-    if (mode === 'online' && state !== 'idle' && state !== 'game-over') {
-      if (concedeConfirm) {
-        concedeConfirm = false;
-        clearTimeout(concedeConfirmTimer);
-        doConcede();
-      } else {
-        concedeConfirm = true;
-        clearTimeout(concedeConfirmTimer);
-        concedeConfirmTimer = setTimeout(() => { concedeConfirm = false; }, 3000);
-      }
+    if (state !== 'idle') {
+      gameMenuOpen = true; concedeConfirm = false;
       mouse.down = false; return;
     } else if (mode !== 'online') {
       mode = mode==='vs-ai'?'vs-player':'vs-ai';
@@ -2571,9 +2770,7 @@ function handlePointerDown(p) {
     }
   }
   if (hitPanelBtn(p, W-SC)) {
-    if (mode === 'online' && state !== 'game-over' && state !== 'idle') {
-      doConcede();
-    } else {
+    if (state === 'idle' || state === 'game-over') {
       showSplash();
     }
     mouse.down = false; return;
@@ -2721,6 +2918,9 @@ let reconnectTimer = null;
 let pendingMoves = [];
 let concedeConfirm = false;
 let concedeConfirmTimer = null;
+let gameMenuOpen = false;
+let endHistory = [];
+let suspendedGame = null;
 
 const TIME_CONTROLS = [
   { label:'30 seconds', value:'30s',  ms:30000,     realtime:true },
@@ -3084,7 +3284,8 @@ function buildSplash() {
     bgEl.appendChild(d);
   });
 
-  document.getElementById('btnStart').onclick = applyAndStart;
+  document.getElementById('btnStart').onclick = () => { suspendedGame = null; syncResumeBtn(); applyAndStart(); };
+  document.getElementById('btnResume').onclick = resumeGame;
 }
 
 // ── Online panel logic ────────────────────────────────────────────
@@ -3577,10 +3778,13 @@ function showSplash() {
   clearTimeout(aiTimer);
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
+  gameMenuOpen = false;
+  suspendedGame = null;
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
   document.getElementById('splash').classList.remove('hidden');
+  syncResumeBtn();
 }
 
 // ── Achievement system ────────────────────────────────────────────
