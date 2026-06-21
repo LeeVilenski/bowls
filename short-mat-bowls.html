@@ -131,6 +131,18 @@ button:active { opacity: .7; }
 }
 #btnAch:hover, #btnProfile:hover { background: #334155; color: #e2e8f0; }
 
+#game-settings-panel {
+  position: fixed; inset: 0; z-index: 250; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#game-settings-panel.show { display: flex; }
+#game-settings-inner {
+  width: 100%; max-width: 440px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
 #profile-panel {
   position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -139,7 +151,7 @@ button:active { opacity: .7; }
 }
 #profile-panel.show { display: flex; }
 #profile-inner { width: 100%; max-width: 440px; }
-#profile-back {
+#game-settings-back, #profile-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
 }
@@ -331,9 +343,25 @@ button:active { opacity: .7; }
     <div class="spl-title">Short Mat <em>Bowls</em></div>
 
     <div class="spl-card">
+      <div class="spl-head">Mode</div>
+      <div class="spl-row"><div class="seg" id="sMode"></div></div>
+    </div>
+
+    <button id="btnStart">Start Game</button>
+    <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
+    <button id="btnProfile">👤 Profile</button>
+    <button id="btnAch">🏆 Achievements</button>
+  </div>
+</div>
+
+<div id="game-settings-panel">
+  <div id="game-settings-inner">
+    <button id="game-settings-back">&larr; Back</button>
+    <div class="spl-title" style="font-size:20px">Game Settings</div>
+
+    <div class="spl-card">
       <div class="spl-head">Game</div>
       <div class="spl-row"><span class="spl-lbl">Ends</span><div class="seg" id="sEnds"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Mode</span><div class="seg" id="sMode"></div></div>
       <div id="aiPickWrap">
         <div class="spl-row"><span class="spl-lbl">Opponent</span><div class="seg" id="sAI"></div></div>
         <div id="aiBio" style="font-size:10px;color:#94a3b8;margin-top:2px;padding:0 4px;line-height:1.3"></div>
@@ -341,19 +369,11 @@ button:active { opacity: .7; }
     </div>
 
     <div class="spl-card">
-      <div class="spl-head">Bowls</div>
-      <div class="spl-row">
-        <span class="spl-lbl">Size</span>
-        <input type="range" id="sSizeSlider" min="0" max="5" step="1" value="3">
-        <span class="rval" id="sSizeLbl">3</span>
-      </div>
+      <div class="spl-head" id="p2BowlsHead">Player 2 Bowls</div>
+      <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="sP2"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="sD2"></div></div>
       <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="sBias"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Player 1</span><div class="swatches" id="sP1"></div></div>
-      <div class="spl-row"><span class="spl-lbl">P1 Style</span><div class="seg" id="sD1"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Player 2</span><div class="swatches" id="sP2"></div></div>
-      <div class="spl-row"><span class="spl-lbl">P2 Style</span><div class="seg" id="sD2"></div></div>
     </div>
-
 
     <div class="spl-card">
       <div class="spl-head">Surface</div>
@@ -380,10 +400,7 @@ button:active { opacity: .7; }
       <div class="bg-grid" id="sBg"></div>
     </div>
 
-    <button id="btnStart">Start Game</button>
-    <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
-    <button id="btnProfile">👤 Profile</button>
-    <button id="btnAch">🏆 Achievements</button>
+    <button id="btnStartGame" style="padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#1d4ed8,#6d28d9);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(109,40,217,0.35);letter-spacing:0.3px">Start Game</button>
   </div>
 </div>
 
@@ -399,6 +416,12 @@ button:active { opacity: .7; }
       <div class="spl-head">Default Bowls</div>
       <div class="spl-row"><span class="spl-lbl">Colour</span><div class="swatches" id="profP1"></div></div>
       <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="profD1"></div></div>
+      <div class="spl-row">
+        <span class="spl-lbl">Size</span>
+        <input type="range" id="profSize" min="0" max="5" step="1" value="3">
+        <span class="rval" id="profSizeLbl">3</span>
+      </div>
+      <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="profBias"></div></div>
     </div>
     <div class="spl-card">
       <div class="spl-head">Statistics</div>
@@ -452,15 +475,8 @@ button:active { opacity: .7; }
       <div class="spl-row"><span class="spl-lbl">Time</span><div class="seg" id="cTime"></div></div>
     </div>
     <div class="spl-card">
-      <div class="spl-head">Bowls</div>
-      <div class="spl-row">
-        <span class="spl-lbl">Size</span>
-        <input type="range" id="cSizeSlider" min="0" max="5" step="1" value="3">
-        <span class="rval" id="cSizeLbl">3</span>
-      </div>
-      <div class="spl-row"><span class="spl-lbl">Bias</span><div class="seg" id="cBias"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Your colour</span><div class="swatches" id="cP1"></div></div>
-      <div class="spl-row"><span class="spl-lbl">Style</span><div class="seg" id="cD1"></div></div>
+      <div class="spl-head">Your Bowls</div>
+      <div class="spl-row" style="font-size:11px;color:#64748b;">Using defaults from your Profile</div>
     </div>
     <div class="spl-card">
       <div class="spl-head">Surface</div>
@@ -3297,63 +3313,84 @@ function formatClock(ms) {
 }
 
 // ── Splash screen ─────────────────────────────────────────────────
+function seg(containerId, options, getVal, setVal) {
+  const el = document.getElementById(containerId);
+  options.forEach(([label, val]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (val === getVal()) b.classList.add('sel');
+    b.onclick = () => {
+      setVal(val);
+      el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    el.appendChild(b);
+  });
+}
+
+function buildSwatches(id, getIdx, setIdx) {
+  const el = document.getElementById(id);
+  BOWL_COLOURS.forEach((col, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'sw' + (i === getIdx() ? ' sel' : '');
+    sw.style.background = col.main;
+    sw.title = col.name;
+    sw.onclick = () => {
+      setIdx(i);
+      el.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
+    };
+    el.appendChild(sw);
+  });
+}
+
 function buildSplash() {
-  function seg(containerId, options, getVal, setVal) {
-    const el = document.getElementById(containerId);
-    options.forEach(([label, val]) => {
-      const b = document.createElement('button');
-      b.textContent = label;
-      if (val === getVal()) b.classList.add('sel');
-      b.onclick = () => {
-        setVal(val);
-        el.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
-        b.classList.add('sel');
-      };
-      el.appendChild(b);
-    });
-  }
+  seg('sMode', [['1 Player','vs-ai'],['2 Players','vs-player'],['Online','online']], ()=>splashCfg.mode, v=>{
+    splashCfg.mode=v;
+  });
+
+  document.getElementById('btnStart').onclick = () => {
+    if (splashCfg.mode === 'online') {
+      showOnlinePanel();
+    } else {
+      applyProfileToSplash();
+      showGameSettingsPanel();
+    }
+  };
+  document.getElementById('btnResume').onclick = resumeGame;
+}
+
+let gameSettingsBuilt = false;
+
+function showGameSettingsPanel() {
+  if (!gameSettingsBuilt) buildGameSettingsPanel();
+  const isAI = splashCfg.mode === 'vs-ai';
+  document.getElementById('aiPickWrap').style.display = isAI ? '' : 'none';
+  document.getElementById('p2BowlsHead').textContent = isAI
+    ? AI_PLAYERS[splashCfg.aiLevel].name + ' Bowls'
+    : 'Player 2 Bowls';
+  document.getElementById('game-settings-panel').classList.add('show');
+}
+
+function hideGameSettingsPanel() {
+  document.getElementById('game-settings-panel').classList.remove('show');
+}
+
+function buildGameSettingsPanel() {
+  gameSettingsBuilt = true;
 
   seg('sEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>splashCfg.ends, v=>splashCfg.ends=v);
-  seg('sMode', [['vs AI','vs-ai'],['2 Players','vs-player'],['Online','online']], ()=>splashCfg.mode, v=>{
-    splashCfg.mode=v;
-    document.getElementById('aiPickWrap').style.display = v==='vs-ai'?'':'none';
-    if (v === 'online') showOnlinePanel();
-  });
   const aiOpts = AI_PLAYERS.map((a,i)=>[a.name.split(' ')[0],i]);
   seg('sAI', aiOpts, ()=>splashCfg.aiLevel, v=>{
     splashCfg.aiLevel=v;
     document.getElementById('aiBio').textContent = AI_PLAYERS[v].bio;
+    document.getElementById('p2BowlsHead').textContent = AI_PLAYERS[v].name + ' Bowls';
   });
   document.getElementById('aiBio').textContent = AI_PLAYERS[splashCfg.aiLevel].bio;
-  document.getElementById('aiPickWrap').style.display = splashCfg.mode==='vs-ai'?'':'none';
-  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
 
-  const szSlider = document.getElementById('sSizeSlider');
-  const szLbl    = document.getElementById('sSizeLbl');
-  szSlider.value = splashCfg.size;
-  szLbl.textContent = splashCfg.size;
-  szSlider.oninput = () => { splashCfg.size = +szSlider.value; szLbl.textContent = splashCfg.size; };
-
-  function buildSwatches(id, getIdx, setIdx) {
-    const el = document.getElementById(id);
-    BOWL_COLOURS.forEach((col, i) => {
-      const sw = document.createElement('div');
-      sw.className = 'sw' + (i === getIdx() ? ' sel' : '');
-      sw.style.background = col.main;
-      sw.title = col.name;
-      sw.onclick = () => {
-        setIdx(i);
-        el.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
-      };
-      el.appendChild(sw);
-    });
-  }
-  buildSwatches('sP1', ()=>splashCfg.p1idx, i=>splashCfg.p1idx=i);
-  seg('sD1', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p1design, v=>splashCfg.p1design=v);
   buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
   seg('sD2', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p2design, v=>splashCfg.p2design=v);
+  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
 
-  // Surface presets & sliders
   const spdSlider = document.getElementById('sSpeedSlider');
   const spdLbl = document.getElementById('sSpeedLbl');
   const bendLSlider = document.getElementById('sBendLeftSlider');
@@ -3418,8 +3455,12 @@ function buildSplash() {
     bgEl.appendChild(d);
   });
 
-  document.getElementById('btnStart').onclick = () => { suspendedGame = null; syncResumeBtn(); applyAndStart(); };
-  document.getElementById('btnResume').onclick = resumeGame;
+  document.getElementById('game-settings-back').onclick = hideGameSettingsPanel;
+  document.getElementById('btnStartGame').onclick = () => {
+    suspendedGame = null; syncResumeBtn();
+    hideGameSettingsPanel();
+    applyAndStart();
+  };
 }
 
 // ── Online panel logic ────────────────────────────────────────────
@@ -3743,13 +3784,13 @@ let createPanelBuilt = false;
 
 function showCreatePanel() {
   if (!netDisplayName) { alert('Please enter a display name'); return; }
+  const prof = loadProfile();
+  if (prof.p1idx != null) createCfg.p1idx = prof.p1idx;
+  if (prof.p1design != null) createCfg.p1design = prof.p1design;
+  if (prof.size != null) createCfg.size = prof.size;
+  if (prof.biasVal != null) createCfg.biasVal = prof.biasVal;
   const panel = document.getElementById('create-game-panel');
-  if (!createPanelBuilt) {
-    const prof = loadProfile();
-    if (prof.p1idx != null) createCfg.p1idx = prof.p1idx;
-    if (prof.p1design != null) createCfg.p1design = prof.p1design;
-    buildCreatePanel();
-  }
+  if (!createPanelBuilt) buildCreatePanel();
   document.getElementById('waiting-view').classList.remove('show');
   panel.classList.add('show');
 }
@@ -3778,28 +3819,6 @@ function buildCreatePanel() {
 
   cseg('cEnds', [[4,4],[6,6],[8,8],[10,10],[12,12]], ()=>createCfg.ends, v=>createCfg.ends=v);
   cseg('cTime', TIME_CONTROLS.map(t => [t.label, t.value]), ()=>createCfg.timeControl, v=>createCfg.timeControl=v);
-  cseg('cBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>createCfg.biasVal, v=>createCfg.biasVal=v);
-
-  const szSlider = document.getElementById('cSizeSlider');
-  const szLbl = document.getElementById('cSizeLbl');
-  szSlider.value = createCfg.size;
-  szSlider.oninput = () => { createCfg.size = +szSlider.value; szLbl.textContent = szSlider.value; };
-
-  // P1 colour swatches
-  const p1El = document.getElementById('cP1');
-  BOWL_COLOURS.forEach((col, i) => {
-    const sw = document.createElement('div');
-    sw.className = 'sw' + (i === createCfg.p1idx ? ' sel' : '');
-    sw.style.background = col.main;
-    sw.title = col.name;
-    sw.onclick = () => {
-      createCfg.p1idx = i;
-      p1El.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === i));
-    };
-    p1El.appendChild(sw);
-  });
-
-  cseg('cD1', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>createCfg.p1design, v=>createCfg.p1design=v);
 
   // Surface
   const spdS = document.getElementById('cSpeedSlider'), spdL = document.getElementById('cSpeedLbl');
@@ -3962,6 +3981,7 @@ function showSplash() {
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
+  hideGameSettingsPanel();
   document.getElementById('splash').classList.remove('hidden');
   syncResumeBtn();
 }
@@ -4190,6 +4210,34 @@ function buildProfilePanel() {
     };
     d1El.appendChild(b);
   });
+
+  const profSize = prof.size != null ? prof.size : 3;
+  const profSzSlider = document.getElementById('profSize');
+  const profSzLbl = document.getElementById('profSizeLbl');
+  profSzSlider.value = profSize;
+  profSzLbl.textContent = profSize;
+  profSzSlider.oninput = () => {
+    const p = loadProfile();
+    p.size = +profSzSlider.value;
+    saveProfile(p);
+    profSzLbl.textContent = profSzSlider.value;
+  };
+
+  const profBiasVal = prof.biasVal != null ? prof.biasVal : 1.0;
+  const profBiasEl = document.getElementById('profBias');
+  [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]].forEach(([label, val]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (val === profBiasVal) b.classList.add('sel');
+    b.onclick = () => {
+      const p = loadProfile();
+      p.biasVal = val;
+      saveProfile(p);
+      profBiasEl.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    profBiasEl.appendChild(b);
+  });
 }
 
 function renderProfileStats() {
@@ -4241,16 +4289,10 @@ document.getElementById('profile-back').onclick = () => {
 
 function applyProfileToSplash() {
   const prof = loadProfile();
-  if (prof.p1idx != null) {
-    splashCfg.p1idx = prof.p1idx;
-    const sP1 = document.getElementById('sP1');
-    if (sP1) sP1.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === prof.p1idx));
-  }
-  if (prof.p1design != null) {
-    splashCfg.p1design = prof.p1design;
-    const sD1 = document.getElementById('sD1');
-    if (sD1) sD1.querySelectorAll('button').forEach((b, j) => b.classList.toggle('sel', j === prof.p1design));
-  }
+  if (prof.p1idx != null) splashCfg.p1idx = prof.p1idx;
+  if (prof.p1design != null) splashCfg.p1design = prof.p1design;
+  if (prof.size != null) splashCfg.size = prof.size;
+  if (prof.biasVal != null) splashCfg.biasVal = prof.biasVal;
 }
 
 buildSplash();
