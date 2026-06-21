@@ -2741,7 +2741,6 @@ function handleRemoteTimeout() {
   shotClockExpired = true;
   const remotePlayer = playerForTurn(turnIdx);
   shotClockForfeits[remotePlayer - 1]++;
-  sendMove('timeout', remotePlayer, {});
   if (shotClockForfeits[remotePlayer - 1] >= 3) {
     finishClockForfeit(remotePlayer);
     return;
@@ -3181,10 +3180,10 @@ function setupConn(conn) {
         serverTimeOffset = msg.serverTime - Date.now();
       }
       onRemoteMove(msg.move);
+      return;
     }
-    if (msg.type === 'CLOCK_START') { shotClockStart = Date.now(); shotClockExpired = false; return; }
+    if (msg.type === 'CLOCK_START') { shotClockStart = serverNow(); shotClockExpired = false; return; }
     if (msg.type === 'LEAVE') { msgText = 'Opponent left the match.'; return; }
-    if (msg.type === 'MOVE') { onRemoteMove(msg.move); }
   });
   conn.on('close', () => onPeerDisconnect());
   conn.on('error', () => onPeerDisconnect());
