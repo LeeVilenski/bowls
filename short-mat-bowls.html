@@ -2794,7 +2794,6 @@ function handleRemoteTimeout() {
   shotClockExpired = true;
   const remotePlayer = playerForTurn(turnIdx);
   shotClockForfeits[remotePlayer - 1]++;
-  sendMove('timeout', remotePlayer, {});
   if (shotClockForfeits[remotePlayer - 1] >= 3) {
     finishClockForfeit(remotePlayer);
     return;
@@ -3311,6 +3310,7 @@ function applyRemoteMove(move) {
     deliverBowl(move.player, d.angle, d.speed);
     shotClockStart = 0;
   } else if (move.type === 'timeout') {
+    if (shotClockExpired) return;
     shotClockForfeits[move.player - 1]++;
     shotClockStart = 0;
     shotClockExpired = true;
