@@ -178,6 +178,7 @@ button:active { opacity: .7; }
 .stat-bar.green { background: linear-gradient(90deg, #22c55e, #16a34a); }
 .stat-bar.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 .stat-bar.purple { background: linear-gradient(90deg, #a855f7, #7c3aed); }
+.stat-section-head { font-size: 12px; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 1px; padding: 10px 0 4px; margin-top: 4px; border-top: 1px solid #334155; }
 
 .hist-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
 .hist-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; }
@@ -2879,6 +2880,7 @@ function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
   const me = myPlayerIdx();
   const fWon = forfeitingPlayer !== me;
+  checkAchievements('game_over', { concede: true, concedingPlayer: forfeitingPlayer });
   recordCurrentGame(fWon, false);
   awardXP(fWon, true);
   if (mode === 'online' && sb) {
@@ -4178,7 +4180,7 @@ function loadAch() {
 }
 function saveAch(data) { localStorage.setItem(ACH_KEY, JSON.stringify(data)); }
 function loadStats() {
-  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0 };
+  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0, onlineEndsWon:0, onlineTotalPts:0, onlineBestMargin:0 };
   try { return Object.assign(def, JSON.parse(localStorage.getItem(STATS_KEY))); }
   catch { return def; }
 }
@@ -4225,6 +4227,7 @@ function checkAchievements(event, data) {
       if (data.pts === 4) unlockAch('perfect_end');
       stats.totalPts += data.pts;
       stats.endsWon++;
+      if (mode === 'online') { stats.onlineTotalPts += data.pts; stats.onlineEndsWon++; }
     }
     saveStats(stats);
     if (stats.totalPts >= 100) unlockAch('score_100');
@@ -4249,6 +4252,7 @@ function checkAchievements(event, data) {
       if (mode === 'online') stats.onlineWins++;
       const margin = myScore - oppScore;
       if (margin > stats.bestMargin) stats.bestMargin = margin;
+      if (mode === 'online' && margin > stats.onlineBestMargin) stats.onlineBestMargin = margin;
       unlockAch('first_win');
       if (stats.wins >= 3) unlockAch('win_3');
       if (stats.wins >= 10) unlockAch('win_10');
@@ -4443,17 +4447,29 @@ function renderProfileStats() {
   const onlineLosses = s.onlineGames - s.onlineWins;
   const maxPts = Math.max(s.totalPts, 1);
 
+  const onlineWinPct = s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0;
+  const localWinPct = localGames > 0 ? Math.round(localWins / localGames * 100) : 0;
+  const localEndsWon = s.endsWon - (s.onlineEndsWon || 0);
+  const localTotalPts = s.totalPts - (s.onlineTotalPts || 0);
+  const localBestMargin = s.bestMargin;
+
   el.innerHTML =
     statBar('Win Rate', winPct + '%', winPct, 'green') +
     statRow('Games Played', s.games) +
     statRow('Wins / Losses', s.wins + ' / ' + losses) +
     statBar('Shots Scored', s.totalPts, Math.min(s.totalPts / maxPts * 100, 100), 'blue') +
-    statBar('Online', s.onlineWins + 'W – ' + onlineLosses + 'L',
-      s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0, 'purple') +
-    statBar('Local', localWins + 'W – ' + localLosses + 'L',
-      localGames > 0 ? Math.round(localWins / localGames * 100) : 0, 'green') +
-    statRow('Ends Won', s.endsWon) +
-    statRow('Best Margin', s.bestMargin);
+    '<div class="stat-section-head">🌐 Online</div>' +
+    statBar('Win Rate', onlineWinPct + '%', onlineWinPct, 'purple') +
+    statRow('Games', s.onlineGames) +
+    statRow('Wins / Losses', s.onlineWins + ' / ' + onlineLosses) +
+    statRow('Ends Won', s.onlineEndsWon || 0) +
+    statRow('Best Margin', s.onlineBestMargin || 0) +
+    '<div class="stat-section-head">🤖 Local</div>' +
+    statBar('Win Rate', localWinPct + '%', localWinPct, 'green') +
+    statRow('Games', localGames) +
+    statRow('Wins / Losses', localWins + ' / ' + localLosses) +
+    statRow('Ends Won', localEndsWon) +
+    statRow('Best Margin', localBestMargin);
 }
 
 function statBar(label, valText, pct, color) {
