@@ -1066,6 +1066,9 @@ function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 function promptPlayer(p) {
   shotClockStart = mode === 'online' ? serverNow() : 0;
   shotClockExpired = false;
+  if (mode === 'online' && netConn && netConn.open) {
+    netConn.send({ type: 'CLOCK_START' });
+  }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -1442,6 +1445,7 @@ const ALL_MENU_ITEMS = [
   { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
+  { id: 'leave',   label: '🚪  Leave Match',  bg: '#92400e', fg: '#fde68a' },
   { id: 'concede', label: '🏳  Concede',      bg: '#7f1d1d', fg: '#fca5a5' },
 ];
 const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
@@ -1451,6 +1455,8 @@ function visibleMenuItems() {
     if (item.id === 'concede' && state === 'game-over') return false;
     if (item.id === 'exit' && mode === 'online') return false;
     if (item.id === 'exit' && state === 'game-over') return false;
+    if (item.id === 'leave' && mode !== 'online') return false;
+    if (item.id === 'leave' && state === 'game-over') return false;
     return true;
   });
 }
@@ -1574,6 +1580,7 @@ function handleGameMenuTap(p) {
   if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
   if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
   if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
+  if (id === 'leave') { gameMenuOpen = false; doLeaveOnline(); return; }
   if (id === 'concede') {
     if (concedeConfirm) {
       concedeConfirm = false;
@@ -2293,7 +2300,7 @@ function drawSidePanels() {
       const label = forfeits > 0 ? `${txt} (${forfeits}/3)` : txt;
       const blockTopY = m2s(MAT.x, FENDER.y).y;
       const clockY = blockTopY - 30;
-      ctx.font = 'bold 18px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillStyle = urgent ? '#ef4444' : '#e2e8f0';
       ctx.fillText(label, W/2, msgText && state !== 'moving' ? clockY - 30 : clockY);
     }
@@ -3175,6 +3182,9 @@ function setupConn(conn) {
       }
       onRemoteMove(msg.move);
     }
+    if (msg.type === 'CLOCK_START') { shotClockStart = Date.now(); shotClockExpired = false; return; }
+    if (msg.type === 'LEAVE') { msgText = 'Opponent left the match.'; return; }
+    if (msg.type === 'MOVE') { onRemoteMove(msg.move); }
   });
   conn.on('close', () => onPeerDisconnect());
   conn.on('error', () => onPeerDisconnect());
@@ -3244,6 +3254,7 @@ function applyRemoteMove(move) {
   } else if (move.type === 'timeout') {
     shotClockForfeits[move.player - 1]++;
     shotClockStart = 0;
+    shotClockExpired = true;
     if (shotClockForfeits[move.player - 1] >= 3) {
       finishClockForfeit(move.player);
       return;
@@ -3933,6 +3944,13 @@ function applyAndStart() {
 
   document.getElementById('splash').classList.add('hidden');
   startGame();
+}
+
+function doLeaveOnline() {
+  if (netConn && netConn.open) {
+    netConn.send({ type: 'LEAVE' });
+  }
+  showSplash();
 }
 
 function showSplash() {
