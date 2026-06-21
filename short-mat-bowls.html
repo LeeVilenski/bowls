@@ -167,6 +167,41 @@ button:active { opacity: .7; }
 .stat-bar.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 .stat-bar.purple { background: linear-gradient(90deg, #a855f7, #7c3aed); }
 
+.hist-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
+.hist-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; }
+.hist-row:last-child { border-bottom: none; }
+.hist-result { font-size: 14px; font-weight: 800; width: 22px; text-align: center; border-radius: 4px; padding: 2px 0; }
+.hist-win { color: #22c55e; }
+.hist-loss { color: #ef4444; }
+.hist-detail { font-size: 13px; color: #e2e8f0; line-height: 1.4; }
+.hist-detail small { color: #94a3b8; }
+
+/* XP / Rating */
+.xp-card { margin-bottom: 4px; }
+.xp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.xp-level { font-size: 18px; font-weight: 800; color: #fbbf24; }
+.xp-rating { font-size: 13px; color: #a78bfa; font-weight: 700; }
+.xp-bar-outer {
+  height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden; margin-bottom: 4px;
+}
+.xp-bar-inner {
+  height: 100%; border-radius: 5px; transition: width 0.5s ease;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+.xp-label { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; }
+#xp-toast {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  background: #1e293b; border: 1px solid #fbbf24; border-radius: 10px;
+  padding: 10px 18px; z-index: 500; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s; text-align: center; min-width: 160px;
+}
+#xp-toast.show { opacity: 1; }
+#xp-toast .xp-gain { font-size: 18px; font-weight: 800; color: #fbbf24; }
+#xp-toast .xp-detail { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+#xp-toast .elo-change { font-size: 13px; font-weight: 700; margin-top: 4px; }
+.elo-up { color: #22c55e; }
+.elo-down { color: #ef4444; }
+
 /* Achievement panel */
 #ach-panel {
   position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
@@ -387,10 +422,18 @@ button:active { opacity: .7; }
   </div>
 </div>
 
+<div id="xp-toast"><div class="xp-gain"></div><div class="xp-detail"></div><div class="elo-change"></div></div>
+
 <div id="profile-panel">
   <div id="profile-inner">
     <button id="profile-back">&larr; Back</button>
     <div class="profile-title">👤 Player Profile</div>
+    <div class="spl-card xp-card">
+      <div class="spl-head">Ranking</div>
+      <div class="xp-header"><span class="xp-level" id="xp-level-display">Level 1</span><span class="xp-rating" id="xp-rating-display">Rating: 1000</span></div>
+      <div class="xp-bar-outer"><div class="xp-bar-inner" id="xp-bar"></div></div>
+      <div class="xp-label"><span id="xp-current">0 XP</span><span id="xp-next">100 XP to next</span></div>
+    </div>
     <div class="spl-card">
       <div class="spl-head">Identity</div>
       <div class="spl-row"><span class="spl-lbl">Name</span><input type="text" id="profile-name" maxlength="20" placeholder="Enter name..."></div>
@@ -403,6 +446,10 @@ button:active { opacity: .7; }
     <div class="spl-card">
       <div class="spl-head">Statistics</div>
       <div id="profile-stats"></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Match History</div>
+      <div id="profile-history"></div>
     </div>
   </div>
 </div>
@@ -1285,6 +1332,9 @@ function advanceEnd() {
 function gameOver() {
   state = 'game-over';
   checkAchievements('game_over');
+  const me = myPlayerIdx();
+  const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
+  recordCurrentGame(won, false);
   const n2 = mode==='vs-ai' ? 'AI' : (mode==='online' ? 'Opponent' : 'Player 2');
   let res;
   if (mode === 'online') {
@@ -1304,6 +1354,7 @@ function gameOver() {
       localStorage.removeItem('bowls_activeGame');
     });
   }
+  awardXP(won, false);
   msg(`Game over — ${res}`);
 }
 
@@ -1315,10 +1366,14 @@ function doConcede() {
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
   checkAchievements('game_over', { concede: true, concedingPlayer });
+  const me = myPlayerIdx();
+  const conWon = concedingPlayer !== me;
+  recordCurrentGame(conWon, true);
   if (mode === 'online' && sb && onlineGameId) {
     await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
   }
+  awardXP(conWon, true);
   if (concedingPlayer === localPlayer) {
     msg(`Game over — <span style="color:#ef4444">You conceded</span>. ${scores[0]}–${scores[1]}`);
   } else {
@@ -2753,6 +2808,10 @@ function handleRemoteTimeout() {
 
 function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
+  const me = myPlayerIdx();
+  const fWon = forfeitingPlayer !== me;
+  recordCurrentGame(fWon, false);
+  awardXP(fWon, true);
   if (mode === 'online' && sb) {
     sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
@@ -2994,6 +3053,7 @@ let sb = null;
 let netPeer = null, netConn = null;
 let localPlayer = 0;
 let onlineGameId = '';
+let onlineOpponentName = '';
 let moveNum = 0;
 let shotClockLimit = 0;
 let shotClockStart = 0;
@@ -3210,6 +3270,7 @@ function cleanupNet() {
   if (netPeer) { netPeer.destroy(); netPeer = null; }
   peerLatencyMs = -1;
   onlineGameId = '';
+  onlineOpponentName = '';
   localPlayer = 0;
   moveNum = 0;
   hostGameStarted = false;
@@ -3569,6 +3630,7 @@ async function confirmJoinLobby() {
   const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
   if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
 
+  onlineOpponentName = game.host_name || 'Opponent';
   const tc = game.time_control;
   applyOnlineSettings(game.settings, game.seed);
   shotClockLimit = getTimeControlMs(tc);
@@ -3590,6 +3652,7 @@ async function doResumeLobby(game) {
   onlineGameId = game.id;
   const isHost = game.host_name === netDisplayName;
   localPlayer = isHost ? 1 : 2;
+  onlineOpponentName = isHost ? (game.guest_name || 'Opponent') : (game.host_name || 'Opponent');
   rngSeed = game.seed;
   applyOnlineSettings(game.settings, game.seed);
   shotClockLimit = getTimeControlMs(game.time_control);
@@ -3891,6 +3954,7 @@ async function finishJoinAsHost(game) {
   hostGameStarted = true;
   unsubscribeLobby();
   const { data: fresh } = await sb.from('games').select('*').eq('id', game.id).single();
+  onlineOpponentName = (fresh || game).guest_name || 'Opponent';
   const settings = (fresh || game).settings || {};
   settings.p2Color = settings.p2Color != null ? settings.p2Color : 2;
   settings.p2Design = settings.p2Design != null ? settings.p2Design : 0;
@@ -4101,6 +4165,45 @@ function checkAchievements(event, data) {
   }
 }
 
+// ── Match History ─────────────────────────────────────────────────
+const HISTORY_KEY = 'bowls_history';
+const MAX_HISTORY = 50;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
+}
+function saveHistory(h) { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); }
+
+function recordGame(result) {
+  const h = loadHistory();
+  h.unshift(result);
+  if (h.length > MAX_HISTORY) h.length = MAX_HISTORY;
+  saveHistory(h);
+}
+
+function getOpponentName() {
+  if (mode === 'vs-ai') return AI_PLAYERS[aiLevel].name;
+  if (mode === 'online') return onlineOpponentName || 'Opponent';
+  return 'Player 2';
+}
+
+function recordCurrentGame(won, conceded) {
+  const me = myPlayerIdx();
+  const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
+  const endsPlayed = conceded ? endNum : endNum - 1;
+  recordGame({
+    date: Date.now(),
+    opponent: getOpponentName(),
+    mode,
+    myScore,
+    oppScore,
+    ends: endsPlayed,
+    totalEnds: ENDS,
+    won,
+    conceded: !!conceded
+  });
+}
+
 function renderAchPanel() {
   const data = loadAch();
   const unlocked = Object.keys(data).length;
@@ -4222,9 +4325,152 @@ function statRow(label, val) {
     `<span class="stat-val">${val}</span></div>`;
 }
 
+function renderMatchHistory() {
+  const el = document.getElementById('profile-history');
+  const history = loadHistory();
+  if (!history.length) { el.innerHTML = '<div class="hist-empty">No games played yet</div>'; return; }
+  el.innerHTML = history.slice(0, 20).map(g => {
+    const d = new Date(g.date);
+    const dateStr = d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+    const result = g.won ? 'W' : 'L';
+    const resultClass = g.won ? 'hist-win' : 'hist-loss';
+    const score = `${g.myScore}–${g.oppScore}`;
+    const modeLabel = g.mode === 'vs-ai' ? '🤖' : g.mode === 'online' ? '🌐' : '👥';
+    const endsPlayed = g.conceded ? '(conceded)' : `${g.ends}/${g.totalEnds} ends`;
+    return `<div class="hist-row"><span class="hist-result ${resultClass}">${result}</span>` +
+      `<span class="hist-detail"><strong>${modeLabel} vs ${g.opponent}</strong><br>` +
+      `<small>${score} · ${endsPlayed} · ${dateStr}</small></span></div>`;
+  }).join('');
+}
+
+// ── XP & ELO Rating System ──────────────────────────────────────
+const XP_KEY = 'bowls_xp';
+const DEVICE_ID_KEY = 'bowls_device_id';
+const XP_WIN = 100, XP_LOSS = 25, XP_END_WON = 10, XP_CONCEDE_WIN = 75, XP_CONCEDE_LOSS = 10;
+const ELO_DEFAULT = 1000, ELO_K = 32;
+
+function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+function loadXP() {
+  const def = { xp: 0, level: 1, elo: ELO_DEFAULT };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem(XP_KEY))); } catch { return def; }
+}
+function saveXP(data) { localStorage.setItem(XP_KEY, JSON.stringify(data)); }
+
+function xpForLevel(lvl) { return Math.floor(100 * Math.pow(1.2, lvl - 1)); }
+
+function calcLevel(totalXP) {
+  let lvl = 1, xpNeeded = 0;
+  while (true) {
+    const req = xpForLevel(lvl);
+    if (xpNeeded + req > totalXP) break;
+    xpNeeded += req;
+    lvl++;
+  }
+  return { level: lvl, xpIntoLevel: totalXP - xpNeeded, xpForNext: xpForLevel(lvl) };
+}
+
+function calcElo(myRating, oppRating, won) {
+  const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / 400));
+  const score = won ? 1 : 0;
+  return Math.round(myRating + ELO_K * (score - expected));
+}
+
+function countMyEndsWon() {
+  const me = myPlayerIdx();
+  return endHistory.filter(e => e.winner === me).length;
+}
+
+async function awardXP(won, conceded) {
+  const data = loadXP();
+  const oldElo = data.elo;
+  const endsWon = countMyEndsWon();
+
+  let gained = 0;
+  if (conceded) {
+    gained = won ? XP_CONCEDE_WIN : XP_CONCEDE_LOSS;
+  } else {
+    gained = won ? XP_WIN : XP_LOSS;
+  }
+  gained += endsWon * XP_END_WON;
+
+  data.xp += gained;
+  const lvlInfo = calcLevel(data.xp);
+  data.level = lvlInfo.level;
+
+  if (mode === 'online') {
+    const oppElo = await getOpponentElo();
+    data.elo = calcElo(oldElo, oppElo, won);
+  }
+
+  saveXP(data);
+  syncPlayerToServer(data);
+  showXPToast(gained, data.elo - oldElo);
+}
+
+async function getOpponentElo() {
+  if (!sb || !onlineOpponentName) return ELO_DEFAULT;
+  try {
+    const { data } = await sb.from('players').select('elo')
+      .eq('display_name', onlineOpponentName).single();
+    return data ? data.elo : ELO_DEFAULT;
+  } catch { return ELO_DEFAULT; }
+}
+
+async function syncPlayerToServer(data) {
+  if (!initSupabase()) return;
+  const deviceId = getDeviceId();
+  const row = {
+    device_id: deviceId,
+    display_name: netDisplayName || 'Anonymous',
+    xp: data.xp,
+    level: data.level,
+    elo: data.elo
+  };
+  await sb.from('players').upsert(row, { onConflict: 'device_id' }).then(({ error }) => {
+    if (error) console.error('syncPlayer', error);
+  });
+}
+
+function showXPToast(gained, eloDelta) {
+  const toast = document.getElementById('xp-toast');
+  toast.querySelector('.xp-gain').textContent = `+${gained} XP`;
+  toast.querySelector('.xp-detail').textContent = `Level ${loadXP().level}`;
+  const eloEl = toast.querySelector('.elo-change');
+  if (mode === 'online' && eloDelta !== 0) {
+    const sign = eloDelta > 0 ? '+' : '';
+    eloEl.textContent = `${sign}${eloDelta} Rating`;
+    eloEl.className = 'elo-change ' + (eloDelta > 0 ? 'elo-up' : 'elo-down');
+  } else {
+    eloEl.textContent = '';
+  }
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+function renderXPCard() {
+  const data = loadXP();
+  const lvl = calcLevel(data.xp);
+  document.getElementById('xp-level-display').textContent = `Level ${data.level}`;
+  document.getElementById('xp-rating-display').textContent = `Rating: ${data.elo}`;
+  const pct = lvl.xpForNext > 0 ? Math.round(lvl.xpIntoLevel / lvl.xpForNext * 100) : 100;
+  document.getElementById('xp-bar').style.width = pct + '%';
+  document.getElementById('xp-current').textContent = `${lvl.xpIntoLevel} / ${lvl.xpForNext} XP`;
+  document.getElementById('xp-next').textContent = `Level ${data.level + 1}`;
+}
+
 function showProfilePanel() {
   buildProfilePanel();
   renderProfileStats();
+  renderMatchHistory();
+  renderXPCard();
   document.getElementById('profile-panel').classList.add('show');
 }
 
