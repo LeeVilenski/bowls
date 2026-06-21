@@ -1472,7 +1472,6 @@ function visibleMenuItems() {
     if (item.id === 'exit' && mode === 'online') return false;
     if (item.id === 'exit' && state === 'game-over') return false;
     if (item.id === 'leave' && mode !== 'online') return false;
-    if (item.id === 'leave' && state === 'game-over') return false;
     return true;
   });
 }
