@@ -1746,9 +1746,25 @@ function buildSuspendedState() {
 }
 
 function exitToMenu() {
+  clearTimeout(aiTimer);
+  // If a bowl is in flight or camera is returning, finalize the turn before saving
+  if (state === 'moving' || state === 'camera-return') {
+    const farDeadY = yFromFar(L.DEAD);
+    bowls.forEach(b => {
+      if (!b.stopped && !b.offMat) {
+        b.vx = 0; b.vy = 0; b.stopped = true;
+        if (delivDir === 1 ? b.y > farDeadY : b.y < farDeadY) { b.offMat = true; }
+      }
+    });
+    if (jack && !jack.stopped && !jack.offMat && !jack.offSide) { jack.vx = 0; jack.vy = 0; jack.stopped = true; }
+    blockAnim = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, va: 0, active: false, resetting: false };
+    turnIdx++;
+    if (turnIdx >= BPP * 2) { finishEnd(); }
+    else { state = 'aim'; }
+  }
   suspendedGame = buildSuspendedState();
   saveGameState(suspendedGame);
-  clearTimeout(aiTimer);
+  resetCam();
   gameMenuOpen = false;
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   state = 'idle'; syncFireBtn();
@@ -1780,9 +1796,17 @@ function resumeGame() {
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
   state = sg.state;
   if (state === 'moving' || state === 'camera-return') {
-    bowls.forEach(b => { b.vx = 0; b.vy = 0; b.stopped = true; });
+    const farDeadY = yFromFar(L.DEAD);
+    bowls.forEach(b => {
+      if (!b.stopped && !b.offMat) {
+        b.vx = 0; b.vy = 0; b.stopped = true;
+        if (delivDir === 1 ? b.y > farDeadY : b.y < farDeadY) { b.offMat = true; }
+      }
+    });
     if (jack) { jack.vx = 0; jack.vy = 0; jack.stopped = true; }
+    turnIdx++;
     state = 'aim';
+    if (turnIdx >= BPP * 2) { finishEnd(); return; }
     promptPlayer(playerForTurn(turnIdx));
   } else if (state === 'aim' || state === 'ai-turn') {
     promptPlayer(playerForTurn(turnIdx));
