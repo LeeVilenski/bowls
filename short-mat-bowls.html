@@ -1745,23 +1745,20 @@ function buildSuspendedState() {
   };
 }
 
-function exitToMenu() {
-  clearTimeout(aiTimer);
-  // If a bowl is in flight or camera is returning, finalize the turn before saving
-  if (state === 'moving' || state === 'camera-return') {
-    const farDeadY = yFromFar(L.DEAD);
-    bowls.forEach(b => {
-      if (!b.stopped && !b.offMat) {
-        b.vx = 0; b.vy = 0; b.stopped = true;
-        if (delivDir === 1 ? b.y > farDeadY : b.y < farDeadY) { b.offMat = true; }
-      }
-    });
-    if (jack && !jack.stopped && !jack.offMat && !jack.offSide) { jack.vx = 0; jack.vy = 0; jack.stopped = true; }
-    blockAnim = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, va: 0, active: false, resetting: false };
-    turnIdx++;
-    if (turnIdx >= BPP * 2) { finishEnd(); }
-    else { state = 'aim'; }
+function settlePhysics() {
+  for (let i = 0; i < 3000 && !allStopped(); i++) {
+    for (const b of bowls) stepObj(b, b.bias);
+    stepObj(jack, null);
+    stepCollisions();
   }
+  resetCam();
+  state = 'camera-return';
+  if (jack && jack.offSide) { handleJackOffSide(); return; }
+  _doOnAllStopped();
+}
+
+function exitToMenu() {
+  if (state === 'moving') settlePhysics();
   suspendedGame = buildSuspendedState();
   saveGameState(suspendedGame);
   resetCam();
@@ -4279,7 +4276,7 @@ function showSplash() {
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   gameMenuOpen = false;
-  suspendedGame = null; clearSavedGame();
+  suspendedGame = null;
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
@@ -4795,7 +4792,6 @@ function applyProfileToSplash() {
 
 buildSplash();
 applyProfileToSplash();
-
 const _savedGame = loadSavedGame();
 showSplash();
 suspendedGame = _savedGame;
@@ -4803,11 +4799,13 @@ syncResumeBtn();
 
 window.addEventListener('beforeunload', () => {
   if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    if (state === 'moving') settlePhysics();
     saveGameState(buildSuspendedState());
   }
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    if (state === 'moving') settlePhysics();
     saveGameState(buildSuspendedState());
   }
 });
