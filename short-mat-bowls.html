@@ -1401,6 +1401,7 @@ function advanceEnd() {
 
 function gameOver() {
   state = 'game-over';
+  clearSavedGame();
   checkAchievements('game_over');
   const me = myPlayerIdx();
   const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
@@ -1435,6 +1436,7 @@ function doConcede() {
 
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
+  clearSavedGame();
   checkAchievements('game_over', { concede: true, concedingPlayer });
   const me = myPlayerIdx();
   const conWon = concedingPlayer !== me;
@@ -1729,14 +1731,20 @@ function handleGameMenuTap(p) {
   }
 }
 
-function exitToMenu() {
-  suspendedGame = {
+function buildSuspendedState() {
+  return {
     mode, state: state === 'idle' ? 'idle' : state, bowls: JSON.parse(JSON.stringify(bowls)),
     jack: jack ? JSON.parse(JSON.stringify(jack)) : null,
     scores: [...scores], endNum, jackOwner, turnIdx, delivDir, endHistory: [...endHistory],
     biasDirs: [...biasDirs], aiLevel, jackOffCounts: [...jackOffCounts],
     splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
+    friction, biasMultLeft, biasMultRight, bgStyle,
   };
+}
+
+function exitToMenu() {
+  suspendedGame = buildSuspendedState();
+  saveGameState(suspendedGame);
   clearTimeout(aiTimer);
   gameMenuOpen = false;
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
@@ -1748,6 +1756,7 @@ function exitToMenu() {
 function resumeGame() {
   if (!suspendedGame) return;
   const sg = suspendedGame; suspendedGame = null;
+  clearSavedGame();
   mode = sg.mode; bowls = sg.bowls; jack = sg.jack;
   scores = sg.scores; endNum = sg.endNum; jackOwner = sg.jackOwner;
   turnIdx = sg.turnIdx; delivDir = sg.delivDir; endHistory = sg.endHistory;
@@ -1756,12 +1765,28 @@ function resumeGame() {
   Object.assign(splashCfg, sg.splashCfg);
   C.p1 = BOWL_COLOURS[splashCfg.p1idx].main; C.p1d = BOWL_COLOURS[splashCfg.p1idx].dark;
   C.p2 = BOWL_COLOURS[splashCfg.p2idx].main; C.p2d = BOWL_COLOURS[splashCfg.p2idx].dark;
+  RB = 10 + splashCfg.size;
+  biasMult = splashCfg.biasVal;
+  friction = sg.friction != null ? sg.friction : 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
+  biasMultLeft = sg.biasMultLeft != null ? sg.biasMultLeft : (splashCfg.bendLeft / 50) ** 2 * 0.15;
+  biasMultRight = sg.biasMultRight != null ? sg.biasMultRight : (splashCfg.bendRight / 50) ** 2 * 0.15;
+  bgStyle = sg.bgStyle || splashCfg.bg;
   resetCam(); resetAim(); updateHUD();
   document.getElementById('splash').classList.add('hidden');
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
   state = sg.state;
-  if (state === 'aim') promptPlayer(playerForTurn(turnIdx));
-  else if (state === 'ai-turn') promptPlayer(playerForTurn(turnIdx));
+  if (state === 'moving' || state === 'camera-return') {
+    bowls.forEach(b => { b.vx = 0; b.vy = 0; b.stopped = true; });
+    if (jack) { jack.vx = 0; jack.vy = 0; jack.stopped = true; }
+    state = 'aim';
+    promptPlayer(playerForTurn(turnIdx));
+  } else if (state === 'aim' || state === 'ai-turn') {
+    promptPlayer(playerForTurn(turnIdx));
+  } else if (state === 'end-result' || state === 'jack-off-side') {
+    msg('Tap to continue');
+  } else if (state === 'place-jack') {
+    msg('Place jack along yellow line');
+  }
   syncResumeBtn();
 }
 
@@ -2892,6 +2917,7 @@ function handleRemoteTimeout() {
 
 function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
+  clearSavedGame();
   const me = myPlayerIdx();
   const fWon = forfeitingPlayer !== me;
   checkAchievements('game_over', { concede: true, concedingPlayer: forfeitingPlayer });
@@ -3205,6 +3231,23 @@ let concedeConfirmTimer = null;
 let gameMenuOpen = false;
 let endHistory = [];
 let suspendedGame = null;
+
+const SAVED_GAME_KEY = 'bowls_suspendedGame';
+
+function saveGameState(sg) {
+  try { localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(sg)); } catch {}
+}
+
+function clearSavedGame() {
+  localStorage.removeItem(SAVED_GAME_KEY);
+}
+
+function loadSavedGame() {
+  try {
+    const raw = localStorage.getItem(SAVED_GAME_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
 
 const TIME_CONTROLS = [
   { label:'30 seconds', value:'30s',  ms:30000,     realtime:true },
@@ -3652,7 +3695,7 @@ function buildGameSettingsPanel() {
 
   document.getElementById('game-settings-back').onclick = hideGameSettingsPanel;
   document.getElementById('btnStartGame').onclick = () => {
-    suspendedGame = null; syncResumeBtn();
+    suspendedGame = null; clearSavedGame(); syncResumeBtn();
     hideGameSettingsPanel();
     applyAndStart();
   };
@@ -4208,7 +4251,7 @@ function showSplash() {
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   gameMenuOpen = false;
-  suspendedGame = null;
+  suspendedGame = null; clearSavedGame();
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
@@ -4725,6 +4768,15 @@ function applyProfileToSplash() {
 buildSplash();
 applyProfileToSplash();
 showSplash();
+
+suspendedGame = loadSavedGame();
+syncResumeBtn();
+
+window.addEventListener('beforeunload', () => {
+  if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    saveGameState(buildSuspendedState());
+  }
+});
 
 requestAnimationFrame(loop);
 </script>
