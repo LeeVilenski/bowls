@@ -2416,7 +2416,7 @@ function drawSidePanels() {
   // Left — P1
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,SP,H);
   // Label (above score)
-  ctx.fillStyle=C.p1; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
+  ctx.fillStyle=C.p1; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   ctx.fillText('P1',SC,16);
   // Score
   ctx.font='bold 22px Segoe UI';
