@@ -4771,9 +4771,10 @@ function applyProfileToSplash() {
 
 buildSplash();
 applyProfileToSplash();
-showSplash();
 
-suspendedGame = loadSavedGame();
+const _savedGame = loadSavedGame();
+showSplash();
+suspendedGame = _savedGame;
 syncResumeBtn();
 
 window.addEventListener('beforeunload', () => {
