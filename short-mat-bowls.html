@@ -1133,6 +1133,7 @@ function scoreEnd() {
 // ── Game flow ─────────────────────────────────────────────────────
 function startGame() {
   clearTimeout(aiTimer);
+  clearSavedGame();
   if (mode !== 'online') { rngSeed = Date.now(); }
   seededRng = mulberry32(rngSeed);
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
@@ -1170,7 +1171,7 @@ function aiPlaceJack() {
 }
 
 function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End ${endNum}/${ENDS}`; }
-function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
+function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'online') saveGameState(buildSuspendedState()); }
 
 function promptPlayer(p, opts) {
   const resuming = opts && opts.resuming;
@@ -1327,6 +1328,7 @@ function _doOnAllStopped() {
   if (state === 'moving' || state === 'game-over') return;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
+  if (mode !== 'online') saveGameState(buildSuspendedState());
 }
 
 function onAllStopped() {
@@ -1391,6 +1393,7 @@ function finishEnd() {
     msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
     unlockAch('dead_end');
   }
+  if (mode !== 'online') saveGameState(buildSuspendedState());
 }
 
 function advanceEnd() {
@@ -4767,13 +4770,19 @@ function applyProfileToSplash() {
 
 buildSplash();
 applyProfileToSplash();
-showSplash();
 
-suspendedGame = loadSavedGame();
+const _savedGame = loadSavedGame();
+showSplash();
+suspendedGame = _savedGame;
 syncResumeBtn();
 
 window.addEventListener('beforeunload', () => {
   if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    saveGameState(buildSuspendedState());
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state !== 'idle' && state !== 'game-over' && mode !== 'online') {
     saveGameState(buildSuspendedState());
   }
 });
