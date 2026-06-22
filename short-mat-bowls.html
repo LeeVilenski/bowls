@@ -1138,7 +1138,7 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
-  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0;
+  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; lastMoveServerTs=0;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1176,13 +1176,12 @@ function promptPlayer(p, opts) {
   const resuming = opts && opts.resuming;
   if (resuming && opts.clockStart) {
     shotClockStart = opts.clockStart;
+  } else if (mode === 'online' && lastMoveServerTs) {
+    shotClockStart = lastMoveServerTs + SHOT_ROLL_GRACE_MS;
   } else {
     shotClockStart = mode === 'online' ? serverNow() : 0;
   }
   shotClockExpired = false;
-  if (!resuming && mode === 'online' && netConn && netConn.open) {
-    netConn.send({ type: 'CLOCK_START', ts: serverNow() });
-  }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -3171,7 +3170,9 @@ let shotClockStart = 0;
 let shotClockForfeits = [0, 0];
 let shotClockExpired = false;
 let serverTimeOffset = 0;
+let lastMoveServerTs = 0;
 const TIMEOUT_GRACE_MS = 3000;
+const SHOT_ROLL_GRACE_MS = 10000;
 let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
@@ -3272,6 +3273,7 @@ async function sendMove(type, player, data) {
   if (inserted && inserted.created_at) {
     const srvTs = new Date(inserted.created_at).getTime();
     serverTimeOffset = srvTs - Date.now();
+    lastMoveServerTs = srvTs;
   }
   if (netConn && netConn.open) {
     netConn.send({ type: 'MOVE', move: row, serverTime: serverNow() });
@@ -3292,7 +3294,9 @@ function subscribeMoves(gameId) {
       (payload) => {
         if (payload.new.player !== localPlayer) {
           if (payload.new.created_at) {
-            serverTimeOffset = new Date(payload.new.created_at).getTime() - Date.now();
+            const srvTs = new Date(payload.new.created_at).getTime();
+            serverTimeOffset = srvTs - Date.now();
+            lastMoveServerTs = srvTs;
           }
           onRemoteMove(payload.new);
         }
@@ -3348,6 +3352,7 @@ function setupConn(conn) {
     if (msg.type === 'MOVE') {
       if (msg.serverTime) {
         serverTimeOffset = msg.serverTime - Date.now();
+        lastMoveServerTs = msg.serverTime;
       }
       onRemoteMove(msg.move);
       return;
@@ -3732,7 +3737,7 @@ async function refreshLobby() {
       if (g.time_control) {
         const tcMs = getTimeControlMs(g.time_control);
         const since = lm ? lm.created_at : g.created_at;
-        const deadline = new Date(since).getTime() + tcMs;
+        const deadline = new Date(since).getTime() + SHOT_ROLL_GRACE_MS + tcMs;
         const rem = Math.max(0, deadline - Date.now());
         clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}" data-deadline="${deadline}">${formatClock(rem)}</span>`;
       }
@@ -3928,11 +3933,10 @@ function replayMoves(moves) {
   if (state === 'game-over') return;
   if (jack && turnIdx < BPP * 2) {
     const lastMove = moves[moves.length - 1];
-    let clockStart = 0;
     if (lastMove && lastMove.created_at) {
-      clockStart = new Date(lastMove.created_at).getTime();
+      lastMoveServerTs = new Date(lastMove.created_at).getTime();
     }
-    promptPlayer(playerForTurn(turnIdx), { resuming: true, clockStart });
+    promptPlayer(playerForTurn(turnIdx), { resuming: true, clockStart: lastMoveServerTs ? lastMoveServerTs + SHOT_ROLL_GRACE_MS : 0 });
     checkExpiredTimerOnResume();
   } else if (!jack) {
     state = 'place-jack'; syncFireBtn();
