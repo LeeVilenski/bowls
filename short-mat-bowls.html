@@ -1172,10 +1172,15 @@ function aiPlaceJack() {
 function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End ${endNum}/${ENDS}`; }
 function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
 
-function promptPlayer(p) {
-  shotClockStart = mode === 'online' ? serverNow() : 0;
+function promptPlayer(p, opts) {
+  const resuming = opts && opts.resuming;
+  if (resuming && opts.clockStart) {
+    shotClockStart = opts.clockStart;
+  } else {
+    shotClockStart = mode === 'online' ? serverNow() : 0;
+  }
   shotClockExpired = false;
-  if (mode === 'online' && netConn && netConn.open) {
+  if (!resuming && mode === 'online' && netConn && netConn.open) {
     netConn.send({ type: 'CLOCK_START', ts: serverNow() });
   }
   if (p === 2 && mode === 'vs-ai') {
@@ -3121,6 +3126,12 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); handlePointerDo
 canvas.addEventListener('touchmove',  e => { e.preventDefault(); handlePointerMove(getPos(e)); }, { passive: false });
 canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp(); },            { passive: false });
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (mode === 'online' && state === 'aim') checkExpiredTimerOnResume();
+  }
+});
+
 // Buttons
 function syncFireBtn() {}
 function syncFFBtn() {}
@@ -3457,6 +3468,19 @@ function formatClock(ms) {
   return `${Math.ceil(ms / 1000)}s`;
 }
 
+function checkExpiredTimerOnResume() {
+  if (mode !== 'online' || !shotClockStart || !shotClockLimit) return;
+  if (state !== 'aim') return;
+  const rem = shotClockRemaining();
+  if (rem > 0) return;
+  const currentPlayer = playerForTurn(turnIdx);
+  if (currentPlayer === localPlayer) {
+    handleShotClockExpiry();
+  } else if (rem <= -TIMEOUT_GRACE_MS) {
+    handleRemoteTimeout();
+  }
+}
+
 // ── Splash screen ─────────────────────────────────────────────────
 function seg(containerId, options, getVal, setVal) {
   const el = document.getElementById(containerId);
@@ -3618,6 +3642,18 @@ let createCfg = {
 };
 let onlinePanelBuilt = false;
 
+let lobbyClockInterval = null;
+
+function tickLobbyClocks() {
+  const clocks = document.querySelectorAll('.my-game-clock[data-deadline]');
+  clocks.forEach(el => {
+    const deadline = Number(el.dataset.deadline);
+    const rem = Math.max(0, deadline - Date.now());
+    el.textContent = formatClock(rem);
+    el.classList.toggle('urgent', rem < 60000);
+  });
+}
+
 function showOnlinePanel() {
   const panel = document.getElementById('online-panel');
   const nameInput = document.getElementById('lobby-name');
@@ -3625,11 +3661,13 @@ function showOnlinePanel() {
   if (!onlinePanelBuilt) buildOnlinePanel();
   panel.classList.add('show');
   refreshLobby();
+  if (!lobbyClockInterval) lobbyClockInterval = setInterval(tickLobbyClocks, 1000);
 }
 
 function hideOnlinePanel() {
   document.getElementById('online-panel').classList.remove('show');
   unsubscribeLobby();
+  if (lobbyClockInterval) { clearInterval(lobbyClockInterval); lobbyClockInterval = null; }
   splashCfg.mode = 'vs-ai';
   const seg = document.getElementById('sMode');
   seg.querySelectorAll('button').forEach(b => {
@@ -3694,9 +3732,9 @@ async function refreshLobby() {
       if (g.time_control) {
         const tcMs = getTimeControlMs(g.time_control);
         const since = lm ? lm.created_at : g.created_at;
-        const elapsed = Date.now() - new Date(since).getTime();
-        const rem = Math.max(0, tcMs - elapsed);
-        clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}">${formatClock(rem)}</span>`;
+        const deadline = new Date(since).getTime() + tcMs;
+        const rem = Math.max(0, deadline - Date.now());
+        clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}" data-deadline="${deadline}">${formatClock(rem)}</span>`;
       }
       row.innerHTML = `<span class="my-game-opp">vs ${esc(opp)}</span>` +
         `<span class="${turnClass}">${turnLabel}</span>` +
@@ -3889,13 +3927,15 @@ function replayMoves(moves) {
   resetCam();
   if (state === 'game-over') return;
   if (jack && turnIdx < BPP * 2) {
-    promptPlayer(playerForTurn(turnIdx));
     const lastMove = moves[moves.length - 1];
+    let clockStart = 0;
     if (lastMove && lastMove.created_at) {
       const srvTs = new Date(lastMove.created_at).getTime();
       serverTimeOffset = srvTs - Date.now();
-      shotClockStart = srvTs;
+      clockStart = srvTs;
     }
+    promptPlayer(playerForTurn(turnIdx), { resuming: true, clockStart });
+    checkExpiredTimerOnResume();
   } else if (!jack) {
     state = 'place-jack'; syncFireBtn();
   }
