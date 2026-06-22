@@ -1132,6 +1132,7 @@ function scoreEnd() {
 // ── Game flow ─────────────────────────────────────────────────────
 function startGame() {
   clearTimeout(aiTimer);
+  clearMatchState();
   if (mode !== 'online') { rngSeed = Date.now(); }
   seededRng = mulberry32(rngSeed);
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
@@ -1169,7 +1170,7 @@ function aiPlaceJack() {
 }
 
 function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End ${endNum}/${ENDS}`; }
-function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
+function beginTurns() { promptPlayer(playerForTurn(turnIdx)); saveMatchState(); }
 
 function promptPlayer(p) {
   shotClockStart = mode === 'online' ? serverNow() : 0;
@@ -1322,6 +1323,7 @@ function _doOnAllStopped() {
   if (state === 'moving' || state === 'game-over') return;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
+  saveMatchState();
 }
 
 function onAllStopped() {
@@ -1386,6 +1388,7 @@ function finishEnd() {
     msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
     unlockAch('dead_end');
   }
+  saveMatchState();
 }
 
 function advanceEnd() {
@@ -1396,6 +1399,7 @@ function advanceEnd() {
 
 function gameOver() {
   state = 'game-over';
+  clearMatchState();
   checkAchievements('game_over');
   const me = myPlayerIdx();
   const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
@@ -1430,6 +1434,7 @@ function doConcede() {
 
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
+  clearMatchState();
   checkAchievements('game_over', { concede: true, concedingPlayer });
   const me = myPlayerIdx();
   const conWon = concedingPlayer !== me;
@@ -1732,6 +1737,7 @@ function exitToMenu() {
 
 function resumeGame() {
   if (!suspendedGame) return;
+  clearMatchState();
   const sg = suspendedGame; suspendedGame = null;
   mode = sg.mode; bowls = sg.bowls; jack = sg.jack;
   scores = sg.scores; endNum = sg.endNum; jackOwner = sg.jackOwner;
@@ -4170,6 +4176,30 @@ const ACHIEVEMENTS = [
   { id:'online_win_10', icon:'⭐', name:'Rising Star',         desc:'Win 10 online games' },
 ];
 
+const MATCH_KEY = 'bowls_match';
+
+function saveMatchState() {
+  if (mode === 'online' || state === 'idle' || state === 'game-over') return;
+  const data = {
+    mode, state: (state === 'moving' || state === 'camera-return') ? 'aim' : state,
+    bowls: JSON.parse(JSON.stringify(bowls)),
+    jack: jack ? JSON.parse(JSON.stringify(jack)) : null,
+    scores: [...scores], endNum, jackOwner, turnIdx, delivDir,
+    endHistory: [...endHistory], biasDirs: [...biasDirs], aiLevel,
+    jackOffCounts: [...jackOffCounts],
+    splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
+  };
+  try { localStorage.setItem(MATCH_KEY, JSON.stringify(data)); } catch {}
+}
+
+function loadMatchState() {
+  try { return JSON.parse(localStorage.getItem(MATCH_KEY)); } catch { return null; }
+}
+
+function clearMatchState() {
+  localStorage.removeItem(MATCH_KEY);
+}
+
 const ACH_KEY = 'bowls_achievements';
 const STATS_KEY = 'bowls_stats';
 
@@ -4630,9 +4660,18 @@ function applyProfileToSplash() {
   if (prof.biasVal != null) splashCfg.biasVal = prof.biasVal;
 }
 
+window.addEventListener('beforeunload', saveMatchState);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveMatchState(); });
+
 buildSplash();
 applyProfileToSplash();
 showSplash();
+
+const savedMatch = loadMatchState();
+if (savedMatch) {
+  suspendedGame = savedMatch;
+  syncResumeBtn();
+}
 
 requestAnimationFrame(loop);
 </script>
