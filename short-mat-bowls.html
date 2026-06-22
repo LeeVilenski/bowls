@@ -1745,7 +1745,20 @@ function buildSuspendedState() {
   };
 }
 
+function settlePhysics() {
+  for (let i = 0; i < 3000 && !allStopped(); i++) {
+    for (const b of bowls) stepObj(b, b.bias);
+    stepObj(jack, null);
+    stepCollisions();
+  }
+  resetCam();
+  state = 'camera-return';
+  if (jack && jack.offSide) { handleJackOffSide(); return; }
+  _doOnAllStopped();
+}
+
 function exitToMenu() {
+  if (state === 'moving') settlePhysics();
   suspendedGame = buildSuspendedState();
   saveGameState(suspendedGame);
   clearTimeout(aiTimer);
@@ -4255,7 +4268,7 @@ function showSplash() {
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   gameMenuOpen = false;
-  suspendedGame = null; clearSavedGame();
+  suspendedGame = null;
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
@@ -4772,17 +4785,18 @@ function applyProfileToSplash() {
 buildSplash();
 applyProfileToSplash();
 showSplash();
-
 suspendedGame = loadSavedGame();
 syncResumeBtn();
 
 window.addEventListener('beforeunload', () => {
   if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    if (state === 'moving') settlePhysics();
     saveGameState(buildSuspendedState());
   }
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    if (state === 'moving') settlePhysics();
     saveGameState(buildSuspendedState());
   }
 });
