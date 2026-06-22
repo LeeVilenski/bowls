@@ -1139,7 +1139,7 @@ function startGame() {
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
-  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; lastMoveServerTs=0;
+  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1175,6 +1175,9 @@ function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'onli
 
 function promptPlayer(p, opts) {
   const resuming = opts && opts.resuming;
+  // Anchor the clock to a shared server timestamp (lastMoveServerTs) so both
+  // clients compute the same start; falls back to serverNow() only before any
+  // move exists. The roll grace covers the bowl settling after the prior shot.
   if (resuming && opts.clockStart) {
     shotClockStart = opts.clockStart;
   } else if (mode === 'online' && lastMoveServerTs) {
@@ -1183,6 +1186,7 @@ function promptPlayer(p, opts) {
     shotClockStart = mode === 'online' ? serverNow() : 0;
   }
   shotClockExpired = false;
+  clockDisplayMs = -1;   // snap the smoothed HUD clock to the fresh turn
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -2478,7 +2482,12 @@ function drawSidePanels() {
 
   // Shot clock — only shown when under 60s remaining and bowls aren't moving
   if (mode === 'online' && shotClockStart && shotClockLimit && state !== 'moving') {
-    const rem = Math.max(0, shotClockRemaining());
+    const remRaw = Math.max(0, shotClockRemaining());
+    // Ease the displayed value toward the true remaining time so small offset
+    // corrections don't make the number jump; snap on a big gap (new turn).
+    if (clockDisplayMs < 0 || Math.abs(clockDisplayMs - remRaw) > 1500) clockDisplayMs = remRaw;
+    else clockDisplayMs += (remRaw - clockDisplayMs) * 0.25;
+    const rem = clockDisplayMs;
     if (rem < 60000) {
       const txt = formatClock(rem);
       const urgent = rem < 10000;
@@ -2924,6 +2933,10 @@ function handleShotClockExpiry() {
   promptPlayer(playerForTurn(turnIdx));
 }
 
+// Resume-recovery only: when reloading a game whose opponent abandoned a turn
+// long ago, no `timeout` move may ever arrive, so checkExpiredTimerOnResume()
+// infers it once to advance the head. Live play never calls this — there the
+// shooter forfeits its own clock (below), which avoids the double-count race.
 function handleRemoteTimeout() {
   if (shotClockExpired) return;
   shotClockExpired = true;
@@ -2938,6 +2951,18 @@ function handleRemoteTimeout() {
   turnIdx++;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
+}
+
+// Forfeits are owned by the shooter only: each client forfeits its OWN clock and
+// broadcasts a `timeout` move; the opponent applies that move (applyRemoteMove).
+// The watcher never infers the opponent's timeout during live play, which removes
+// the double-count race where the inferred-timeout and the received move both
+// advanced the turn.
+function checkShotClock() {
+  if (mode !== 'online' || !shotClockStart || !shotClockLimit) return;
+  if (state !== 'aim') return;
+  if (playerForTurn(turnIdx) !== localPlayer) return;
+  if (shotClockRemaining() <= 0) handleShotClockExpiry();
 }
 
 function finishClockForfeit(forfeitingPlayer) {
@@ -2960,13 +2985,7 @@ function finishClockForfeit(forfeitingPlayer) {
 }
 
 function loop() {
-  if (mode === 'online' && shotClockStart && shotClockLimit && state === 'aim' && shotClockRemaining() <= 0) {
-    if (playerForTurn(turnIdx) === localPlayer) {
-      handleShotClockExpiry();
-    } else if (shotClockRemaining() <= -TIMEOUT_GRACE_MS && !shotClockExpired) {
-      handleRemoteTimeout();
-    }
-  }
+  checkShotClock();
   if (state==='moving') {
     const steps = ffModeActive ? 3 : 1;
     for (let s = 0; s < steps; s++) {
@@ -3240,9 +3259,11 @@ let shotClockStart = 0;
 let shotClockForfeits = [0, 0];
 let shotClockExpired = false;
 let serverTimeOffset = 0;
-let lastMoveServerTs = 0;
-const TIMEOUT_GRACE_MS = 3000;
-const SHOT_ROLL_GRACE_MS = 10000;
+let serverOffsetInit = false;
+let clockDisplayMs = -1;          // smoothed value shown in the HUD
+let lastMoveServerTs = 0;         // server timestamp of the last move (shared clock anchor)
+const TIMEOUT_GRACE_MS = 3000;    // resume-recovery tolerance before inferring an opponent timeout
+const SHOT_ROLL_GRACE_MS = 10000; // roll-settle grace added to the clock anchor
 let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
@@ -3356,10 +3377,15 @@ async function sendMove(type, player, data) {
   if (!sb) return;
   moveNum++;
   const row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
-  const { data: inserted } = await sb.from('moves').insert(row).select('created_at').single();
+  const t0 = Date.now();
+  const { data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single();
+  if (error) console.error('sendMove insert failed', error);
   if (inserted && inserted.created_at) {
+    // RTT-corrected clock sync: estimate the server processed the insert at the
+    // midpoint of the round trip, rather than at response-receipt time.
+    const t1 = Date.now();
     const srvTs = new Date(inserted.created_at).getTime();
-    serverTimeOffset = srvTs - Date.now();
+    updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
     lastMoveServerTs = srvTs;
   }
   if (netConn && netConn.open) {
@@ -3382,8 +3408,11 @@ function subscribeMoves(gameId) {
         if (payload.new.player !== localPlayer) {
           if (payload.new.created_at) {
             const srvTs = new Date(payload.new.created_at).getTime();
-            serverTimeOffset = srvTs - Date.now();
             lastMoveServerTs = srvTs;
+            // Seed the offset from a received move only until our own RTT-measured
+            // sends take over — one-way delivery latency is unknown, so using it
+            // continuously would only add jitter to the displayed clock.
+            if (!serverOffsetInit) updateServerOffset(srvTs - Date.now());
           }
           onRemoteMove(payload.new);
         }
@@ -3438,8 +3467,8 @@ function setupConn(conn) {
     if (msg.type === 'PONG') { peerLatencyMs = Date.now() - msg.t; return; }
     if (msg.type === 'MOVE') {
       if (msg.serverTime) {
-        serverTimeOffset = msg.serverTime - Date.now();
         lastMoveServerTs = msg.serverTime;
+        if (!serverOffsetInit) updateServerOffset(msg.serverTime - Date.now());
       }
       onRemoteMove(msg.move);
       return;
@@ -3547,6 +3576,13 @@ function isRealtime(tc) {
 }
 
 function serverNow() { return Date.now() + serverTimeOffset; }
+
+// EWMA-smoothed clock offset. First sample seeds it directly; later samples are
+// blended so a single high-latency insert can't yank the displayed clock.
+function updateServerOffset(sample) {
+  if (!serverOffsetInit) { serverTimeOffset = sample; serverOffsetInit = true; }
+  else serverTimeOffset += (sample - serverTimeOffset) * 0.3;
+}
 
 function shotClockRemaining() {
   if (!shotClockStart || !shotClockLimit) return Infinity;
@@ -4023,7 +4059,9 @@ function replayMoves(moves) {
   if (jack && turnIdx < BPP * 2) {
     const lastMove = moves[moves.length - 1];
     if (lastMove && lastMove.created_at) {
-      lastMoveServerTs = new Date(lastMove.created_at).getTime();
+      const srvTs = new Date(lastMove.created_at).getTime();
+      lastMoveServerTs = srvTs;
+      if (!serverOffsetInit) updateServerOffset(srvTs - Date.now()); // seed on resume; refined by RTT on next send
     }
     promptPlayer(playerForTurn(turnIdx), { resuming: true, clockStart: lastMoveServerTs ? lastMoveServerTs + SHOT_ROLL_GRACE_MS : 0 });
     checkExpiredTimerOnResume();
@@ -4809,6 +4847,13 @@ document.addEventListener('visibilitychange', () => {
     saveGameState(buildSuspendedState());
   }
 });
+
+// The shot-clock expiry check also runs off the animation frame: requestAnimationFrame
+// is throttled/paused when the PWA is backgrounded, which would otherwise let a
+// backgrounded shooter blow past their clock without forfeiting. setInterval keeps
+// firing (coarsely) in the background, and visibilitychange re-checks on resume.
+setInterval(checkShotClock, 500);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkShotClock(); });
 
 requestAnimationFrame(loop);
 </script>
