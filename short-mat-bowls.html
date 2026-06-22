@@ -178,6 +178,7 @@ button:active { opacity: .7; }
 .stat-bar.green { background: linear-gradient(90deg, #22c55e, #16a34a); }
 .stat-bar.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 .stat-bar.purple { background: linear-gradient(90deg, #a855f7, #7c3aed); }
+.stat-section-head { font-size: 12px; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 1px; padding: 10px 0 4px; margin-top: 4px; border-top: 1px solid #334155; }
 
 .hist-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
 .hist-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; }
@@ -1132,13 +1133,13 @@ function scoreEnd() {
 // ── Game flow ─────────────────────────────────────────────────────
 function startGame() {
   clearTimeout(aiTimer);
-  clearMatchState();
+  clearSavedGame();
   if (mode !== 'online') { rngSeed = Date.now(); }
   seededRng = mulberry32(rngSeed);
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
-  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0;
+  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; lastMoveServerTs=0;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1170,14 +1171,18 @@ function aiPlaceJack() {
 }
 
 function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End ${endNum}/${ENDS}`; }
-function beginTurns() { promptPlayer(playerForTurn(turnIdx)); saveMatchState(); }
+function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'online') saveGameState(buildSuspendedState()); }
 
-function promptPlayer(p) {
-  shotClockStart = mode === 'online' ? serverNow() : 0;
-  shotClockExpired = false;
-  if (mode === 'online' && netConn && netConn.open) {
-    netConn.send({ type: 'CLOCK_START', ts: serverNow() });
+function promptPlayer(p, opts) {
+  const resuming = opts && opts.resuming;
+  if (resuming && opts.clockStart) {
+    shotClockStart = opts.clockStart;
+  } else if (mode === 'online' && lastMoveServerTs) {
+    shotClockStart = lastMoveServerTs + SHOT_ROLL_GRACE_MS;
+  } else {
+    shotClockStart = mode === 'online' ? serverNow() : 0;
   }
+  shotClockExpired = false;
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -1323,7 +1328,7 @@ function _doOnAllStopped() {
   if (state === 'moving' || state === 'game-over') return;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
-  saveMatchState();
+  if (mode !== 'online') saveGameState(buildSuspendedState());
 }
 
 function onAllStopped() {
@@ -1388,7 +1393,7 @@ function finishEnd() {
     msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
     unlockAch('dead_end');
   }
-  saveMatchState();
+  if (mode !== 'online') saveGameState(buildSuspendedState());
 }
 
 function advanceEnd() {
@@ -1399,7 +1404,7 @@ function advanceEnd() {
 
 function gameOver() {
   state = 'game-over';
-  clearMatchState();
+  clearSavedGame();
   checkAchievements('game_over');
   const me = myPlayerIdx();
   const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
@@ -1434,7 +1439,7 @@ function doConcede() {
 
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
-  clearMatchState();
+  clearSavedGame();
   checkAchievements('game_over', { concede: true, concedingPlayer });
   const me = myPlayerIdx();
   const conWon = concedingPlayer !== me;
@@ -1528,6 +1533,16 @@ function drawOverlayUI() {
     ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
   }
 
+  // Head button also available after end finishes and at game over
+  if (state === 'end-result' || state === 'game-over') {
+    const hx = W - btnW/2 - 6, hy = btnY;
+    ctx.fillStyle = headOverlay ? '#0d9488' : 'rgba(13,94,88,0.7)';
+    ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.fillStyle = headOverlay ? '#fff' : '#5eead4';
+    ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
+  }
+
   // FF button (right side) — only during moving
   if (state === 'moving') {
     const ffx = W - btnW/2 - 6, ffy = btnY;
@@ -1570,7 +1585,7 @@ const ALL_MENU_ITEMS = [
   { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
-  { id: 'leave',   label: '🚪  Leave Match',  bg: '#92400e', fg: '#fde68a' },
+  { id: 'lobby',   label: '📋  Back to Lobby', bg: '#1e3a8a', fg: '#93c5fd' },
   { id: 'concede', label: '🏳  Concede',      bg: '#7f1d1d', fg: '#fca5a5' },
 ];
 const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
@@ -1579,7 +1594,7 @@ function visibleMenuItems() {
   return ALL_MENU_ITEMS.filter(item => {
     if (item.id === 'concede' && state === 'game-over') return false;
     if (item.id === 'exit' && mode === 'online') return false;
-    if (item.id === 'leave' && mode !== 'online') return false;
+    if (item.id === 'lobby' && mode !== 'online') return false;
     return true;
   });
 }
@@ -1703,7 +1718,7 @@ function handleGameMenuTap(p) {
   if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
   if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
   if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
-  if (id === 'leave') { gameMenuOpen = false; doLeaveOnline(); return; }
+  if (id === 'lobby') { gameMenuOpen = false; backToLobby(); return; }
   if (id === 'concede') {
     if (concedeConfirm) {
       concedeConfirm = false;
@@ -1719,14 +1734,20 @@ function handleGameMenuTap(p) {
   }
 }
 
-function exitToMenu() {
-  suspendedGame = {
+function buildSuspendedState() {
+  return {
     mode, state: state === 'idle' ? 'idle' : state, bowls: JSON.parse(JSON.stringify(bowls)),
     jack: jack ? JSON.parse(JSON.stringify(jack)) : null,
     scores: [...scores], endNum, jackOwner, turnIdx, delivDir, endHistory: [...endHistory],
     biasDirs: [...biasDirs], aiLevel, jackOffCounts: [...jackOffCounts],
     splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
+    friction, biasMultLeft, biasMultRight, bgStyle,
   };
+}
+
+function exitToMenu() {
+  suspendedGame = buildSuspendedState();
+  saveGameState(suspendedGame);
   clearTimeout(aiTimer);
   gameMenuOpen = false;
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
@@ -1737,8 +1758,9 @@ function exitToMenu() {
 
 function resumeGame() {
   if (!suspendedGame) return;
-  clearMatchState();
+  clearSavedGame();
   const sg = suspendedGame; suspendedGame = null;
+  clearSavedGame();
   mode = sg.mode; bowls = sg.bowls; jack = sg.jack;
   scores = sg.scores; endNum = sg.endNum; jackOwner = sg.jackOwner;
   turnIdx = sg.turnIdx; delivDir = sg.delivDir; endHistory = sg.endHistory;
@@ -1747,12 +1769,28 @@ function resumeGame() {
   Object.assign(splashCfg, sg.splashCfg);
   C.p1 = BOWL_COLOURS[splashCfg.p1idx].main; C.p1d = BOWL_COLOURS[splashCfg.p1idx].dark;
   C.p2 = BOWL_COLOURS[splashCfg.p2idx].main; C.p2d = BOWL_COLOURS[splashCfg.p2idx].dark;
+  RB = 10 + splashCfg.size;
+  biasMult = splashCfg.biasVal;
+  friction = sg.friction != null ? sg.friction : 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
+  biasMultLeft = sg.biasMultLeft != null ? sg.biasMultLeft : (splashCfg.bendLeft / 50) ** 2 * 0.15;
+  biasMultRight = sg.biasMultRight != null ? sg.biasMultRight : (splashCfg.bendRight / 50) ** 2 * 0.15;
+  bgStyle = sg.bgStyle || splashCfg.bg;
   resetCam(); resetAim(); updateHUD();
   document.getElementById('splash').classList.add('hidden');
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
   state = sg.state;
-  if (state === 'aim') promptPlayer(playerForTurn(turnIdx));
-  else if (state === 'ai-turn') promptPlayer(playerForTurn(turnIdx));
+  if (state === 'moving' || state === 'camera-return') {
+    bowls.forEach(b => { b.vx = 0; b.vy = 0; b.stopped = true; });
+    if (jack) { jack.vx = 0; jack.vy = 0; jack.stopped = true; }
+    state = 'aim';
+    promptPlayer(playerForTurn(turnIdx));
+  } else if (state === 'aim' || state === 'ai-turn') {
+    promptPlayer(playerForTurn(turnIdx));
+  } else if (state === 'end-result' || state === 'jack-off-side') {
+    msg('Tap to continue');
+  } else if (state === 'place-jack') {
+    msg('Place jack along yellow line');
+  }
   syncResumeBtn();
 }
 
@@ -2883,8 +2921,10 @@ function handleRemoteTimeout() {
 
 function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
+  clearSavedGame();
   const me = myPlayerIdx();
   const fWon = forfeitingPlayer !== me;
+  checkAchievements('game_over', { concede: true, concedingPlayer: forfeitingPlayer });
   recordCurrentGame(fWon, false);
   awardXP(fWon, true);
   if (mode === 'online' && sb) {
@@ -3062,14 +3102,23 @@ function handlePointerDown(p) {
     swipeStartY   = p.y;
     swipeStartX   = p.x;
     aimLiveSpeed  = 0;
-  } else if (state === 'end-result') {
-    if (mode === 'online') {
-      localAcked = true;
-      sendMove('end_ack', localPlayer, {});
-      if (opponentAcked) advanceEnd();
-      else msg('Waiting for opponent…');
-    } else {
-      advanceEnd();
+  } else if (state === 'end-result' || state === 'game-over') {
+    // Head button (right side) — review the head before continuing
+    const hx = W - btnW/2 - 6;
+    if (p.x >= hx - btnW/2 && p.x <= hx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
+      headOverlay = !headOverlay;
+      mouse.down = false; return;
+    }
+    if (state === 'end-result') {
+      if (mode === 'online') {
+        localAcked = true;
+        sendMove('end_ack', localPlayer, {});
+        if (opponentAcked) advanceEnd();
+        else msg('Waiting for opponent…');
+      } else {
+        headOverlay = false;
+        advanceEnd();
+      }
     }
   } else if (state === 'jack-off-side') {
     startEnd();
@@ -3125,6 +3174,12 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); handlePointerDo
 canvas.addEventListener('touchmove',  e => { e.preventDefault(); handlePointerMove(getPos(e)); }, { passive: false });
 canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp(); },            { passive: false });
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (mode === 'online' && state === 'aim') checkExpiredTimerOnResume();
+  }
+});
+
 // Buttons
 function syncFireBtn() {}
 function syncFFBtn() {}
@@ -3164,7 +3219,9 @@ let shotClockStart = 0;
 let shotClockForfeits = [0, 0];
 let shotClockExpired = false;
 let serverTimeOffset = 0;
+let lastMoveServerTs = 0;
 const TIMEOUT_GRACE_MS = 3000;
+const SHOT_ROLL_GRACE_MS = 10000;
 let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
@@ -3178,6 +3235,23 @@ let concedeConfirmTimer = null;
 let gameMenuOpen = false;
 let endHistory = [];
 let suspendedGame = null;
+
+const SAVED_GAME_KEY = 'bowls_suspendedGame';
+
+function saveGameState(sg) {
+  try { localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(sg)); } catch {}
+}
+
+function clearSavedGame() {
+  localStorage.removeItem(SAVED_GAME_KEY);
+}
+
+function loadSavedGame() {
+  try {
+    const raw = localStorage.getItem(SAVED_GAME_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
 
 const TIME_CONTROLS = [
   { label:'30 seconds', value:'30s',  ms:30000,     realtime:true },
@@ -3265,6 +3339,7 @@ async function sendMove(type, player, data) {
   if (inserted && inserted.created_at) {
     const srvTs = new Date(inserted.created_at).getTime();
     serverTimeOffset = srvTs - Date.now();
+    lastMoveServerTs = srvTs;
   }
   if (netConn && netConn.open) {
     netConn.send({ type: 'MOVE', move: row, serverTime: serverNow() });
@@ -3285,7 +3360,9 @@ function subscribeMoves(gameId) {
       (payload) => {
         if (payload.new.player !== localPlayer) {
           if (payload.new.created_at) {
-            serverTimeOffset = new Date(payload.new.created_at).getTime() - Date.now();
+            const srvTs = new Date(payload.new.created_at).getTime();
+            serverTimeOffset = srvTs - Date.now();
+            lastMoveServerTs = srvTs;
           }
           onRemoteMove(payload.new);
         }
@@ -3341,6 +3418,7 @@ function setupConn(conn) {
     if (msg.type === 'MOVE') {
       if (msg.serverTime) {
         serverTimeOffset = msg.serverTime - Date.now();
+        lastMoveServerTs = msg.serverTime;
       }
       onRemoteMove(msg.move);
       return;
@@ -3459,6 +3537,19 @@ function formatClock(ms) {
   if (ms >= 3600000) { const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return `${h}h ${m}m`; }
   if (ms >= 60000) { const m = Math.floor(ms / 60000); const s = Math.floor((ms % 60000) / 1000); return `${m}:${String(s).padStart(2,'0')}`; }
   return `${Math.ceil(ms / 1000)}s`;
+}
+
+function checkExpiredTimerOnResume() {
+  if (mode !== 'online' || !shotClockStart || !shotClockLimit) return;
+  if (state !== 'aim') return;
+  const rem = shotClockRemaining();
+  if (rem > 0) return;
+  const currentPlayer = playerForTurn(turnIdx);
+  if (currentPlayer === localPlayer) {
+    handleShotClockExpiry();
+  } else if (rem <= -TIMEOUT_GRACE_MS) {
+    handleRemoteTimeout();
+  }
 }
 
 // ── Splash screen ─────────────────────────────────────────────────
@@ -3608,7 +3699,7 @@ function buildGameSettingsPanel() {
 
   document.getElementById('game-settings-back').onclick = hideGameSettingsPanel;
   document.getElementById('btnStartGame').onclick = () => {
-    suspendedGame = null; syncResumeBtn();
+    suspendedGame = null; clearSavedGame(); syncResumeBtn();
     hideGameSettingsPanel();
     applyAndStart();
   };
@@ -3622,6 +3713,18 @@ let createCfg = {
 };
 let onlinePanelBuilt = false;
 
+let lobbyClockInterval = null;
+
+function tickLobbyClocks() {
+  const clocks = document.querySelectorAll('.my-game-clock[data-deadline]');
+  clocks.forEach(el => {
+    const deadline = Number(el.dataset.deadline);
+    const rem = Math.max(0, deadline - Date.now());
+    el.textContent = formatClock(rem);
+    el.classList.toggle('urgent', rem < 60000);
+  });
+}
+
 function showOnlinePanel() {
   const panel = document.getElementById('online-panel');
   const nameInput = document.getElementById('lobby-name');
@@ -3629,11 +3732,13 @@ function showOnlinePanel() {
   if (!onlinePanelBuilt) buildOnlinePanel();
   panel.classList.add('show');
   refreshLobby();
+  if (!lobbyClockInterval) lobbyClockInterval = setInterval(tickLobbyClocks, 1000);
 }
 
 function hideOnlinePanel() {
   document.getElementById('online-panel').classList.remove('show');
   unsubscribeLobby();
+  if (lobbyClockInterval) { clearInterval(lobbyClockInterval); lobbyClockInterval = null; }
   splashCfg.mode = 'vs-ai';
   const seg = document.getElementById('sMode');
   seg.querySelectorAll('button').forEach(b => {
@@ -3698,9 +3803,9 @@ async function refreshLobby() {
       if (g.time_control) {
         const tcMs = getTimeControlMs(g.time_control);
         const since = lm ? lm.created_at : g.created_at;
-        const elapsed = Date.now() - new Date(since).getTime();
-        const rem = Math.max(0, tcMs - elapsed);
-        clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}">${formatClock(rem)}</span>`;
+        const deadline = new Date(since).getTime() + SHOT_ROLL_GRACE_MS + tcMs;
+        const rem = Math.max(0, deadline - Date.now());
+        clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}" data-deadline="${deadline}">${formatClock(rem)}</span>`;
       }
       row.innerHTML = `<span class="my-game-opp">vs ${esc(opp)}</span>` +
         `<span class="${turnClass}">${turnLabel}</span>` +
@@ -3765,6 +3870,7 @@ async function confirmJoinLobby() {
   const gameId = pendingJoinGameId;
   if (!gameId) return;
   pendingJoinGameId = null;
+  cleanupNet();
   const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
   if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
 
@@ -3787,6 +3893,7 @@ async function confirmJoinLobby() {
 }
 
 async function doResumeLobby(game) {
+  cleanupNet();
   onlineGameId = game.id;
   const isHost = game.host_name === netDisplayName;
   localPlayer = isHost ? 1 : 2;
@@ -3893,13 +4000,12 @@ function replayMoves(moves) {
   resetCam();
   if (state === 'game-over') return;
   if (jack && turnIdx < BPP * 2) {
-    promptPlayer(playerForTurn(turnIdx));
     const lastMove = moves[moves.length - 1];
     if (lastMove && lastMove.created_at) {
-      const srvTs = new Date(lastMove.created_at).getTime();
-      serverTimeOffset = srvTs - Date.now();
-      shotClockStart = srvTs;
+      lastMoveServerTs = new Date(lastMove.created_at).getTime();
     }
+    promptPlayer(playerForTurn(turnIdx), { resuming: true, clockStart: lastMoveServerTs ? lastMoveServerTs + SHOT_ROLL_GRACE_MS : 0 });
+    checkExpiredTimerOnResume();
   } else if (!jack) {
     state = 'place-jack'; syncFireBtn();
   }
@@ -4030,6 +4136,7 @@ function buildCreatePanel() {
 }
 
 async function doCreateGame() {
+  cleanupNet();
   const settings = {
     ends: createCfg.ends, size: createCfg.size, biasVal: createCfg.biasVal,
     speedVal: createCfg.speedVal, bendLeft: createCfg.bendLeft, bendRight: createCfg.bendRight,
@@ -4131,12 +4238,24 @@ function doLeaveOnline() {
   showSplash();
 }
 
+function backToLobby() {
+  clearTimeout(aiTimer);
+  cleanupNet();
+  concedeConfirm = false; clearTimeout(concedeConfirmTimer);
+  gameMenuOpen = false;
+  state = 'idle'; syncFireBtn();
+  hideGameSettingsPanel();
+  document.getElementById('splash').classList.remove('hidden');
+  syncResumeBtn();
+  showOnlinePanel();
+}
+
 function showSplash() {
   clearTimeout(aiTimer);
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   gameMenuOpen = false;
-  suspendedGame = null;
+  suspendedGame = null; clearSavedGame();
   state = 'idle'; syncFireBtn();
   localStorage.removeItem('bowls_activeGame');
   localStorage.removeItem('bowls_localPlayer');
@@ -4176,30 +4295,6 @@ const ACHIEVEMENTS = [
   { id:'online_win_10', icon:'⭐', name:'Rising Star',         desc:'Win 10 online games' },
 ];
 
-const MATCH_KEY = 'bowls_match';
-
-function saveMatchState() {
-  if (mode === 'online' || state === 'idle' || state === 'game-over') return;
-  const data = {
-    mode, state: (state === 'moving' || state === 'camera-return') ? 'aim' : state,
-    bowls: JSON.parse(JSON.stringify(bowls)),
-    jack: jack ? JSON.parse(JSON.stringify(jack)) : null,
-    scores: [...scores], endNum, jackOwner, turnIdx, delivDir,
-    endHistory: [...endHistory], biasDirs: [...biasDirs], aiLevel,
-    jackOffCounts: [...jackOffCounts],
-    splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
-  };
-  try { localStorage.setItem(MATCH_KEY, JSON.stringify(data)); } catch {}
-}
-
-function loadMatchState() {
-  try { return JSON.parse(localStorage.getItem(MATCH_KEY)); } catch { return null; }
-}
-
-function clearMatchState() {
-  localStorage.removeItem(MATCH_KEY);
-}
-
 const ACH_KEY = 'bowls_achievements';
 const STATS_KEY = 'bowls_stats';
 
@@ -4208,7 +4303,7 @@ function loadAch() {
 }
 function saveAch(data) { localStorage.setItem(ACH_KEY, JSON.stringify(data)); }
 function loadStats() {
-  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0 };
+  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0, onlineEndsWon:0, onlineTotalPts:0, onlineBestMargin:0 };
   try { return Object.assign(def, JSON.parse(localStorage.getItem(STATS_KEY))); }
   catch { return def; }
 }
@@ -4255,6 +4350,7 @@ function checkAchievements(event, data) {
       if (data.pts === 4) unlockAch('perfect_end');
       stats.totalPts += data.pts;
       stats.endsWon++;
+      if (mode === 'online') { stats.onlineTotalPts += data.pts; stats.onlineEndsWon++; }
     }
     saveStats(stats);
     if (stats.totalPts >= 100) unlockAch('score_100');
@@ -4279,6 +4375,7 @@ function checkAchievements(event, data) {
       if (mode === 'online') stats.onlineWins++;
       const margin = myScore - oppScore;
       if (margin > stats.bestMargin) stats.bestMargin = margin;
+      if (mode === 'online' && margin > stats.onlineBestMargin) stats.onlineBestMargin = margin;
       unlockAch('first_win');
       if (stats.wins >= 3) unlockAch('win_3');
       if (stats.wins >= 10) unlockAch('win_10');
@@ -4473,17 +4570,29 @@ function renderProfileStats() {
   const onlineLosses = s.onlineGames - s.onlineWins;
   const maxPts = Math.max(s.totalPts, 1);
 
+  const onlineWinPct = s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0;
+  const localWinPct = localGames > 0 ? Math.round(localWins / localGames * 100) : 0;
+  const localEndsWon = s.endsWon - (s.onlineEndsWon || 0);
+  const localTotalPts = s.totalPts - (s.onlineTotalPts || 0);
+  const localBestMargin = s.bestMargin;
+
   el.innerHTML =
     statBar('Win Rate', winPct + '%', winPct, 'green') +
     statRow('Games Played', s.games) +
     statRow('Wins / Losses', s.wins + ' / ' + losses) +
     statBar('Shots Scored', s.totalPts, Math.min(s.totalPts / maxPts * 100, 100), 'blue') +
-    statBar('Online', s.onlineWins + 'W – ' + onlineLosses + 'L',
-      s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0, 'purple') +
-    statBar('Local', localWins + 'W – ' + localLosses + 'L',
-      localGames > 0 ? Math.round(localWins / localGames * 100) : 0, 'green') +
-    statRow('Ends Won', s.endsWon) +
-    statRow('Best Margin', s.bestMargin);
+    '<div class="stat-section-head">🌐 Online</div>' +
+    statBar('Win Rate', onlineWinPct + '%', onlineWinPct, 'purple') +
+    statRow('Games', s.onlineGames) +
+    statRow('Wins / Losses', s.onlineWins + ' / ' + onlineLosses) +
+    statRow('Ends Won', s.onlineEndsWon || 0) +
+    statRow('Best Margin', s.onlineBestMargin || 0) +
+    '<div class="stat-section-head">🤖 Local</div>' +
+    statBar('Win Rate', localWinPct + '%', localWinPct, 'green') +
+    statRow('Games', localGames) +
+    statRow('Wins / Losses', localWins + ' / ' + localLosses) +
+    statRow('Ends Won', localEndsWon) +
+    statRow('Best Margin', localBestMargin);
 }
 
 function statBar(label, valText, pct, color) {
@@ -4660,18 +4769,23 @@ function applyProfileToSplash() {
   if (prof.biasVal != null) splashCfg.biasVal = prof.biasVal;
 }
 
-window.addEventListener('beforeunload', saveMatchState);
-document.addEventListener('visibilitychange', () => { if (document.hidden) saveMatchState(); });
-
 buildSplash();
 applyProfileToSplash();
 showSplash();
 
-const savedMatch = loadMatchState();
-if (savedMatch) {
-  suspendedGame = savedMatch;
-  syncResumeBtn();
-}
+suspendedGame = loadSavedGame();
+syncResumeBtn();
+
+window.addEventListener('beforeunload', () => {
+  if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    saveGameState(buildSuspendedState());
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    saveGameState(buildSuspendedState());
+  }
+});
 
 requestAnimationFrame(loop);
 </script>
