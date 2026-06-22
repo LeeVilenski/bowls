@@ -1571,7 +1571,7 @@ const ALL_MENU_ITEMS = [
   { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
-  { id: 'leave',   label: '🚪  Leave Match',  bg: '#92400e', fg: '#fde68a' },
+  { id: 'lobby',   label: '📋  Back to Lobby', bg: '#1e3a8a', fg: '#93c5fd' },
   { id: 'concede', label: '🏳  Concede',      bg: '#7f1d1d', fg: '#fca5a5' },
 ];
 const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
@@ -1580,7 +1580,7 @@ function visibleMenuItems() {
   return ALL_MENU_ITEMS.filter(item => {
     if (item.id === 'concede' && state === 'game-over') return false;
     if (item.id === 'exit' && mode === 'online') return false;
-    if (item.id === 'leave' && mode !== 'online') return false;
+    if (item.id === 'lobby' && mode !== 'online') return false;
     return true;
   });
 }
@@ -1704,7 +1704,7 @@ function handleGameMenuTap(p) {
   if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
   if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
   if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
-  if (id === 'leave') { gameMenuOpen = false; doLeaveOnline(); return; }
+  if (id === 'lobby') { gameMenuOpen = false; backToLobby(); return; }
   if (id === 'concede') {
     if (concedeConfirm) {
       concedeConfirm = false;
@@ -3799,6 +3799,7 @@ async function confirmJoinLobby() {
   const gameId = pendingJoinGameId;
   if (!gameId) return;
   pendingJoinGameId = null;
+  cleanupNet();
   const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
   if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
 
@@ -3821,6 +3822,7 @@ async function confirmJoinLobby() {
 }
 
 async function doResumeLobby(game) {
+  cleanupNet();
   onlineGameId = game.id;
   const isHost = game.host_name === netDisplayName;
   localPlayer = isHost ? 1 : 2;
@@ -4066,6 +4068,7 @@ function buildCreatePanel() {
 }
 
 async function doCreateGame() {
+  cleanupNet();
   const settings = {
     ends: createCfg.ends, size: createCfg.size, biasVal: createCfg.biasVal,
     speedVal: createCfg.speedVal, bendLeft: createCfg.bendLeft, bendRight: createCfg.bendRight,
@@ -4165,6 +4168,18 @@ function doLeaveOnline() {
     netConn.send({ type: 'LEAVE' });
   }
   showSplash();
+}
+
+function backToLobby() {
+  clearTimeout(aiTimer);
+  cleanupNet();
+  concedeConfirm = false; clearTimeout(concedeConfirmTimer);
+  gameMenuOpen = false;
+  state = 'idle'; syncFireBtn();
+  hideGameSettingsPanel();
+  document.getElementById('splash').classList.remove('hidden');
+  syncResumeBtn();
+  showOnlinePanel();
 }
 
 function showSplash() {
