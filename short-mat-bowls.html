@@ -178,6 +178,7 @@ button:active { opacity: .7; }
 .stat-bar.green { background: linear-gradient(90deg, #22c55e, #16a34a); }
 .stat-bar.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 .stat-bar.purple { background: linear-gradient(90deg, #a855f7, #7c3aed); }
+.stat-section-head { font-size: 12px; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 1px; padding: 10px 0 4px; margin-top: 4px; border-top: 1px solid #334155; }
 
 .hist-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
 .hist-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; }
@@ -1132,12 +1133,13 @@ function scoreEnd() {
 // ── Game flow ─────────────────────────────────────────────────────
 function startGame() {
   clearTimeout(aiTimer);
+  clearSavedGame();
   if (mode !== 'online') { rngSeed = Date.now(); }
   seededRng = mulberry32(rngSeed);
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
-  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1;
+  shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1169,15 +1171,22 @@ function aiPlaceJack() {
 }
 
 function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End ${endNum}/${ENDS}`; }
-function beginTurns() { promptPlayer(playerForTurn(turnIdx)); }
+function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'online') saveGameState(buildSuspendedState()); }
 
-function promptPlayer(p) {
-  shotClockStart = mode === 'online' ? serverNow() : 0;
+function promptPlayer(p, opts) {
+  const resuming = opts && opts.resuming;
+  // Anchor the clock to a shared server timestamp (lastMoveServerTs) so both
+  // clients compute the same start; falls back to serverNow() only before any
+  // move exists. The roll grace covers the bowl settling after the prior shot.
+  if (resuming && opts.clockStart) {
+    shotClockStart = opts.clockStart;
+  } else if (mode === 'online' && lastMoveServerTs) {
+    shotClockStart = lastMoveServerTs + SHOT_ROLL_GRACE_MS;
+  } else {
+    shotClockStart = mode === 'online' ? serverNow() : 0;
+  }
   shotClockExpired = false;
   clockDisplayMs = -1;   // snap the smoothed HUD clock to the fresh turn
-  if (mode === 'online' && netConn && netConn.open) {
-    netConn.send({ type: 'CLOCK_START', ts: serverNow() });
-  }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -1323,6 +1332,7 @@ function _doOnAllStopped() {
   if (state === 'moving' || state === 'game-over') return;
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
+  if (mode !== 'online') saveGameState(buildSuspendedState());
 }
 
 function onAllStopped() {
@@ -1387,6 +1397,7 @@ function finishEnd() {
     msg(`${endLabel()} — Dead end (no jack in play). Click to continue.`);
     unlockAch('dead_end');
   }
+  if (mode !== 'online') saveGameState(buildSuspendedState());
 }
 
 function advanceEnd() {
@@ -1397,6 +1408,7 @@ function advanceEnd() {
 
 function gameOver() {
   state = 'game-over';
+  clearSavedGame();
   checkAchievements('game_over');
   const me = myPlayerIdx();
   const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
@@ -1431,6 +1443,7 @@ function doConcede() {
 
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
+  clearSavedGame();
   checkAchievements('game_over', { concede: true, concedingPlayer });
   const me = myPlayerIdx();
   const conWon = concedingPlayer !== me;
@@ -1524,6 +1537,16 @@ function drawOverlayUI() {
     ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
   }
 
+  // Head button also available after end finishes and at game over
+  if (state === 'end-result' || state === 'game-over') {
+    const hx = W - btnW/2 - 6, hy = btnY;
+    ctx.fillStyle = headOverlay ? '#0d9488' : 'rgba(13,94,88,0.7)';
+    ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.fillStyle = headOverlay ? '#fff' : '#5eead4';
+    ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
+  }
+
   // FF button (right side) — only during moving
   if (state === 'moving') {
     const ffx = W - btnW/2 - 6, ffy = btnY;
@@ -1566,7 +1589,7 @@ const ALL_MENU_ITEMS = [
   { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
-  { id: 'leave',   label: '🚪  Leave Match',  bg: '#92400e', fg: '#fde68a' },
+  { id: 'lobby',   label: '📋  Back to Lobby', bg: '#1e3a8a', fg: '#93c5fd' },
   { id: 'concede', label: '🏳  Concede',      bg: '#7f1d1d', fg: '#fca5a5' },
 ];
 const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
@@ -1575,7 +1598,7 @@ function visibleMenuItems() {
   return ALL_MENU_ITEMS.filter(item => {
     if (item.id === 'concede' && state === 'game-over') return false;
     if (item.id === 'exit' && mode === 'online') return false;
-    if (item.id === 'leave' && mode !== 'online') return false;
+    if (item.id === 'lobby' && mode !== 'online') return false;
     return true;
   });
 }
@@ -1699,7 +1722,7 @@ function handleGameMenuTap(p) {
   if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
   if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
   if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
-  if (id === 'leave') { gameMenuOpen = false; doLeaveOnline(); return; }
+  if (id === 'lobby') { gameMenuOpen = false; backToLobby(); return; }
   if (id === 'concede') {
     if (concedeConfirm) {
       concedeConfirm = false;
@@ -1715,15 +1738,34 @@ function handleGameMenuTap(p) {
   }
 }
 
-function exitToMenu() {
-  suspendedGame = {
+function buildSuspendedState() {
+  return {
     mode, state: state === 'idle' ? 'idle' : state, bowls: JSON.parse(JSON.stringify(bowls)),
     jack: jack ? JSON.parse(JSON.stringify(jack)) : null,
     scores: [...scores], endNum, jackOwner, turnIdx, delivDir, endHistory: [...endHistory],
     biasDirs: [...biasDirs], aiLevel, jackOffCounts: [...jackOffCounts],
     splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
+    friction, biasMultLeft, biasMultRight, bgStyle,
   };
-  clearTimeout(aiTimer);
+}
+
+function settlePhysics() {
+  for (let i = 0; i < 3000 && !allStopped(); i++) {
+    for (const b of bowls) stepObj(b, b.bias);
+    stepObj(jack, null);
+    stepCollisions();
+  }
+  resetCam();
+  state = 'camera-return';
+  if (jack && jack.offSide) { handleJackOffSide(); return; }
+  _doOnAllStopped();
+}
+
+function exitToMenu() {
+  if (state === 'moving') settlePhysics();
+  suspendedGame = buildSuspendedState();
+  saveGameState(suspendedGame);
+  resetCam();
   gameMenuOpen = false;
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   state = 'idle'; syncFireBtn();
@@ -1733,7 +1775,9 @@ function exitToMenu() {
 
 function resumeGame() {
   if (!suspendedGame) return;
+  clearSavedGame();
   const sg = suspendedGame; suspendedGame = null;
+  clearSavedGame();
   mode = sg.mode; bowls = sg.bowls; jack = sg.jack;
   scores = sg.scores; endNum = sg.endNum; jackOwner = sg.jackOwner;
   turnIdx = sg.turnIdx; delivDir = sg.delivDir; endHistory = sg.endHistory;
@@ -1742,12 +1786,36 @@ function resumeGame() {
   Object.assign(splashCfg, sg.splashCfg);
   C.p1 = BOWL_COLOURS[splashCfg.p1idx].main; C.p1d = BOWL_COLOURS[splashCfg.p1idx].dark;
   C.p2 = BOWL_COLOURS[splashCfg.p2idx].main; C.p2d = BOWL_COLOURS[splashCfg.p2idx].dark;
+  RB = 10 + splashCfg.size;
+  biasMult = splashCfg.biasVal;
+  friction = sg.friction != null ? sg.friction : 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
+  biasMultLeft = sg.biasMultLeft != null ? sg.biasMultLeft : (splashCfg.bendLeft / 50) ** 2 * 0.15;
+  biasMultRight = sg.biasMultRight != null ? sg.biasMultRight : (splashCfg.bendRight / 50) ** 2 * 0.15;
+  bgStyle = sg.bgStyle || splashCfg.bg;
   resetCam(); resetAim(); updateHUD();
   document.getElementById('splash').classList.add('hidden');
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
   state = sg.state;
-  if (state === 'aim') promptPlayer(playerForTurn(turnIdx));
-  else if (state === 'ai-turn') promptPlayer(playerForTurn(turnIdx));
+  if (state === 'moving' || state === 'camera-return') {
+    const farDeadY = yFromFar(L.DEAD);
+    bowls.forEach(b => {
+      if (!b.stopped && !b.offMat) {
+        b.vx = 0; b.vy = 0; b.stopped = true;
+        if (delivDir === 1 ? b.y > farDeadY : b.y < farDeadY) { b.offMat = true; }
+      }
+    });
+    if (jack) { jack.vx = 0; jack.vy = 0; jack.stopped = true; }
+    turnIdx++;
+    state = 'aim';
+    if (turnIdx >= BPP * 2) { finishEnd(); return; }
+    promptPlayer(playerForTurn(turnIdx));
+  } else if (state === 'aim' || state === 'ai-turn') {
+    promptPlayer(playerForTurn(turnIdx));
+  } else if (state === 'end-result' || state === 'jack-off-side') {
+    msg('Tap to continue');
+  } else if (state === 'place-jack') {
+    msg('Place jack along yellow line');
+  }
   syncResumeBtn();
 }
 
@@ -2352,7 +2420,7 @@ function drawSidePanels() {
   // Left — P1
   ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,SP,H);
   // Label (above score)
-  ctx.fillStyle=C.p1; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
+  ctx.fillStyle=C.p1; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   ctx.fillText('P1',SC,16);
   // Score
   ctx.font='bold 22px Segoe UI';
@@ -2865,10 +2933,31 @@ function handleShotClockExpiry() {
   promptPlayer(playerForTurn(turnIdx));
 }
 
+// Resume-recovery only: when reloading a game whose opponent abandoned a turn
+// long ago, no `timeout` move may ever arrive, so checkExpiredTimerOnResume()
+// infers it once to advance the head. Live play never calls this — there the
+// shooter forfeits its own clock (below), which avoids the double-count race.
+function handleRemoteTimeout() {
+  if (shotClockExpired) return;
+  shotClockExpired = true;
+  const remotePlayer = playerForTurn(turnIdx);
+  shotClockForfeits[remotePlayer - 1]++;
+  if (shotClockForfeits[remotePlayer - 1] >= 3) {
+    finishClockForfeit(remotePlayer);
+    return;
+  }
+  msg(`Opponent timed out — shot forfeited (${shotClockForfeits[remotePlayer-1]}/3).`);
+  shotClockStart = 0;
+  turnIdx++;
+  if (turnIdx >= BPP * 2) { finishEnd(); return; }
+  promptPlayer(playerForTurn(turnIdx));
+}
+
 // Forfeits are owned by the shooter only: each client forfeits its OWN clock and
 // broadcasts a `timeout` move; the opponent applies that move (applyRemoteMove).
-// The watcher never infers the opponent's timeout, which removes the double-count
-// race where the inferred-timeout and the received move both advanced the turn.
+// The watcher never infers the opponent's timeout during live play, which removes
+// the double-count race where the inferred-timeout and the received move both
+// advanced the turn.
 function checkShotClock() {
   if (mode !== 'online' || !shotClockStart || !shotClockLimit) return;
   if (state !== 'aim') return;
@@ -2878,8 +2967,10 @@ function checkShotClock() {
 
 function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
+  clearSavedGame();
   const me = myPlayerIdx();
   const fWon = forfeitingPlayer !== me;
+  checkAchievements('game_over', { concede: true, concedingPlayer: forfeitingPlayer });
   recordCurrentGame(fWon, false);
   awardXP(fWon, true);
   if (mode === 'online' && sb) {
@@ -3051,14 +3142,23 @@ function handlePointerDown(p) {
     swipeStartY   = p.y;
     swipeStartX   = p.x;
     aimLiveSpeed  = 0;
-  } else if (state === 'end-result') {
-    if (mode === 'online') {
-      localAcked = true;
-      sendMove('end_ack', localPlayer, {});
-      if (opponentAcked) advanceEnd();
-      else msg('Waiting for opponent…');
-    } else {
-      advanceEnd();
+  } else if (state === 'end-result' || state === 'game-over') {
+    // Head button (right side) — review the head before continuing
+    const hx = W - btnW/2 - 6;
+    if (p.x >= hx - btnW/2 && p.x <= hx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
+      headOverlay = !headOverlay;
+      mouse.down = false; return;
+    }
+    if (state === 'end-result') {
+      if (mode === 'online') {
+        localAcked = true;
+        sendMove('end_ack', localPlayer, {});
+        if (opponentAcked) advanceEnd();
+        else msg('Waiting for opponent…');
+      } else {
+        headOverlay = false;
+        advanceEnd();
+      }
     }
   } else if (state === 'jack-off-side') {
     startEnd();
@@ -3114,6 +3214,12 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); handlePointerDo
 canvas.addEventListener('touchmove',  e => { e.preventDefault(); handlePointerMove(getPos(e)); }, { passive: false });
 canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp(); },            { passive: false });
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (mode === 'online' && state === 'aim') checkExpiredTimerOnResume();
+  }
+});
+
 // Buttons
 function syncFireBtn() {}
 function syncFFBtn() {}
@@ -3155,6 +3261,9 @@ let shotClockExpired = false;
 let serverTimeOffset = 0;
 let serverOffsetInit = false;
 let clockDisplayMs = -1;          // smoothed value shown in the HUD
+let lastMoveServerTs = 0;         // server timestamp of the last move (shared clock anchor)
+const TIMEOUT_GRACE_MS = 3000;    // resume-recovery tolerance before inferring an opponent timeout
+const SHOT_ROLL_GRACE_MS = 10000; // roll-settle grace added to the clock anchor
 let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
@@ -3168,6 +3277,23 @@ let concedeConfirmTimer = null;
 let gameMenuOpen = false;
 let endHistory = [];
 let suspendedGame = null;
+
+const SAVED_GAME_KEY = 'bowls_suspendedGame';
+
+function saveGameState(sg) {
+  try { localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(sg)); } catch {}
+}
+
+function clearSavedGame() {
+  localStorage.removeItem(SAVED_GAME_KEY);
+}
+
+function loadSavedGame() {
+  try {
+    const raw = localStorage.getItem(SAVED_GAME_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
 
 const TIME_CONTROLS = [
   { label:'30 seconds', value:'30s',  ms:30000,     realtime:true },
@@ -3260,6 +3386,7 @@ async function sendMove(type, player, data) {
     const t1 = Date.now();
     const srvTs = new Date(inserted.created_at).getTime();
     updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
+    lastMoveServerTs = srvTs;
   }
   if (netConn && netConn.open) {
     netConn.send({ type: 'MOVE', move: row, serverTime: serverNow() });
@@ -3278,10 +3405,17 @@ function subscribeMoves(gameId) {
   moveSubscription = sb.channel(`moves:${gameId}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves', filter: `game_id=eq.${gameId}` },
       (payload) => {
-        // Don't derive the clock offset from received moves — one-way delivery
-        // latency is unknown, so it only adds jitter. Offset is synced from our
-        // own inserts (RTT-measured) in sendMove.
-        if (payload.new.player !== localPlayer) onRemoteMove(payload.new);
+        if (payload.new.player !== localPlayer) {
+          if (payload.new.created_at) {
+            const srvTs = new Date(payload.new.created_at).getTime();
+            lastMoveServerTs = srvTs;
+            // Seed the offset from a received move only until our own RTT-measured
+            // sends take over — one-way delivery latency is unknown, so using it
+            // continuously would only add jitter to the displayed clock.
+            if (!serverOffsetInit) updateServerOffset(srvTs - Date.now());
+          }
+          onRemoteMove(payload.new);
+        }
       })
     .subscribe();
 }
@@ -3332,6 +3466,10 @@ function setupConn(conn) {
     if (msg.type === 'PING') { conn.send({ type: 'PONG', t: msg.t }); return; }
     if (msg.type === 'PONG') { peerLatencyMs = Date.now() - msg.t; return; }
     if (msg.type === 'MOVE') {
+      if (msg.serverTime) {
+        lastMoveServerTs = msg.serverTime;
+        if (!serverOffsetInit) updateServerOffset(msg.serverTime - Date.now());
+      }
       onRemoteMove(msg.move);
       return;
     }
@@ -3456,6 +3594,19 @@ function formatClock(ms) {
   if (ms >= 3600000) { const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return `${h}h ${m}m`; }
   if (ms >= 60000) { const m = Math.floor(ms / 60000); const s = Math.floor((ms % 60000) / 1000); return `${m}:${String(s).padStart(2,'0')}`; }
   return `${Math.ceil(ms / 1000)}s`;
+}
+
+function checkExpiredTimerOnResume() {
+  if (mode !== 'online' || !shotClockStart || !shotClockLimit) return;
+  if (state !== 'aim') return;
+  const rem = shotClockRemaining();
+  if (rem > 0) return;
+  const currentPlayer = playerForTurn(turnIdx);
+  if (currentPlayer === localPlayer) {
+    handleShotClockExpiry();
+  } else if (rem <= -TIMEOUT_GRACE_MS) {
+    handleRemoteTimeout();
+  }
 }
 
 // ── Splash screen ─────────────────────────────────────────────────
@@ -3605,7 +3756,7 @@ function buildGameSettingsPanel() {
 
   document.getElementById('game-settings-back').onclick = hideGameSettingsPanel;
   document.getElementById('btnStartGame').onclick = () => {
-    suspendedGame = null; syncResumeBtn();
+    suspendedGame = null; clearSavedGame(); syncResumeBtn();
     hideGameSettingsPanel();
     applyAndStart();
   };
@@ -3619,6 +3770,18 @@ let createCfg = {
 };
 let onlinePanelBuilt = false;
 
+let lobbyClockInterval = null;
+
+function tickLobbyClocks() {
+  const clocks = document.querySelectorAll('.my-game-clock[data-deadline]');
+  clocks.forEach(el => {
+    const deadline = Number(el.dataset.deadline);
+    const rem = Math.max(0, deadline - Date.now());
+    el.textContent = formatClock(rem);
+    el.classList.toggle('urgent', rem < 60000);
+  });
+}
+
 function showOnlinePanel() {
   const panel = document.getElementById('online-panel');
   const nameInput = document.getElementById('lobby-name');
@@ -3626,11 +3789,13 @@ function showOnlinePanel() {
   if (!onlinePanelBuilt) buildOnlinePanel();
   panel.classList.add('show');
   refreshLobby();
+  if (!lobbyClockInterval) lobbyClockInterval = setInterval(tickLobbyClocks, 1000);
 }
 
 function hideOnlinePanel() {
   document.getElementById('online-panel').classList.remove('show');
   unsubscribeLobby();
+  if (lobbyClockInterval) { clearInterval(lobbyClockInterval); lobbyClockInterval = null; }
   splashCfg.mode = 'vs-ai';
   const seg = document.getElementById('sMode');
   seg.querySelectorAll('button').forEach(b => {
@@ -3695,9 +3860,9 @@ async function refreshLobby() {
       if (g.time_control) {
         const tcMs = getTimeControlMs(g.time_control);
         const since = lm ? lm.created_at : g.created_at;
-        const elapsed = Date.now() - new Date(since).getTime();
-        const rem = Math.max(0, tcMs - elapsed);
-        clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}">${formatClock(rem)}</span>`;
+        const deadline = new Date(since).getTime() + SHOT_ROLL_GRACE_MS + tcMs;
+        const rem = Math.max(0, deadline - Date.now());
+        clockHtml = `<span class="my-game-clock${rem < 60000 ? ' urgent' : ''}" data-deadline="${deadline}">${formatClock(rem)}</span>`;
       }
       row.innerHTML = `<span class="my-game-opp">vs ${esc(opp)}</span>` +
         `<span class="${turnClass}">${turnLabel}</span>` +
@@ -3762,6 +3927,7 @@ async function confirmJoinLobby() {
   const gameId = pendingJoinGameId;
   if (!gameId) return;
   pendingJoinGameId = null;
+  cleanupNet();
   const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
   if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
 
@@ -3784,6 +3950,7 @@ async function confirmJoinLobby() {
 }
 
 async function doResumeLobby(game) {
+  cleanupNet();
   onlineGameId = game.id;
   const isHost = game.host_name === netDisplayName;
   localPlayer = isHost ? 1 : 2;
@@ -3890,13 +4057,14 @@ function replayMoves(moves) {
   resetCam();
   if (state === 'game-over') return;
   if (jack && turnIdx < BPP * 2) {
-    promptPlayer(playerForTurn(turnIdx));
     const lastMove = moves[moves.length - 1];
     if (lastMove && lastMove.created_at) {
       const srvTs = new Date(lastMove.created_at).getTime();
-      updateServerOffset(srvTs - Date.now());  // coarse seed; refined by RTT on next send
-      shotClockStart = srvTs;
+      lastMoveServerTs = srvTs;
+      if (!serverOffsetInit) updateServerOffset(srvTs - Date.now()); // seed on resume; refined by RTT on next send
     }
+    promptPlayer(playerForTurn(turnIdx), { resuming: true, clockStart: lastMoveServerTs ? lastMoveServerTs + SHOT_ROLL_GRACE_MS : 0 });
+    checkExpiredTimerOnResume();
   } else if (!jack) {
     state = 'place-jack'; syncFireBtn();
   }
@@ -4027,6 +4195,7 @@ function buildCreatePanel() {
 }
 
 async function doCreateGame() {
+  cleanupNet();
   const settings = {
     ends: createCfg.ends, size: createCfg.size, biasVal: createCfg.biasVal,
     speedVal: createCfg.speedVal, bendLeft: createCfg.bendLeft, bendRight: createCfg.bendRight,
@@ -4128,6 +4297,18 @@ function doLeaveOnline() {
   showSplash();
 }
 
+function backToLobby() {
+  clearTimeout(aiTimer);
+  cleanupNet();
+  concedeConfirm = false; clearTimeout(concedeConfirmTimer);
+  gameMenuOpen = false;
+  state = 'idle'; syncFireBtn();
+  hideGameSettingsPanel();
+  document.getElementById('splash').classList.remove('hidden');
+  syncResumeBtn();
+  showOnlinePanel();
+}
+
 function showSplash() {
   clearTimeout(aiTimer);
   cleanupNet();
@@ -4181,7 +4362,7 @@ function loadAch() {
 }
 function saveAch(data) { localStorage.setItem(ACH_KEY, JSON.stringify(data)); }
 function loadStats() {
-  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0 };
+  const def = { wins:0, games:0, totalPts:0, maxBehind:0, onlineWins:0, onlineGames:0, endsWon:0, bestMargin:0, winStreak:0, onlineEndsWon:0, onlineTotalPts:0, onlineBestMargin:0 };
   try { return Object.assign(def, JSON.parse(localStorage.getItem(STATS_KEY))); }
   catch { return def; }
 }
@@ -4228,6 +4409,7 @@ function checkAchievements(event, data) {
       if (data.pts === 4) unlockAch('perfect_end');
       stats.totalPts += data.pts;
       stats.endsWon++;
+      if (mode === 'online') { stats.onlineTotalPts += data.pts; stats.onlineEndsWon++; }
     }
     saveStats(stats);
     if (stats.totalPts >= 100) unlockAch('score_100');
@@ -4252,6 +4434,7 @@ function checkAchievements(event, data) {
       if (mode === 'online') stats.onlineWins++;
       const margin = myScore - oppScore;
       if (margin > stats.bestMargin) stats.bestMargin = margin;
+      if (mode === 'online' && margin > stats.onlineBestMargin) stats.onlineBestMargin = margin;
       unlockAch('first_win');
       if (stats.wins >= 3) unlockAch('win_3');
       if (stats.wins >= 10) unlockAch('win_10');
@@ -4446,17 +4629,29 @@ function renderProfileStats() {
   const onlineLosses = s.onlineGames - s.onlineWins;
   const maxPts = Math.max(s.totalPts, 1);
 
+  const onlineWinPct = s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0;
+  const localWinPct = localGames > 0 ? Math.round(localWins / localGames * 100) : 0;
+  const localEndsWon = s.endsWon - (s.onlineEndsWon || 0);
+  const localTotalPts = s.totalPts - (s.onlineTotalPts || 0);
+  const localBestMargin = s.bestMargin;
+
   el.innerHTML =
     statBar('Win Rate', winPct + '%', winPct, 'green') +
     statRow('Games Played', s.games) +
     statRow('Wins / Losses', s.wins + ' / ' + losses) +
     statBar('Shots Scored', s.totalPts, Math.min(s.totalPts / maxPts * 100, 100), 'blue') +
-    statBar('Online', s.onlineWins + 'W – ' + onlineLosses + 'L',
-      s.onlineGames > 0 ? Math.round(s.onlineWins / s.onlineGames * 100) : 0, 'purple') +
-    statBar('Local', localWins + 'W – ' + localLosses + 'L',
-      localGames > 0 ? Math.round(localWins / localGames * 100) : 0, 'green') +
-    statRow('Ends Won', s.endsWon) +
-    statRow('Best Margin', s.bestMargin);
+    '<div class="stat-section-head">🌐 Online</div>' +
+    statBar('Win Rate', onlineWinPct + '%', onlineWinPct, 'purple') +
+    statRow('Games', s.onlineGames) +
+    statRow('Wins / Losses', s.onlineWins + ' / ' + onlineLosses) +
+    statRow('Ends Won', s.onlineEndsWon || 0) +
+    statRow('Best Margin', s.onlineBestMargin || 0) +
+    '<div class="stat-section-head">🤖 Local</div>' +
+    statBar('Win Rate', localWinPct + '%', localWinPct, 'green') +
+    statRow('Games', localGames) +
+    statRow('Wins / Losses', localWins + ' / ' + localLosses) +
+    statRow('Ends Won', localEndsWon) +
+    statRow('Best Margin', localBestMargin);
 }
 
 function statBar(label, valText, pct, color) {
@@ -4635,7 +4830,23 @@ function applyProfileToSplash() {
 
 buildSplash();
 applyProfileToSplash();
+const _savedGame = loadSavedGame();
 showSplash();
+suspendedGame = _savedGame;
+syncResumeBtn();
+
+window.addEventListener('beforeunload', () => {
+  if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    if (state === 'moving') settlePhysics();
+    saveGameState(buildSuspendedState());
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state !== 'idle' && state !== 'game-over' && mode !== 'online') {
+    if (state === 'moving') settlePhysics();
+    saveGameState(buildSuspendedState());
+  }
+});
 
 // The shot-clock expiry check also runs off the animation frame: requestAnimationFrame
 // is throttled/paused when the PWA is backgrounded, which would otherwise let a
