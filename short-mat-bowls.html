@@ -1528,6 +1528,16 @@ function drawOverlayUI() {
     ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
   }
 
+  // Head button also available after end finishes and at game over
+  if (state === 'end-result' || state === 'game-over') {
+    const hx = W - btnW/2 - 6, hy = btnY;
+    ctx.fillStyle = headOverlay ? '#0d9488' : 'rgba(13,94,88,0.7)';
+    ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.fillStyle = headOverlay ? '#fff' : '#5eead4';
+    ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
+  }
+
   // FF button (right side) — only during moving
   if (state === 'moving') {
     const ffx = W - btnW/2 - 6, ffy = btnY;
@@ -3062,14 +3072,23 @@ function handlePointerDown(p) {
     swipeStartY   = p.y;
     swipeStartX   = p.x;
     aimLiveSpeed  = 0;
-  } else if (state === 'end-result') {
-    if (mode === 'online') {
-      localAcked = true;
-      sendMove('end_ack', localPlayer, {});
-      if (opponentAcked) advanceEnd();
-      else msg('Waiting for opponent…');
-    } else {
-      advanceEnd();
+  } else if (state === 'end-result' || state === 'game-over') {
+    // Head button (right side) — review the head before continuing
+    const hx = W - btnW/2 - 6;
+    if (p.x >= hx - btnW/2 && p.x <= hx + btnW/2 && p.y >= btnY - btnH/2 && p.y <= btnY + btnH/2) {
+      headOverlay = !headOverlay;
+      mouse.down = false; return;
+    }
+    if (state === 'end-result') {
+      if (mode === 'online') {
+        localAcked = true;
+        sendMove('end_ack', localPlayer, {});
+        if (opponentAcked) advanceEnd();
+        else msg('Waiting for opponent…');
+      } else {
+        headOverlay = false;
+        advanceEnd();
+      }
     }
   } else if (state === 'jack-off-side') {
     startEnd();
