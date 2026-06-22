@@ -3930,9 +3930,7 @@ function replayMoves(moves) {
     const lastMove = moves[moves.length - 1];
     let clockStart = 0;
     if (lastMove && lastMove.created_at) {
-      const srvTs = new Date(lastMove.created_at).getTime();
-      serverTimeOffset = srvTs - Date.now();
-      clockStart = srvTs;
+      clockStart = new Date(lastMove.created_at).getTime();
     }
     promptPlayer(playerForTurn(turnIdx), { resuming: true, clockStart });
     checkExpiredTimerOnResume();
