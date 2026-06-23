@@ -10,7 +10,6 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>Short Mat Bowls</title>
-<script src="https://unpkg.com/peerjs@1/dist/peerjs.min.js" defer></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2" defer></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3238,7 +3237,6 @@ if ('serviceWorker' in navigator) {
 const SUPABASE_URL  = 'https://qbbcxkmvcpwcwrcdtcce.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFiYmN4a212Y3B3Y3dyY2R0Y2NlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5ODExMzUsImV4cCI6MjA5NzU1NzEzNX0.g8jFLYNqmpEHznmvRXUZIU_IH5N8BymoetYTQkzf91I';
 let sb = null;
-let netPeer = null, netConn = null;
 let localPlayer = 0;
 let onlineGameId = '';
 let onlineOpponentName = '';
@@ -3376,9 +3374,9 @@ async function sendMove(type, player, data) {
     updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
     lastMoveServerTs = srvTs;
   }
-  if (netConn && netConn.open) {
-    netConn.send({ type: 'MOVE', move: row, serverTime: serverNow() });
-  }
+  // Low-latency hint over the realtime channel; the DB insert above is the
+  // reliable path (postgres_changes delivers it even if the broadcast is missed).
+  sendBroadcast('move', { move: row, serverTime: serverNow() });
 }
 
 async function fetchMoves(gameId) {
@@ -3390,7 +3388,8 @@ async function fetchMoves(gameId) {
 
 function subscribeMoves(gameId) {
   if (!sb || moveSubscription) return;
-  moveSubscription = sb.channel(`moves:${gameId}`)
+  moveSubscription = sb.channel(`game:${gameId}`, { config: { broadcast: { self: false } } })
+    // Durable path: every move is inserted into the DB and delivered here.
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves', filter: `game_id=eq.${gameId}` },
       (payload) => {
         if (payload.new.player !== localPlayer) {
@@ -3405,10 +3404,29 @@ function subscribeMoves(gameId) {
           onRemoteMove(payload.new);
         }
       })
-    .subscribe();
+    // Low-latency path: the sender broadcasts the move directly over the same
+    // socket. Deduped against the DB copy by move_num in onRemoteMove.
+    .on('broadcast', { event: 'move' }, ({ payload }) => {
+      if (payload.serverTime) {
+        lastMoveServerTs = payload.serverTime;
+        if (!serverOffsetInit) updateServerOffset(payload.serverTime - Date.now());
+      }
+      onRemoteMove(payload.move);
+    })
+    .on('broadcast', { event: 'ping' }, ({ payload }) => sendBroadcast('pong', { t: payload.t }))
+    .on('broadcast', { event: 'pong' }, ({ payload }) => { peerLatencyMs = Date.now() - payload.t; })
+    .on('broadcast', { event: 'leave' }, () => { msgText = 'Opponent left the match.'; })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') startPing();
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        peerLatencyMs = -1; clearInterval(pingInterval);
+      }
+    });
 }
 
 function unsubscribeMoves() {
+  clearInterval(pingInterval);
+  peerLatencyMs = -1;
   if (moveSubscription) { sb.removeChannel(moveSubscription); moveSubscription = null; }
 }
 
@@ -3424,61 +3442,18 @@ function unsubscribeLobby() {
   if (lobbySubscription) { sb.removeChannel(lobbySubscription); lobbySubscription = null; }
 }
 
-// ── PeerJS (real-time overlay) ───────────────────────────────────
-function setupPeer(id, onOpen) {
-  netPeer = new Peer(id || undefined);
-  netPeer.on('open', () => { if (onOpen) onOpen(netPeer.id); });
-  netPeer.on('error', (e) => console.warn('PeerJS error', e));
+// ── Realtime broadcast (over the Supabase channel) ───────────────
+// Best-effort send on the game channel. Returns silently if the channel isn't
+// subscribed yet — the DB insert + postgres_changes is the reliable fallback.
+function sendBroadcast(event, payload) {
+  if (!moveSubscription) return;
+  try { moveSubscription.send({ type: 'broadcast', event, payload }); } catch (e) {}
 }
 
-function peerHost(roomCode, onGuest) {
-  setupPeer(roomCode, () => {
-    netPeer.on('connection', (conn) => {
-      netConn = conn;
-      setupConn(conn);
-      if (onGuest) onGuest();
-    });
-  });
-}
-
-function peerJoin(roomCode, onConnected) {
-  setupPeer(null, () => {
-    netConn = netPeer.connect(roomCode, { reliable: true });
-    setupConn(netConn);
-    netConn.on('open', () => { if (onConnected) onConnected(); });
-  });
-}
-
-function setupConn(conn) {
-  conn.on('data', (msg) => {
-    if (msg.type === 'PING') { conn.send({ type: 'PONG', t: msg.t }); return; }
-    if (msg.type === 'PONG') { peerLatencyMs = Date.now() - msg.t; return; }
-    if (msg.type === 'MOVE') {
-      if (msg.serverTime) {
-        lastMoveServerTs = msg.serverTime;
-        if (!serverOffsetInit) updateServerOffset(msg.serverTime - Date.now());
-      }
-      onRemoteMove(msg.move);
-      return;
-    }
-    if (msg.type === 'CLOCK_START') { shotClockStart = msg.ts ? msg.ts : serverNow(); shotClockExpired = false; return; }
-    if (msg.type === 'LEAVE') { msgText = 'Opponent left the match.'; return; }
-  });
-  conn.on('close', () => onPeerDisconnect());
-  conn.on('error', () => onPeerDisconnect());
-  startPing();
-}
-
+// Round-trip latency probe (client → realtime server → opponent → back).
 function startPing() {
   clearInterval(pingInterval);
-  pingInterval = setInterval(() => {
-    if (netConn && netConn.open) netConn.send({ type: 'PING', t: Date.now() });
-  }, 2000);
-}
-
-function onPeerDisconnect() {
-  peerLatencyMs = -1;
-  clearInterval(pingInterval);
+  pingInterval = setInterval(() => sendBroadcast('ping', { t: Date.now() }), 3000);
 }
 
 function cleanupNet() {
@@ -3486,8 +3461,6 @@ function cleanupNet() {
   unsubscribeLobby();
   clearInterval(pingInterval);
   clearTimeout(reconnectTimer);
-  if (netConn) { netConn.close(); netConn = null; }
-  if (netPeer) { netPeer.destroy(); netPeer = null; }
   peerLatencyMs = -1;
   onlineGameId = '';
   onlineOpponentName = '';
@@ -3556,11 +3529,6 @@ function applyRemoteMove(move) {
 function getTimeControlMs(tc) {
   const found = TIME_CONTROLS.find(t => t.value === tc);
   return found ? found.ms : 60000;
-}
-
-function isRealtime(tc) {
-  const found = TIME_CONTROLS.find(t => t.value === tc);
-  return found ? found.realtime : true;
 }
 
 function serverNow() { return Date.now() + serverTimeOffset; }
@@ -3923,9 +3891,6 @@ async function confirmJoinLobby() {
   hideOnlinePanel();
   document.getElementById('create-game-panel').classList.remove('show');
 
-  if (isRealtime(tc)) {
-    peerJoin(gameId, () => {});
-  }
   subscribeMoves(gameId);
   localStorage.setItem('bowls_activeGame', gameId);
   localStorage.setItem('bowls_localPlayer', '2');
@@ -3945,10 +3910,6 @@ async function doResumeLobby(game) {
   hideOnlinePanel();
 
   subscribeMoves(game.id);
-  if (isRealtime(game.time_control)) {
-    if (isHost) peerHost(game.id, () => {});
-    else peerJoin(game.id, () => {});
-  }
   localStorage.setItem('bowls_activeGame', game.id);
   localStorage.setItem('bowls_localPlayer', String(localPlayer));
   document.getElementById('splash').classList.add('hidden');
@@ -4194,10 +4155,6 @@ async function doCreateGame() {
 
   shotClockLimit = getTimeControlMs(createCfg.timeControl);
 
-  if (isRealtime(createCfg.timeControl)) {
-    peerHost(code, () => onGuestJoined());
-  }
-
   subscribeLobby(async () => {
     if (!sb) return;
     const { data } = await sb.from('games').select('*').eq('id', code).single();
@@ -4275,9 +4232,7 @@ function applyAndStart() {
 }
 
 function doLeaveOnline() {
-  if (netConn && netConn.open) {
-    netConn.send({ type: 'LEAVE' });
-  }
+  sendBroadcast('leave', {});
   showSplash();
 }
 
