@@ -1219,6 +1219,8 @@ function promptPlayer(p, opts) {
 let _preShot = {};
 let _preShotPositions = [];
 let _preShotJack = null;
+let _pendingShotData = null;  // deferred shot move data — sent after physics settles with result snapshot
+let _remoteResultSnap = null; // authoritative snapshot from the opponent's shot, applied when local physics settles
 function deliverBowl(player, angle, speed) {
   const bs = bowlStart();
   _preShotPositions = bowls.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, stopped: b.stopped, offMat: b.offMat, inDitch: b.inDitch }));
@@ -1324,16 +1326,79 @@ function applyCameraTransform() {
   ctx.translate(-cam.x, -cam.y);
 }
 
+// Capture authoritative final positions for all bowls + jack after physics settles.
+// Included in the shot move so the opponent snaps to the shooter's truth.
+function captureResultSnapshot() {
+  const r = (v) => Math.round(v * 100) / 100; // 0.01 precision — plenty for mat coords
+  const snap = {
+    bowls: bowls.map(b => ({
+      x: r(b.x), y: r(b.y), p: b.player,
+      off: b.offMat || undefined,
+      ditch: b.inDitch || undefined,
+      toucher: b.toucher || undefined,
+      offSide: b.offSide || undefined,
+      forfeited: b.forfeited || undefined,
+      restTarget: b.restTarget,
+    })),
+  };
+  if (jack) {
+    snap.jack = {
+      x: r(jack.x), y: r(jack.y),
+      off: jack.offMat || undefined,
+      ditch: jack.inDitch || undefined,
+      offSide: jack.offSide || undefined,
+    };
+  }
+  return snap;
+}
+
+// Apply a result snapshot from the shooting client, overriding local physics drift.
+function applyResultSnapshot(snap) {
+  if (!snap) return;
+  // Snap bowl final positions — match by index (bowls array is append-only per end)
+  if (snap.bowls) {
+    for (let i = 0; i < snap.bowls.length && i < bowls.length; i++) {
+      const s = snap.bowls[i];
+      const b = bowls[i];
+      b.x = s.x; b.y = s.y;
+      b.stopped = true; b.vx = 0; b.vy = 0;
+      b.offMat = !!s.off;
+      b.inDitch = !!s.ditch;
+      b.toucher = !!s.toucher;
+      b.offSide = !!s.offSide;
+      b.forfeited = !!s.forfeited;
+      if (s.restTarget !== undefined) b.restTarget = s.restTarget;
+    }
+  }
+  if (snap.jack && jack) {
+    jack.x = snap.jack.x; jack.y = snap.jack.y;
+    jack.stopped = true; jack.vx = 0; jack.vy = 0;
+    jack.offMat = !!snap.jack.off;
+    jack.inDitch = !!snap.jack.ditch;
+    jack.offSide = !!snap.jack.offSide;
+  }
+}
+
 function _doOnAllStopped() {
+  // Send the deferred shot move with the authoritative result snapshot
+  if (mode === 'online' && _pendingShotData) {
+    const data = _pendingShotData;
+    _pendingShotData = null;
+    data.result = captureResultSnapshot();
+    sendMove('shot', localPlayer, data);
+  }
+  // Snap to the opponent's authoritative result if we received one
+  if (_remoteResultSnap) {
+    applyResultSnapshot(_remoteResultSnap);
+    _remoteResultSnap = null;
+  }
   // Post-shot achievement checks
   if (_preShot.player === myPlayerIdx()) {
-    // "Playing Up!" — fired shot removed 2+ opponent bowls
     if (_preShot.fired) {
       const liveNow = bowls.filter(b => !b.offMat).length;
       const removed = _preShot.liveBowls - liveNow;
       if (removed >= 2) unlockAch('playing_up');
     }
-    // "Ditching It" — jack went into ditch this shot
     if (jack && jack.inDitch && !_preShot.jackInDitch) unlockAch('ditch_jack');
   }
   turnIdx++;
@@ -1363,6 +1428,17 @@ function onAllStopped() {
 }
 
 function handleJackOffSide() {
+  // Flush deferred shot send (jack-off-side is a physics outcome too)
+  if (mode === 'online' && _pendingShotData) {
+    const data = _pendingShotData;
+    _pendingShotData = null;
+    data.result = captureResultSnapshot();
+    sendMove('shot', localPlayer, data);
+  }
+  if (_remoteResultSnap) {
+    applyResultSnapshot(_remoteResultSnap);
+    _remoteResultSnap = null;
+  }
   const hitter = lastJackHitter ?? playerForTurn(Math.max(0, turnIdx));
   const idx = hitter - 1;
   jackOffCounts[idx]++;
@@ -3177,7 +3253,9 @@ function handlePointerUp() {
       const shotAngle = aimAngle ?? defaultAimAngle();
       const shotSpeed = MIN_SPD + pct * (ceiling - MIN_SPD);
       if (mode === 'online') {
-        sendMove('shot', localPlayer, { angle: shotAngle, speed: shotSpeed, biasDir: biasDirs[localPlayer-1], delivX: delivPos ? delivPos.x : bowlStart().x });
+        // Defer the network send until physics settles (_doOnAllStopped) so we
+        // can include the authoritative result snapshot for the opponent.
+        _pendingShotData = { angle: shotAngle, speed: shotSpeed, biasDir: biasDirs[localPlayer-1], delivX: delivPos ? delivPos.x : bowlStart().x };
       }
       deliverBowl(playerForTurn(turnIdx), shotAngle, shotSpeed);
     } else {
@@ -3526,6 +3604,7 @@ function applyRemoteMove(move) {
     beginTurns();
   } else if (move.type === 'shot') {
     const d = move.data;
+    _remoteResultSnap = d.result || null;
     setBiasDir(move.player, d.biasDir);
     delivPos = { x: d.delivX, y: bowlStart().y };
     deliverBowl(move.player, d.angle, d.speed);
@@ -3972,16 +4051,26 @@ function replayMoves(moves) {
       const d = m.data;
       setBiasDir(m.player, d.biasDir);
       delivPos = { x: d.delivX, y: bowlStart().y };
-      const bs = bowlStart();
-      bowls.push({x:bs.x, y:bs.y, vx:Math.cos(d.angle)*d.speed, vy:Math.sin(d.angle)*d.speed,
-                  player:m.player, bias:biasDirs[m.player-1], stopped:false, offMat:false, toucher:false, inDitch:false,
-                  rotAngle:0, trail:[], restProgress:0, delivering:true,
-                  design:splashCfg[`p${m.player}design`]});
-      for (let i = 0; i < 3000; i++) {
-        for (const b of bowls) stepObj(b, b.bias);
-        stepObj(jack, null);
-        stepCollisions();
-        if (allStopped()) break;
+      if (d.result) {
+        // Authoritative snapshot available — skip re-simulation entirely
+        bowls.push({x:0, y:0, vx:0, vy:0, player:m.player, bias:biasDirs[m.player-1],
+                    stopped:true, offMat:false, toucher:false, inDitch:false,
+                    rotAngle:0, trail:[], restProgress:0,
+                    design:splashCfg[`p${m.player}design`]});
+        applyResultSnapshot(d.result);
+      } else {
+        // Legacy move without snapshot — fall back to local re-simulation
+        const bs = bowlStart();
+        bowls.push({x:bs.x, y:bs.y, vx:Math.cos(d.angle)*d.speed, vy:Math.sin(d.angle)*d.speed,
+                    player:m.player, bias:biasDirs[m.player-1], stopped:false, offMat:false, toucher:false, inDitch:false,
+                    rotAngle:0, trail:[], restProgress:0, delivering:true,
+                    design:splashCfg[`p${m.player}design`]});
+        for (let i = 0; i < 3000; i++) {
+          for (const b of bowls) stepObj(b, b.bias);
+          stepObj(jack, null);
+          stepCollisions();
+          if (allStopped()) break;
+        }
       }
       if (jack && jack.offSide) {
         const hitter = lastJackHitter ?? m.player;
