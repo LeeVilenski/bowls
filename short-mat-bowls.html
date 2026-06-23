@@ -3287,9 +3287,13 @@ function handlePointerUp() {
       const shotAngle = aimAngle ?? defaultAimAngle();
       const shotSpeed = MIN_SPD + pct * (ceiling - MIN_SPD);
       if (mode === 'online') {
-        // Defer the network send until physics settles (_doOnAllStopped) so we
-        // can include the authoritative result snapshot for the opponent.
-        _pendingShotData = { angle: shotAngle, speed: shotSpeed, biasDir: biasDirs[localPlayer-1], delivX: delivPos ? delivPos.x : bowlStart().x };
+        // Send the shot input immediately so the opponent starts simulating in
+        // parallel (instead of waiting ~10s for our physics to settle first).
+        // The DB move with the authoritative result snapshot is sent later in
+        // _doOnAllStopped for durability/reconciliation.
+        const shotInput = { angle: shotAngle, speed: shotSpeed, biasDir: biasDirs[localPlayer-1], delivX: delivPos ? delivPos.x : bowlStart().x };
+        _pendingShotData = shotInput;
+        sendBroadcast('shot_preview', { player: localPlayer, ...shotInput });
       }
       deliverBowl(playerForTurn(turnIdx), shotAngle, shotSpeed);
     } else {
@@ -3589,6 +3593,7 @@ function subscribeMoves(gameId) {
     .on('broadcast', { event: 'pong' }, ({ payload }) => { peerLatencyMs = Date.now() - payload.t; })
     .on('broadcast', { event: 'checksum' }, ({ payload }) => onOpponentChecksum(payload.mn, payload.sum))
     .on('broadcast', { event: 'clock' }, ({ payload }) => onOpponentClockStart(payload.start))
+    .on('broadcast', { event: 'shot_preview' }, ({ payload }) => onShotPreview(payload))
     .on('broadcast', { event: 'leave' }, () => { msgText = 'Opponent left the match.'; })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -3675,7 +3680,7 @@ function unsubscribeMoves() {
 function subscribeLobby(callback) {
   if (!sb) return;
   if (lobbySubscription) { sb.removeChannel(lobbySubscription); }
-  lobbySubscription = sb.channel('lobby')
+  lobbySubscription = sb.channel('lobby-' + Date.now())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => callback())
     .subscribe();
 }
@@ -3716,6 +3721,7 @@ function cleanupNet() {
   moveNum = 0;
   _pendingSends = [];
   hostGameStarted = false;
+  _shotPreviewApplied = false;
 }
 
 // ── Remote move handler ──────────────────────────────────────────
@@ -3820,6 +3826,7 @@ async function fullResync() {
   startGame();
   replayMoves(moves);
   _replaying = false;
+  _shotPreviewApplied = false;
   serverTimeOffset = off; serverOffsetInit = offInit; lastMoveServerTs = lastTs;
   _lastOppChecksum = null;
 }
@@ -3838,11 +3845,17 @@ function applyRemoteMove(move) {
     beginTurns();
   } else if (move.type === 'shot') {
     const d = move.data;
-    _remoteResultSnap = d.result || null;
-    setBiasDir(move.player, d.biasDir);
-    delivPos = { x: d.delivX, y: bowlStart().y };
-    deliverBowl(move.player, d.angle, d.speed);
-    shotClockStart = 0;
+    if (_shotPreviewApplied) {
+      // Preview already started physics — just grab the authoritative snapshot
+      _remoteResultSnap = d.result || null;
+      _shotPreviewApplied = false;
+    } else {
+      _remoteResultSnap = d.result || null;
+      setBiasDir(move.player, d.biasDir);
+      delivPos = { x: d.delivX, y: bowlStart().y };
+      deliverBowl(move.player, d.angle, d.speed);
+      shotClockStart = 0;
+    }
   } else if (move.type === 'timeout') {
     if (shotClockExpired) return;
     shotClockForfeits[move.player - 1]++;
@@ -3863,6 +3876,22 @@ function applyRemoteMove(move) {
   } else if (move.type === 'concede') {
     finishConcede(move.player);
   }
+}
+
+// Low-latency shot preview: the shooter broadcasts input params immediately so
+// the watcher starts the physics simulation in parallel. The durable DB move
+// (with the authoritative result snapshot) arrives later and is deduped — but if
+// the preview was missed, the DB path still works as before (just slower).
+let _shotPreviewApplied = false;
+function onShotPreview(payload) {
+  if (payload.player === localPlayer) return;
+  if (state === 'moving' || state === 'camera-return') return;
+  _shotPreviewApplied = true;
+  _remoteResultSnap = null;
+  setBiasDir(payload.player, payload.biasDir);
+  delivPos = { x: payload.delivX, y: bowlStart().y };
+  deliverBowl(payload.player, payload.angle, payload.speed);
+  shotClockStart = 0;
 }
 
 // ── Shot clock ───────────────────────────────────────────────────
