@@ -1139,7 +1139,7 @@ function startGame() {
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
   shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
-  _lastOppChecksum=null;
+  _lastOppChecksum=null; _pendingSends=[];
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -3353,6 +3353,8 @@ let reconnectTimer = null;
 let pendingMoves = [];
 let _gapFilling = false;  // a reconcile fetch is in flight
 let _replaying = false;   // initial resume replay in progress — suppress reconcile
+let _pendingSends = [];   // moves whose durable insert failed — retried on reconnect/heartbeat
+let heartbeatInterval = null;
 let concedeConfirm = false;
 let concedeConfirmTimer = null;
 let gameMenuOpen = false;
@@ -3454,33 +3456,64 @@ async function deleteLobby(gameId) {
   await sb.from('games').delete().eq('id', gameId);
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 async function sendMove(type, player, data) {
   if (!sb) return;
   moveNum++;
-  let row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
+  const row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
+  // First attempt resolves the final move_num. A 23505 collision means the
+  // opponent already took this number, so renumber; any other failure is
+  // transient (network) and keeps the same number for a background retry.
   const t0 = Date.now();
-  let { data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single();
-  if (error && error.code === '23505') {
-    // move_num collided with the opponent's (both numbered the same). Take the
-    // next free number after the current max and retry once.
+  let res = await sb.from('moves').insert(row).select('created_at').single();
+  if (res.error && res.error.code === '23505') {
     const { data: top } = await sb.from('moves').select('move_num')
       .eq('game_id', onlineGameId).order('move_num', { ascending: false }).limit(1).single();
     moveNum = (top && top.move_num >= moveNum) ? top.move_num + 1 : moveNum + 1;
-    row = { ...row, move_num: moveNum };
-    ({ data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single());
+    row.move_num = moveNum;
+    res = await sb.from('moves').insert(row).select('created_at').single();
   }
-  if (error) console.error('sendMove insert failed', error);
-  if (inserted && inserted.created_at) {
-    // RTT-corrected clock sync: estimate the server processed the insert at the
-    // midpoint of the round trip, rather than at response-receipt time.
-    const t1 = Date.now();
-    const srvTs = new Date(inserted.created_at).getTime();
-    updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
-    lastMoveServerTs = srvTs;
-  }
-  // Low-latency hint over the realtime channel; the DB insert above is the
-  // reliable path (postgres_changes delivers it even if the broadcast is missed).
+  // move_num is now fixed — broadcast the low-latency copy.
   sendBroadcast('move', { move: row, serverTime: serverNow() });
+  if (!res.error && res.data) {
+    if (res.data.created_at) {
+      // RTT-corrected clock sync: estimate the server stamped the row at the
+      // midpoint of the round trip, rather than at response-receipt time.
+      const t1 = Date.now();
+      const srvTs = new Date(res.data.created_at).getTime();
+      updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
+      lastMoveServerTs = srvTs;
+    }
+    return;
+  }
+  // Transient failure: the opponent has the broadcast, but the durable log is
+  // missing this move (resume/full-resync would lose it). Retry in the background.
+  retryInsert(row);
+}
+
+// Retry a failed insert with backoff, keeping the original move_num. Queues the
+// row for flush-on-reconnect if it still won't land.
+async function retryInsert(row) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await sleep(500 * Math.pow(2, attempt)); // 0.5s, 1s, 2s, 4s
+    const { error } = await sb.from('moves').insert(row).select('created_at').single();
+    if (!error || error.code === '23505') return; // landed (or a prior attempt won)
+    console.warn('sendMove retry', attempt + 1, error.message);
+  }
+  console.error('sendMove queued after retries — move', row.move_num);
+  if (!_pendingSends.some(r => r.move_num === row.move_num)) _pendingSends.push(row);
+}
+
+// Flush moves that never reached the DB. Called on (re)subscribe and the heartbeat.
+async function flushPendingSends() {
+  if (!_pendingSends.length || !sb) return;
+  const queue = _pendingSends;
+  _pendingSends = [];
+  for (const row of queue) {
+    const { error } = await sb.from('moves').insert(row).select('created_at').single();
+    if (error && error.code !== '23505') _pendingSends.push(row); // still failing — requeue
+  }
 }
 
 async function fetchMoves(gameId) {
@@ -3525,16 +3558,32 @@ function subscribeMoves(gameId) {
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         startPing();
-        // Catch up on anything missed before/while (re)connecting.
+        startHeartbeat();
+        // Catch up on anything missed before/while (re)connecting, and retry any
+        // moves that never reached the durable log.
         reconcileMoves();
+        flushPendingSends();
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         peerLatencyMs = -1; clearInterval(pingInterval);
       }
     });
 }
 
+// Low-frequency backstop: while waiting on the opponent, poll for any move that
+// was silently lost (delivered to neither transport) so the game can't deadlock
+// with no gap/refocus signal. Also flushes un-persisted local sends.
+function startHeartbeat() {
+  clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(() => {
+    if (mode !== 'online' || !onlineGameId) return;
+    if (state === 'aim' && playerForTurn(turnIdx) !== localPlayer) reconcileMoves();
+    flushPendingSends();
+  }, 15000);
+}
+
 function unsubscribeMoves() {
   clearInterval(pingInterval);
+  clearInterval(heartbeatInterval);
   peerLatencyMs = -1;
   if (moveSubscription) { sb.removeChannel(moveSubscription); moveSubscription = null; }
 }
@@ -3569,12 +3618,14 @@ function cleanupNet() {
   unsubscribeMoves();
   unsubscribeLobby();
   clearInterval(pingInterval);
+  clearInterval(heartbeatInterval);
   clearTimeout(reconnectTimer);
   peerLatencyMs = -1;
   onlineGameId = '';
   onlineOpponentName = '';
   localPlayer = 0;
   moveNum = 0;
+  _pendingSends = [];
   hostGameStarted = false;
 }
 
