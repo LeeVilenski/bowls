@@ -3494,35 +3494,28 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function sendMove(type, player, data) {
   if (!sb) return;
   moveNum++;
-  const row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
-  // First attempt resolves the final move_num. A 23505 collision means the
-  // opponent already took this number, so renumber; any other failure is
-  // transient (network) and keeps the same number for a background retry.
+  let row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
   const t0 = Date.now();
-  let res = await sb.from('moves').insert(row).select('created_at').single();
-  if (res.error && res.error.code === '23505') {
+  let { data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single();
+  if (error && error.code === '23505') {
     const { data: top } = await sb.from('moves').select('move_num')
       .eq('game_id', onlineGameId).order('move_num', { ascending: false }).limit(1).single();
     moveNum = (top && top.move_num >= moveNum) ? top.move_num + 1 : moveNum + 1;
-    row.move_num = moveNum;
-    res = await sb.from('moves').insert(row).select('created_at').single();
+    row = { ...row, move_num: moveNum };
+    ({ data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single());
   }
   // move_num is now fixed — broadcast the low-latency copy.
   sendBroadcast('move', { move: row, serverTime: serverNow() });
-  if (!res.error && res.data) {
-    if (res.data.created_at) {
-      // RTT-corrected clock sync: estimate the server stamped the row at the
-      // midpoint of the round trip, rather than at response-receipt time.
-      const t1 = Date.now();
-      const srvTs = new Date(res.data.created_at).getTime();
-      updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
-      lastMoveServerTs = srvTs;
-    }
+  if (!error && inserted && inserted.created_at) {
+    const t1 = Date.now();
+    const srvTs = new Date(inserted.created_at).getTime();
+    updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
+    lastMoveServerTs = srvTs;
     return;
   }
-  // Transient failure: the opponent has the broadcast, but the durable log is
-  // missing this move (resume/full-resync would lose it). Retry in the background.
-  retryInsert(row);
+  if (error) {
+    retryInsert(row);
+  }
 }
 
 // Retry a failed insert with backoff, keeping the original move_num. Queues the
@@ -3601,8 +3594,6 @@ function subscribeMoves(gameId) {
         moveSubscription.track({ player: localPlayer, name: netDisplayName, at: Date.now() });
         startPing();
         startHeartbeat();
-        // Catch up on anything missed before/while (re)connecting, and retry any
-        // moves that never reached the durable log.
         reconcileMoves();
         flushPendingSends();
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -3778,14 +3769,7 @@ async function reconcileMoves() {
 }
 
 // ── Desync safety net: state checksum ────────────────────────────
-// A cheap deterministic hash of the canonical game state. After each shot the
-// shooter (authoritative) broadcasts its checksum; the watcher compares and, on
-// mismatch, rebuilds from the DB. Catches any residual divergence the result
-// snapshot didn't cover (a missed snapshot, a scoring disagreement).
 function computeStateChecksum() {
-  // Round at the SAME 0.01 precision the result snapshot uses, so the shooter's
-  // raw value and the watcher's snapped value hash identically (no false mismatch
-  // from a rounding-boundary disagreement).
   const r = (v) => Math.round(v * 100) / 100;
   const parts = [scores[0], scores[1], endNum, turnIdx, jackOwner,
                  shotClockForfeits[0], shotClockForfeits[1]];
@@ -3797,13 +3781,12 @@ function computeStateChecksum() {
   return h;
 }
 
-let _lastOppChecksum = null;  // { mn, sum } most recently received from the opponent
+let _lastOppChecksum = null;
 function onOpponentChecksum(mn, sum) {
   _lastOppChecksum = { mn, sum };
   maybeValidateChecksum();
 }
 
-// Compare only when we're settled and at the same point in the move sequence.
 function maybeValidateChecksum() {
   if (!_lastOppChecksum || mode !== 'online') return;
   if (state === 'moving' || state === 'camera-return') return;
@@ -3814,8 +3797,6 @@ function maybeValidateChecksum() {
   }
 }
 
-// Rebuild the whole game from the authoritative move log (which carries the
-// shooter's result snapshots, so replay is deterministic). Clock sync preserved.
 async function fullResync() {
   if (_replaying || _gapFilling || !sb || !onlineGameId) return;
   const moves = await fetchMoves(onlineGameId);
@@ -3830,6 +3811,7 @@ async function fullResync() {
   serverTimeOffset = off; serverOffsetInit = offInit; lastMoveServerTs = lastTs;
   _lastOppChecksum = null;
 }
+
 
 function processPendingMoves() {
   while (pendingMoves.length > 0) {
