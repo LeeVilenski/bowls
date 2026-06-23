@@ -2569,11 +2569,30 @@ function drawSidePanels() {
     ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
   }
 
-  // Online latency indicator
-  if (mode === 'online' && peerLatencyMs >= 0) {
-    const col = peerLatencyMs < 100 ? '#22c55e' : peerLatencyMs < 250 ? '#eab308' : '#ef4444';
-    ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(W/2, 10, 4, 0, Math.PI*2); ctx.fill();
+  // Online connection / presence indicator: a dot plus a status word.
+  //  - our socket down            → amber  "Reconnecting…"
+  //  - up but opponent not present → grey   "Opponent offline"
+  //  - both present               → green/yellow/red by latency, no text
+  if (mode === 'online') {
+    let dot = null, text = '';
+    if (connectionState === 'reconnecting' || connectionState === 'connecting') {
+      dot = '#f59e0b'; text = 'Reconnecting…';
+    } else if (connectionState === 'online' && !opponentOnline) {
+      dot = '#94a3b8'; text = 'Opponent offline';
+    } else if (connectionState === 'online' && peerLatencyMs >= 0) {
+      dot = peerLatencyMs < 100 ? '#22c55e' : peerLatencyMs < 250 ? '#eab308' : '#ef4444';
+    } else if (connectionState === 'online') {
+      dot = '#22c55e';
+    }
+    if (dot) {
+      ctx.fillStyle = dot;
+      ctx.beginPath(); ctx.arc(text ? W/2 - 52 : W/2, 11, 4, 0, Math.PI*2); ctx.fill();
+      if (text) {
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, W/2 - 44, 12);
+      }
+    }
   }
 
   // Shot clock — only shown when under 60s remaining and bowls aren't moving
@@ -3355,6 +3374,8 @@ let _gapFilling = false;  // a reconcile fetch is in flight
 let _replaying = false;   // initial resume replay in progress — suppress reconcile
 let _pendingSends = [];   // moves whose durable insert failed — retried on reconnect/heartbeat
 let heartbeatInterval = null;
+let connectionState = 'offline'; // 'offline' | 'online' | 'reconnecting'
+let opponentOnline = false;      // opponent currently present in the game channel
 let concedeConfirm = false;
 let concedeConfirmTimer = null;
 let gameMenuOpen = false;
@@ -3525,7 +3546,13 @@ async function fetchMoves(gameId) {
 
 function subscribeMoves(gameId) {
   if (!sb || moveSubscription) return;
-  moveSubscription = sb.channel(`game:${gameId}`, { config: { broadcast: { self: false } } })
+  connectionState = 'connecting';
+  moveSubscription = sb.channel(`game:${gameId}`, { config: { broadcast: { self: false }, presence: { key: String(localPlayer) } } })
+    // Presence: an authoritative roster of who's in the channel right now, so we
+    // know when the opponent actually drops (not just when pongs stop arriving).
+    .on('presence', { event: 'sync' }, () => updateOpponentPresence())
+    .on('presence', { event: 'join' }, () => updateOpponentPresence())
+    .on('presence', { event: 'leave' }, () => updateOpponentPresence())
     // Durable path: every move is inserted into the DB and delivered here.
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves', filter: `game_id=eq.${gameId}` },
       (payload) => {
@@ -3557,6 +3584,8 @@ function subscribeMoves(gameId) {
     .on('broadcast', { event: 'leave' }, () => { msgText = 'Opponent left the match.'; })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
+        connectionState = 'online';
+        moveSubscription.track({ player: localPlayer, name: netDisplayName, at: Date.now() });
         startPing();
         startHeartbeat();
         // Catch up on anything missed before/while (re)connecting, and retry any
@@ -3564,9 +3593,18 @@ function subscribeMoves(gameId) {
         reconcileMoves();
         flushPendingSends();
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        connectionState = 'reconnecting';
+        opponentOnline = false;
         peerLatencyMs = -1; clearInterval(pingInterval);
       }
     });
+}
+
+// Derive opponent presence from the channel roster (keyed by player number).
+function updateOpponentPresence() {
+  if (!moveSubscription) { opponentOnline = false; return; }
+  const st = moveSubscription.presenceState();
+  opponentOnline = Object.keys(st).some(k => k !== String(localPlayer));
 }
 
 // Low-frequency backstop: while waiting on the opponent, poll for any move that
@@ -3585,6 +3623,8 @@ function unsubscribeMoves() {
   clearInterval(pingInterval);
   clearInterval(heartbeatInterval);
   peerLatencyMs = -1;
+  opponentOnline = false;
+  connectionState = 'offline';
   if (moveSubscription) { sb.removeChannel(moveSubscription); moveSubscription = null; }
 }
 
@@ -3621,6 +3661,8 @@ function cleanupNet() {
   clearInterval(heartbeatInterval);
   clearTimeout(reconnectTimer);
   peerLatencyMs = -1;
+  connectionState = 'offline';
+  opponentOnline = false;
   onlineGameId = '';
   onlineOpponentName = '';
   localPlayer = 0;
