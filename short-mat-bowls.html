@@ -1139,6 +1139,8 @@ function startGame() {
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
   shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
+  _lastOppChecksum=null; _pendingSends=[];
+  canClaimWin=false; clearTimeout(claimTimer); claimTimer=null; opponentWasEverOnline=false;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1195,6 +1197,11 @@ function promptPlayer(p, opts) {
   }
   shotClockExpired = false;
   clockDisplayMs = -1;   // snap the smoothed HUD clock to the fresh turn
+  // Tell the opponent our real clock start so their watcher display matches the
+  // number we see, instead of the lastMoveServerTs+grace approximation.
+  if (mode === 'online' && p === localPlayer && !resuming) {
+    sendBroadcast('clock', { start: shotClockStart, mn: moveNum });
+  }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -1390,6 +1397,12 @@ function _doOnAllStopped() {
   if (_remoteResultSnap) {
     applyResultSnapshot(_remoteResultSnap);
     _remoteResultSnap = null;
+  }
+  // Desync checkpoint: the shooter (authoritative) broadcasts its state checksum;
+  // the watcher validates its own against it and rebuilds from the DB on mismatch.
+  if (mode === 'online') {
+    if (_preShot.player === localPlayer) sendBroadcast('checksum', { mn: moveNum, sum: computeStateChecksum() });
+    else maybeValidateChecksum();
   }
   // Post-shot achievement checks
   if (_preShot.player === myPlayerIdx()) {
@@ -1670,6 +1683,7 @@ function drawOverlayUI() {
 // ── Game Menu overlay ────────────────────────────────────────────
 const ALL_MENU_ITEMS = [
   { id: 'resume',  label: '▶  Resume Game',  bg: '#1e3a8a', fg: '#93c5fd' },
+  { id: 'claim',   label: '🏆  Claim Win',    bg: '#14532d', fg: '#86efac' },
   { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
@@ -1681,6 +1695,7 @@ const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
 function visibleMenuItems() {
   return ALL_MENU_ITEMS.filter(item => {
     if (item.id === 'concede' && state === 'game-over') return false;
+    if (item.id === 'claim' && !(canClaimWin && state !== 'game-over')) return false;
     if (item.id === 'exit' && mode === 'online') return false;
     if (item.id === 'lobby' && mode !== 'online') return false;
     return true;
@@ -1805,6 +1820,7 @@ function handleGameMenuTap(p) {
   if (id === 'resume') { gameMenuOpen = false; concedeConfirm = false; return; }
   if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
   if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
+  if (id === 'claim') { gameMenuOpen = false; claimAbandonedWin(); return; }
   if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
   if (id === 'lobby') { gameMenuOpen = false; backToLobby(); return; }
   if (id === 'concede') {
@@ -2557,11 +2573,30 @@ function drawSidePanels() {
     ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
   }
 
-  // Online latency indicator
-  if (mode === 'online' && peerLatencyMs >= 0) {
-    const col = peerLatencyMs < 100 ? '#22c55e' : peerLatencyMs < 250 ? '#eab308' : '#ef4444';
-    ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(W/2, 10, 4, 0, Math.PI*2); ctx.fill();
+  // Online connection / presence indicator: a dot plus a status word.
+  //  - our socket down            → amber  "Reconnecting…"
+  //  - up but opponent not present → grey   "Opponent offline"
+  //  - both present               → green/yellow/red by latency, no text
+  if (mode === 'online') {
+    let dot = null, text = '';
+    if (connectionState === 'reconnecting' || connectionState === 'connecting') {
+      dot = '#f59e0b'; text = 'Reconnecting…';
+    } else if (connectionState === 'online' && !opponentOnline) {
+      dot = '#94a3b8'; text = 'Opponent offline';
+    } else if (connectionState === 'online' && peerLatencyMs >= 0) {
+      dot = peerLatencyMs < 100 ? '#22c55e' : peerLatencyMs < 250 ? '#eab308' : '#ef4444';
+    } else if (connectionState === 'online') {
+      dot = '#22c55e';
+    }
+    if (dot) {
+      ctx.fillStyle = dot;
+      ctx.beginPath(); ctx.arc(text ? W/2 - 52 : W/2, 11, 4, 0, Math.PI*2); ctx.fill();
+      if (text) {
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, W/2 - 44, 12);
+      }
+    }
   }
 
   // Shot clock — only shown when under 60s remaining and bowls aren't moving
@@ -3252,9 +3287,13 @@ function handlePointerUp() {
       const shotAngle = aimAngle ?? defaultAimAngle();
       const shotSpeed = MIN_SPD + pct * (ceiling - MIN_SPD);
       if (mode === 'online') {
-        // Defer the network send until physics settles (_doOnAllStopped) so we
-        // can include the authoritative result snapshot for the opponent.
-        _pendingShotData = { angle: shotAngle, speed: shotSpeed, biasDir: biasDirs[localPlayer-1], delivX: delivPos ? delivPos.x : bowlStart().x };
+        // Send the shot input immediately so the opponent starts simulating in
+        // parallel (instead of waiting ~10s for our physics to settle first).
+        // The DB move with the authoritative result snapshot is sent later in
+        // _doOnAllStopped for durability/reconciliation.
+        const shotInput = { angle: shotAngle, speed: shotSpeed, biasDir: biasDirs[localPlayer-1], delivX: delivPos ? delivPos.x : bowlStart().x };
+        _pendingShotData = shotInput;
+        sendBroadcast('shot_preview', { player: localPlayer, ...shotInput });
       }
       deliverBowl(playerForTurn(turnIdx), shotAngle, shotSpeed);
     } else {
@@ -3341,6 +3380,14 @@ let reconnectTimer = null;
 let pendingMoves = [];
 let _gapFilling = false;  // a reconcile fetch is in flight
 let _replaying = false;   // initial resume replay in progress — suppress reconcile
+let _pendingSends = [];   // moves whose durable insert failed — retried on reconnect/heartbeat
+let heartbeatInterval = null;
+let connectionState = 'offline'; // 'offline' | 'online' | 'reconnecting'
+let opponentOnline = false;      // opponent currently present in the game channel
+let opponentWasEverOnline = false;
+let canClaimWin = false;         // opponent gone past the grace — claim-win offered
+let claimTimer = null;
+const CLAIM_GRACE_MS = 60000;    // opponent must be continuously absent this long
 let concedeConfirm = false;
 let concedeConfirmTimer = null;
 let gameMenuOpen = false;
@@ -3442,6 +3489,8 @@ async function deleteLobby(gameId) {
   await sb.from('games').delete().eq('id', gameId);
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 async function sendMove(type, player, data) {
   if (!sb) return;
   moveNum++;
@@ -3449,26 +3498,48 @@ async function sendMove(type, player, data) {
   const t0 = Date.now();
   let { data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single();
   if (error && error.code === '23505') {
-    // move_num collided with the opponent's (both numbered the same). Take the
-    // next free number after the current max and retry once.
     const { data: top } = await sb.from('moves').select('move_num')
       .eq('game_id', onlineGameId).order('move_num', { ascending: false }).limit(1).single();
     moveNum = (top && top.move_num >= moveNum) ? top.move_num + 1 : moveNum + 1;
     row = { ...row, move_num: moveNum };
     ({ data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single());
   }
-  if (error) console.error('sendMove insert failed', error);
-  if (inserted && inserted.created_at) {
-    // RTT-corrected clock sync: estimate the server processed the insert at the
-    // midpoint of the round trip, rather than at response-receipt time.
+  // move_num is now fixed — broadcast the low-latency copy.
+  sendBroadcast('move', { move: row, serverTime: serverNow() });
+  if (!error && inserted && inserted.created_at) {
     const t1 = Date.now();
     const srvTs = new Date(inserted.created_at).getTime();
     updateServerOffset(srvTs - (t0 + (t1 - t0) / 2));
     lastMoveServerTs = srvTs;
+    return;
   }
-  // Low-latency hint over the realtime channel; the DB insert above is the
-  // reliable path (postgres_changes delivers it even if the broadcast is missed).
-  sendBroadcast('move', { move: row, serverTime: serverNow() });
+  if (error) {
+    retryInsert(row);
+  }
+}
+
+// Retry a failed insert with backoff, keeping the original move_num. Queues the
+// row for flush-on-reconnect if it still won't land.
+async function retryInsert(row) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await sleep(500 * Math.pow(2, attempt)); // 0.5s, 1s, 2s, 4s
+    const { error } = await sb.from('moves').insert(row).select('created_at').single();
+    if (!error || error.code === '23505') return; // landed (or a prior attempt won)
+    console.warn('sendMove retry', attempt + 1, error.message);
+  }
+  console.error('sendMove queued after retries — move', row.move_num);
+  if (!_pendingSends.some(r => r.move_num === row.move_num)) _pendingSends.push(row);
+}
+
+// Flush moves that never reached the DB. Called on (re)subscribe and the heartbeat.
+async function flushPendingSends() {
+  if (!_pendingSends.length || !sb) return;
+  const queue = _pendingSends;
+  _pendingSends = [];
+  for (const row of queue) {
+    const { error } = await sb.from('moves').insert(row).select('created_at').single();
+    if (error && error.code !== '23505') _pendingSends.push(row); // still failing — requeue
+  }
 }
 
 async function fetchMoves(gameId) {
@@ -3480,7 +3551,13 @@ async function fetchMoves(gameId) {
 
 function subscribeMoves(gameId) {
   if (!sb || moveSubscription) return;
-  moveSubscription = sb.channel(`game:${gameId}`, { config: { broadcast: { self: false } } })
+  connectionState = 'connecting';
+  moveSubscription = sb.channel(`game:${gameId}`, { config: { broadcast: { self: false }, presence: { key: String(localPlayer) } } })
+    // Presence: an authoritative roster of who's in the channel right now, so we
+    // know when the opponent actually drops (not just when pongs stop arriving).
+    .on('presence', { event: 'sync' }, () => updateOpponentPresence())
+    .on('presence', { event: 'join' }, () => updateOpponentPresence())
+    .on('presence', { event: 'leave' }, () => updateOpponentPresence())
     // Durable path: every move is inserted into the DB and delivered here.
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moves', filter: `game_id=eq.${gameId}` },
       (payload) => {
@@ -3507,28 +3584,94 @@ function subscribeMoves(gameId) {
     })
     .on('broadcast', { event: 'ping' }, ({ payload }) => sendBroadcast('pong', { t: payload.t }))
     .on('broadcast', { event: 'pong' }, ({ payload }) => { peerLatencyMs = Date.now() - payload.t; })
+    .on('broadcast', { event: 'checksum' }, ({ payload }) => onOpponentChecksum(payload.mn, payload.sum))
+    .on('broadcast', { event: 'clock' }, ({ payload }) => onOpponentClockStart(payload.start))
+    .on('broadcast', { event: 'shot_preview' }, ({ payload }) => onShotPreview(payload))
     .on('broadcast', { event: 'leave' }, () => { msgText = 'Opponent left the match.'; })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
+        connectionState = 'online';
+        moveSubscription.track({ player: localPlayer, name: netDisplayName, at: Date.now() });
         startPing();
-        // Catch up on anything missed before/while (re)connecting.
+        startHeartbeat();
         reconcileMoves();
+        flushPendingSends();
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        connectionState = 'reconnecting';
+        opponentOnline = false;
         peerLatencyMs = -1; clearInterval(pingInterval);
       }
     });
 }
 
+// Derive opponent presence from the channel roster (keyed by player number) and
+// drive the abandonment grace timer.
+function updateOpponentPresence() {
+  if (!moveSubscription) { opponentOnline = false; return; }
+  const st = moveSubscription.presenceState();
+  opponentOnline = Object.keys(st).some(k => k !== String(localPlayer));
+  if (opponentOnline) {
+    opponentWasEverOnline = true;
+    clearTimeout(claimTimer); claimTimer = null; canClaimWin = false;
+  } else if (opponentWasEverOnline && !canClaimWin && claimTimer == null &&
+             mode === 'online' && onlineGameId && state !== 'game-over' && isRealtimeGame()) {
+    // Opponent dropped after having been present — start the grace countdown.
+    claimTimer = setTimeout(() => {
+      claimTimer = null;
+      if (!opponentOnline && mode === 'online' && state !== 'game-over') {
+        canClaimWin = true;
+        msg('Opponent disconnected — open the menu (☰) to claim the win.');
+      }
+    }, CLAIM_GRACE_MS);
+  }
+}
+
+// Realtime games (≤5 min control) expect both players online; correspondence
+// games don't, so the claim-win path only applies to realtime.
+function isRealtimeGame() {
+  return shotClockLimit > 0 && shotClockLimit <= 300000;
+}
+
+async function claimAbandonedWin() {
+  canClaimWin = false;
+  clearTimeout(claimTimer); claimTimer = null;
+  state = 'game-over';
+  clearSavedGame();
+  checkAchievements('game_over');
+  recordCurrentGame(true, false);
+  if (mode === 'online' && sb && onlineGameId) {
+    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+    localStorage.removeItem('bowls_activeGame');
+  }
+  awardXP(true, true);
+  msg(`Game over — <span style="color:#22c55e">Opponent disconnected. You win!</span> ${scores[0]}–${scores[1]}`);
+}
+
+// Low-frequency backstop: while waiting on the opponent, poll for any move that
+// was silently lost (delivered to neither transport) so the game can't deadlock
+// with no gap/refocus signal. Also flushes un-persisted local sends.
+function startHeartbeat() {
+  clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(() => {
+    if (mode !== 'online' || !onlineGameId) return;
+    if (state === 'aim' && playerForTurn(turnIdx) !== localPlayer) reconcileMoves();
+    flushPendingSends();
+  }, 15000);
+}
+
 function unsubscribeMoves() {
   clearInterval(pingInterval);
+  clearInterval(heartbeatInterval);
   peerLatencyMs = -1;
+  opponentOnline = false;
+  connectionState = 'offline';
   if (moveSubscription) { sb.removeChannel(moveSubscription); moveSubscription = null; }
 }
 
 function subscribeLobby(callback) {
   if (!sb) return;
   if (lobbySubscription) { sb.removeChannel(lobbySubscription); }
-  lobbySubscription = sb.channel('lobby')
+  lobbySubscription = sb.channel('lobby-' + Date.now())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => callback())
     .subscribe();
 }
@@ -3555,13 +3698,21 @@ function cleanupNet() {
   unsubscribeMoves();
   unsubscribeLobby();
   clearInterval(pingInterval);
+  clearInterval(heartbeatInterval);
   clearTimeout(reconnectTimer);
   peerLatencyMs = -1;
+  connectionState = 'offline';
+  opponentOnline = false;
+  opponentWasEverOnline = false;
+  canClaimWin = false;
+  clearTimeout(claimTimer); claimTimer = null;
   onlineGameId = '';
   onlineOpponentName = '';
   localPlayer = 0;
   moveNum = 0;
+  _pendingSends = [];
   hostGameStarted = false;
+  _shotPreviewApplied = false;
 }
 
 // ── Remote move handler ──────────────────────────────────────────
@@ -3617,6 +3768,51 @@ async function reconcileMoves() {
   }
 }
 
+// ── Desync safety net: state checksum ────────────────────────────
+function computeStateChecksum() {
+  const r = (v) => Math.round(v * 100) / 100;
+  const parts = [scores[0], scores[1], endNum, turnIdx, jackOwner,
+                 shotClockForfeits[0], shotClockForfeits[1]];
+  if (jack) parts.push('J', r(jack.x), r(jack.y), jack.offMat?1:0, jack.inDitch?1:0, jack.offSide?1:0);
+  for (const b of bowls) parts.push('B', b.player, r(b.x), r(b.y), b.offMat?1:0, b.inDitch?1:0, b.toucher?1:0);
+  const s = parts.join(',');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+let _lastOppChecksum = null;
+function onOpponentChecksum(mn, sum) {
+  _lastOppChecksum = { mn, sum };
+  maybeValidateChecksum();
+}
+
+function maybeValidateChecksum() {
+  if (!_lastOppChecksum || mode !== 'online') return;
+  if (state === 'moving' || state === 'camera-return') return;
+  if (_lastOppChecksum.mn !== moveNum) return;
+  if (_lastOppChecksum.sum !== computeStateChecksum()) {
+    console.warn('[desync] checksum mismatch at move', moveNum, '— rebuilding from DB');
+    fullResync();
+  }
+}
+
+async function fullResync() {
+  if (_replaying || _gapFilling || !sb || !onlineGameId) return;
+  const moves = await fetchMoves(onlineGameId);
+  if (!moves.length) return;
+  const off = serverTimeOffset, offInit = serverOffsetInit, lastTs = lastMoveServerTs;
+  msg('Resyncing…');
+  _replaying = true;
+  startGame();
+  replayMoves(moves);
+  _replaying = false;
+  _shotPreviewApplied = false;
+  serverTimeOffset = off; serverOffsetInit = offInit; lastMoveServerTs = lastTs;
+  _lastOppChecksum = null;
+}
+
+
 function processPendingMoves() {
   while (pendingMoves.length > 0) {
     const m = pendingMoves.shift();
@@ -3631,11 +3827,17 @@ function applyRemoteMove(move) {
     beginTurns();
   } else if (move.type === 'shot') {
     const d = move.data;
-    _remoteResultSnap = d.result || null;
-    setBiasDir(move.player, d.biasDir);
-    delivPos = { x: d.delivX, y: bowlStart().y };
-    deliverBowl(move.player, d.angle, d.speed);
-    shotClockStart = 0;
+    if (_shotPreviewApplied) {
+      // Preview already started physics — just grab the authoritative snapshot
+      _remoteResultSnap = d.result || null;
+      _shotPreviewApplied = false;
+    } else {
+      _remoteResultSnap = d.result || null;
+      setBiasDir(move.player, d.biasDir);
+      delivPos = { x: d.delivX, y: bowlStart().y };
+      deliverBowl(move.player, d.angle, d.speed);
+      shotClockStart = 0;
+    }
   } else if (move.type === 'timeout') {
     if (shotClockExpired) return;
     shotClockForfeits[move.player - 1]++;
@@ -3646,7 +3848,7 @@ function applyRemoteMove(move) {
       finishClockForfeit(move.player);
       return;
     }
-    msg(`Opponent timed out — shot forfeited (${shotClockForfeits[move.player-1]}/3).`);
+    msg(`<span style="color:#94a3b8">Opponent timed out</span> — shot forfeited (${shotClockForfeits[move.player-1]}/3). ${3 - shotClockForfeits[move.player-1]} remaining before loss.`);
     turnIdx++;
     if (turnIdx >= BPP * 2) { finishEnd(); return; }
     promptPlayer(playerForTurn(turnIdx));
@@ -3656,6 +3858,22 @@ function applyRemoteMove(move) {
   } else if (move.type === 'concede') {
     finishConcede(move.player);
   }
+}
+
+// Low-latency shot preview: the shooter broadcasts input params immediately so
+// the watcher starts the physics simulation in parallel. The durable DB move
+// (with the authoritative result snapshot) arrives later and is deduped — but if
+// the preview was missed, the DB path still works as before (just slower).
+let _shotPreviewApplied = false;
+function onShotPreview(payload) {
+  if (payload.player === localPlayer) return;
+  if (state === 'moving' || state === 'camera-return') return;
+  _shotPreviewApplied = true;
+  _remoteResultSnap = null;
+  setBiasDir(payload.player, payload.biasDir);
+  delivPos = { x: payload.delivX, y: bowlStart().y };
+  deliverBowl(payload.player, payload.angle, payload.speed);
+  shotClockStart = 0;
 }
 
 // ── Shot clock ───────────────────────────────────────────────────
@@ -3676,6 +3894,15 @@ function updateServerOffset(sample) {
 function shotClockRemaining() {
   if (!shotClockStart || !shotClockLimit) return Infinity;
   return shotClockLimit - (serverNow() - shotClockStart);
+}
+
+// The opponent told us the real moment their turn clock started. Adopt it (display
+// only — we never forfeit the opponent) so our HUD shows the same number they see,
+// instead of the lastMoveServerTs+grace estimate. Ignored unless it's their turn.
+function onOpponentClockStart(start) {
+  if (mode !== 'online' || !start) return;
+  if (playerForTurn(turnIdx) === localPlayer) return;
+  shotClockStart = start;
 }
 
 function formatClock(ms) {
