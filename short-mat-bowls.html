@@ -1140,6 +1140,7 @@ function startGame() {
   jackOffCounts=[0,0]; lastJackHitter=null;
   shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
   _lastOppChecksum=null; _pendingSends=[];
+  canClaimWin=false; clearTimeout(claimTimer); claimTimer=null; opponentWasEverOnline=false;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1682,6 +1683,7 @@ function drawOverlayUI() {
 // ── Game Menu overlay ────────────────────────────────────────────
 const ALL_MENU_ITEMS = [
   { id: 'resume',  label: '▶  Resume Game',  bg: '#1e3a8a', fg: '#93c5fd' },
+  { id: 'claim',   label: '🏆  Claim Win',    bg: '#14532d', fg: '#86efac' },
   { id: 'results', label: '📊  End Results',  bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'profile', label: '👤  Profile',      bg: '#1e293b', fg: '#e2e8f0' },
   { id: 'exit',    label: '🚪  Exit to Menu', bg: '#92400e', fg: '#fde68a' },
@@ -1693,6 +1695,7 @@ const MENU_BTN_W = 340, MENU_BTN_H = 52, MENU_BTN_GAP = 10, MENU_BTN_R = 10;
 function visibleMenuItems() {
   return ALL_MENU_ITEMS.filter(item => {
     if (item.id === 'concede' && state === 'game-over') return false;
+    if (item.id === 'claim' && !(canClaimWin && state !== 'game-over')) return false;
     if (item.id === 'exit' && mode === 'online') return false;
     if (item.id === 'lobby' && mode !== 'online') return false;
     return true;
@@ -1817,6 +1820,7 @@ function handleGameMenuTap(p) {
   if (id === 'resume') { gameMenuOpen = false; concedeConfirm = false; return; }
   if (id === 'results') { gameMenuOpen = gameMenuOpen === 'results' ? true : 'results'; return; }
   if (id === 'profile') { gameMenuOpen = false; showProfilePanel(); return; }
+  if (id === 'claim') { gameMenuOpen = false; claimAbandonedWin(); return; }
   if (id === 'exit') { gameMenuOpen = false; exitToMenu(); return; }
   if (id === 'lobby') { gameMenuOpen = false; backToLobby(); return; }
   if (id === 'concede') {
@@ -3376,6 +3380,10 @@ let _pendingSends = [];   // moves whose durable insert failed — retried on re
 let heartbeatInterval = null;
 let connectionState = 'offline'; // 'offline' | 'online' | 'reconnecting'
 let opponentOnline = false;      // opponent currently present in the game channel
+let opponentWasEverOnline = false;
+let canClaimWin = false;         // opponent gone past the grace — claim-win offered
+let claimTimer = null;
+const CLAIM_GRACE_MS = 60000;    // opponent must be continuously absent this long
 let concedeConfirm = false;
 let concedeConfirmTimer = null;
 let gameMenuOpen = false;
@@ -3600,11 +3608,47 @@ function subscribeMoves(gameId) {
     });
 }
 
-// Derive opponent presence from the channel roster (keyed by player number).
+// Derive opponent presence from the channel roster (keyed by player number) and
+// drive the abandonment grace timer.
 function updateOpponentPresence() {
   if (!moveSubscription) { opponentOnline = false; return; }
   const st = moveSubscription.presenceState();
   opponentOnline = Object.keys(st).some(k => k !== String(localPlayer));
+  if (opponentOnline) {
+    opponentWasEverOnline = true;
+    clearTimeout(claimTimer); claimTimer = null; canClaimWin = false;
+  } else if (opponentWasEverOnline && !canClaimWin && claimTimer == null &&
+             mode === 'online' && onlineGameId && state !== 'game-over' && isRealtimeGame()) {
+    // Opponent dropped after having been present — start the grace countdown.
+    claimTimer = setTimeout(() => {
+      claimTimer = null;
+      if (!opponentOnline && mode === 'online' && state !== 'game-over') {
+        canClaimWin = true;
+        msg('Opponent disconnected — open the menu (☰) to claim the win.');
+      }
+    }, CLAIM_GRACE_MS);
+  }
+}
+
+// Realtime games (≤5 min control) expect both players online; correspondence
+// games don't, so the claim-win path only applies to realtime.
+function isRealtimeGame() {
+  return shotClockLimit > 0 && shotClockLimit <= 300000;
+}
+
+async function claimAbandonedWin() {
+  canClaimWin = false;
+  clearTimeout(claimTimer); claimTimer = null;
+  state = 'game-over';
+  clearSavedGame();
+  checkAchievements('game_over');
+  recordCurrentGame(true, false);
+  if (mode === 'online' && sb && onlineGameId) {
+    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+    localStorage.removeItem('bowls_activeGame');
+  }
+  awardXP(true, true);
+  msg(`Game over — <span style="color:#22c55e">Opponent disconnected. You win!</span> ${scores[0]}–${scores[1]}`);
 }
 
 // Low-frequency backstop: while waiting on the opponent, poll for any move that
@@ -3663,6 +3707,9 @@ function cleanupNet() {
   peerLatencyMs = -1;
   connectionState = 'offline';
   opponentOnline = false;
+  opponentWasEverOnline = false;
+  canClaimWin = false;
+  clearTimeout(claimTimer); claimTimer = null;
   onlineGameId = '';
   onlineOpponentName = '';
   localPlayer = 0;
