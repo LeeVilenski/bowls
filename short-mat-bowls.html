@@ -3204,7 +3204,10 @@ canvas.addEventListener('touchend',   e => { e.preventDefault(); handlePointerUp
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    if (mode === 'online' && state === 'aim') checkExpiredTimerOnResume();
+    if (mode === 'online') {
+      reconcileMoves();   // catch any moves missed while backgrounded
+      if (state === 'aim') checkExpiredTimerOnResume();
+    }
   }
 });
 
@@ -3258,6 +3261,8 @@ let peerLatencyMs = -1;
 let pingInterval = null;
 let reconnectTimer = null;
 let pendingMoves = [];
+let _gapFilling = false;  // a reconcile fetch is in flight
+let _replaying = false;   // initial resume replay in progress — suppress reconcile
 let concedeConfirm = false;
 let concedeConfirmTimer = null;
 let gameMenuOpen = false;
@@ -3362,9 +3367,18 @@ async function deleteLobby(gameId) {
 async function sendMove(type, player, data) {
   if (!sb) return;
   moveNum++;
-  const row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
+  let row = { game_id: onlineGameId, move_num: moveNum, end_num: endNum, type, player, data };
   const t0 = Date.now();
-  const { data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single();
+  let { data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single();
+  if (error && error.code === '23505') {
+    // move_num collided with the opponent's (both numbered the same). Take the
+    // next free number after the current max and retry once.
+    const { data: top } = await sb.from('moves').select('move_num')
+      .eq('game_id', onlineGameId).order('move_num', { ascending: false }).limit(1).single();
+    moveNum = (top && top.move_num >= moveNum) ? top.move_num + 1 : moveNum + 1;
+    row = { ...row, move_num: moveNum };
+    ({ data: inserted, error } = await sb.from('moves').insert(row).select('created_at').single());
+  }
   if (error) console.error('sendMove insert failed', error);
   if (inserted && inserted.created_at) {
     // RTT-corrected clock sync: estimate the server processed the insert at the
@@ -3417,8 +3431,11 @@ function subscribeMoves(gameId) {
     .on('broadcast', { event: 'pong' }, ({ payload }) => { peerLatencyMs = Date.now() - payload.t; })
     .on('broadcast', { event: 'leave' }, () => { msgText = 'Opponent left the match.'; })
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') startPing();
-      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      if (status === 'SUBSCRIBED') {
+        startPing();
+        // Catch up on anything missed before/while (re)connecting.
+        reconcileMoves();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         peerLatencyMs = -1; clearInterval(pingInterval);
       }
     });
@@ -3471,8 +3488,23 @@ function cleanupNet() {
 
 // ── Remote move handler ──────────────────────────────────────────
 function onRemoteMove(move) {
+  if (move.move_num <= moveNum) return;          // already applied (dup across transports)
+  if (move.move_num > moveNum + 1) {
+    // Gap — one or more earlier moves were missed (dropped broadcast, brief
+    // disconnect). Don't apply out of order: pull the missing range from the DB
+    // and apply everything in sequence. The DB insert is the durable source.
+    reconcileMoves();
+    return;
+  }
+  applyOrderedMove(move);
+}
+
+// Apply a single move that is next in sequence. Shared by the live path and the
+// reconcile/replay-from-DB path so move numbering stays strictly monotonic.
+function applyOrderedMove(move) {
   if (move.move_num <= moveNum) return;
   moveNum = move.move_num;
+  if (move.player === localPlayer) return;       // our own move seen via DB catch-up — counter only
   if (move.type === 'concede') {
     pendingMoves = [];
     finishConcede(move.player);
@@ -3483,6 +3515,28 @@ function onRemoteMove(move) {
     return;
   }
   applyRemoteMove(move);
+}
+
+// Fetch every move we haven't applied yet and replay them in order. Triggered on
+// a detected gap, on (re)subscribe, and on tab refocus — so a client that fell
+// behind (missed the opponent's move while backgrounded/disconnected) catches up
+// instead of deadlocking. Idempotent: moves at or below moveNum are skipped.
+async function reconcileMoves() {
+  if (_gapFilling || _replaying || !sb || !onlineGameId) return;
+  _gapFilling = true;
+  try {
+    const { data, error } = await sb.from('moves').select('*')
+      .eq('game_id', onlineGameId).gt('move_num', moveNum).order('move_num');
+    if (error) { console.error('reconcileMoves', error); return; }
+    for (const m of (data || [])) {
+      if (typeof m.data === 'string') m.data = JSON.parse(m.data);
+      applyOrderedMove(m);
+    }
+  } catch (e) {
+    console.error('reconcileMoves', e);
+  } finally {
+    _gapFilling = false;
+  }
 }
 
 function processPendingMoves() {
@@ -3917,7 +3971,11 @@ async function doResumeLobby(game) {
   const moves = await fetchMoves(game.id);
   console.log('[resume] fetched', moves.length, 'moves for game', game.id);
   startGame();
+  _replaying = true;
   replayMoves(moves);
+  _replaying = false;
+  // Catch anything inserted between the fetch above and the channel subscribing.
+  reconcileMoves();
 }
 
 function replayMoves(moves) {
