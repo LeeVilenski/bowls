@@ -1139,6 +1139,7 @@ function startGame() {
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
   shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
+  _lastOppChecksum=null;
   endHistory=[]; gameMenuOpen=false;
   resetCam(); resetAim(); updateHUD(); startEnd();
 }
@@ -1195,6 +1196,11 @@ function promptPlayer(p, opts) {
   }
   shotClockExpired = false;
   clockDisplayMs = -1;   // snap the smoothed HUD clock to the fresh turn
+  // Tell the opponent our real clock start so their watcher display matches the
+  // number we see, instead of the lastMoveServerTs+grace approximation.
+  if (mode === 'online' && p === localPlayer && !resuming) {
+    sendBroadcast('clock', { start: shotClockStart, mn: moveNum });
+  }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
     msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
@@ -1390,6 +1396,12 @@ function _doOnAllStopped() {
   if (_remoteResultSnap) {
     applyResultSnapshot(_remoteResultSnap);
     _remoteResultSnap = null;
+  }
+  // Desync checkpoint: the shooter (authoritative) broadcasts its state checksum;
+  // the watcher validates its own against it and rebuilds from the DB on mismatch.
+  if (mode === 'online') {
+    if (_preShot.player === localPlayer) sendBroadcast('checksum', { mn: moveNum, sum: computeStateChecksum() });
+    else maybeValidateChecksum();
   }
   // Post-shot achievement checks
   if (_preShot.player === myPlayerIdx()) {
@@ -3507,6 +3519,8 @@ function subscribeMoves(gameId) {
     })
     .on('broadcast', { event: 'ping' }, ({ payload }) => sendBroadcast('pong', { t: payload.t }))
     .on('broadcast', { event: 'pong' }, ({ payload }) => { peerLatencyMs = Date.now() - payload.t; })
+    .on('broadcast', { event: 'checksum' }, ({ payload }) => onOpponentChecksum(payload.mn, payload.sum))
+    .on('broadcast', { event: 'clock' }, ({ payload }) => onOpponentClockStart(payload.start))
     .on('broadcast', { event: 'leave' }, () => { msgText = 'Opponent left the match.'; })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -3617,6 +3631,59 @@ async function reconcileMoves() {
   }
 }
 
+// ── Desync safety net: state checksum ────────────────────────────
+// A cheap deterministic hash of the canonical game state. After each shot the
+// shooter (authoritative) broadcasts its checksum; the watcher compares and, on
+// mismatch, rebuilds from the DB. Catches any residual divergence the result
+// snapshot didn't cover (a missed snapshot, a scoring disagreement).
+function computeStateChecksum() {
+  // Round at the SAME 0.01 precision the result snapshot uses, so the shooter's
+  // raw value and the watcher's snapped value hash identically (no false mismatch
+  // from a rounding-boundary disagreement).
+  const r = (v) => Math.round(v * 100) / 100;
+  const parts = [scores[0], scores[1], endNum, turnIdx, jackOwner,
+                 shotClockForfeits[0], shotClockForfeits[1]];
+  if (jack) parts.push('J', r(jack.x), r(jack.y), jack.offMat?1:0, jack.inDitch?1:0, jack.offSide?1:0);
+  for (const b of bowls) parts.push('B', b.player, r(b.x), r(b.y), b.offMat?1:0, b.inDitch?1:0, b.toucher?1:0);
+  const s = parts.join(',');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+let _lastOppChecksum = null;  // { mn, sum } most recently received from the opponent
+function onOpponentChecksum(mn, sum) {
+  _lastOppChecksum = { mn, sum };
+  maybeValidateChecksum();
+}
+
+// Compare only when we're settled and at the same point in the move sequence.
+function maybeValidateChecksum() {
+  if (!_lastOppChecksum || mode !== 'online') return;
+  if (state === 'moving' || state === 'camera-return') return;
+  if (_lastOppChecksum.mn !== moveNum) return;
+  if (_lastOppChecksum.sum !== computeStateChecksum()) {
+    console.warn('[desync] checksum mismatch at move', moveNum, '— rebuilding from DB');
+    fullResync();
+  }
+}
+
+// Rebuild the whole game from the authoritative move log (which carries the
+// shooter's result snapshots, so replay is deterministic). Clock sync preserved.
+async function fullResync() {
+  if (_replaying || _gapFilling || !sb || !onlineGameId) return;
+  const moves = await fetchMoves(onlineGameId);
+  if (!moves.length) return;
+  const off = serverTimeOffset, offInit = serverOffsetInit, lastTs = lastMoveServerTs;
+  msg('Resyncing…');
+  _replaying = true;
+  startGame();
+  replayMoves(moves);
+  _replaying = false;
+  serverTimeOffset = off; serverOffsetInit = offInit; lastMoveServerTs = lastTs;
+  _lastOppChecksum = null;
+}
+
 function processPendingMoves() {
   while (pendingMoves.length > 0) {
     const m = pendingMoves.shift();
@@ -3646,7 +3713,7 @@ function applyRemoteMove(move) {
       finishClockForfeit(move.player);
       return;
     }
-    msg(`Opponent timed out — shot forfeited (${shotClockForfeits[move.player-1]}/3).`);
+    msg(`<span style="color:#94a3b8">Opponent timed out</span> — shot forfeited (${shotClockForfeits[move.player-1]}/3). ${3 - shotClockForfeits[move.player-1]} remaining before loss.`);
     turnIdx++;
     if (turnIdx >= BPP * 2) { finishEnd(); return; }
     promptPlayer(playerForTurn(turnIdx));
@@ -3676,6 +3743,15 @@ function updateServerOffset(sample) {
 function shotClockRemaining() {
   if (!shotClockStart || !shotClockLimit) return Infinity;
   return shotClockLimit - (serverNow() - shotClockStart);
+}
+
+// The opponent told us the real moment their turn clock started. Adopt it (display
+// only — we never forfeit the opponent) so our HUD shows the same number they see,
+// instead of the lastMoveServerTs+grace estimate. Ignored unless it's their turn.
+function onOpponentClockStart(start) {
+  if (mode !== 'online' || !start) return;
+  if (playerForTurn(turnIdx) === localPlayer) return;
+  shotClockStart = start;
 }
 
 function formatClock(ms) {
