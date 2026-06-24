@@ -1503,7 +1503,7 @@ function advanceEnd() {
   startEnd();
 }
 
-function gameOver() {
+async function gameOver() {
   state = 'game-over';
   clearSavedGame();
   checkAchievements('game_over');
@@ -1525,9 +1525,8 @@ function gameOver() {
     else                          res=`Draw! ${scores[0]}–${scores[1]}`;
   }
   if (mode === 'online' && sb && onlineGameId) {
-    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId).then(() => {
-      localStorage.removeItem('bowls_activeGame');
-    });
+    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+    localStorage.removeItem('bowls_activeGame');
   }
   awardXP(won, false);
   msg(`Game over — ${res}`);
@@ -3064,7 +3063,7 @@ function checkShotClock() {
   if (shotClockRemaining() <= 0) handleShotClockExpiry();
 }
 
-function finishClockForfeit(forfeitingPlayer) {
+async function finishClockForfeit(forfeitingPlayer) {
   state = 'game-over';
   clearSavedGame();
   const me = myPlayerIdx();
@@ -3072,8 +3071,8 @@ function finishClockForfeit(forfeitingPlayer) {
   checkAchievements('game_over', { concede: true, concedingPlayer: forfeitingPlayer });
   recordCurrentGame(fWon, false);
   awardXP(fWon, true);
-  if (mode === 'online' && sb) {
-    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+  if (mode === 'online' && sb && onlineGameId) {
+    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
     localStorage.removeItem('bowls_activeGame');
   }
   if (forfeitingPlayer === localPlayer) {
@@ -3462,12 +3461,28 @@ async function listMyGames() {
     .or(`host_name.eq.${netDisplayName},guest_name.eq.${netDisplayName}`);
   if (error) { console.error('listMyGames', error); return []; }
   const games = data || [];
+  const liveGames = [];
   for (const g of games) {
-    const { data: moves } = await sb.from('moves').select('player,created_at,type')
+    const { data: lastMove } = await sb.from('moves').select('player,created_at,type')
       .eq('game_id', g.id).order('move_num', { ascending: false }).limit(1);
-    g._lastMove = moves && moves[0] ? moves[0] : null;
+    g._lastMove = lastMove && lastMove[0] ? lastMove[0] : null;
+    const { data: terminalMoves } = await sb.from('moves').select('player,type')
+      .eq('game_id', g.id).in('type', ['timeout', 'concede']);
+    if (isGameFinishedByMoves(terminalMoves || [])) {
+      sb.from('games').update({ status: 'finished' }).eq('id', g.id);
+      continue;
+    }
+    liveGames.push(g);
   }
-  return games;
+  return liveGames;
+}
+
+function isGameFinishedByMoves(moves) {
+  if (moves.some(m => m.type === 'concede')) return true;
+  const p1Timeouts = moves.filter(m => m.type === 'timeout' && m.player === 1).length;
+  const p2Timeouts = moves.filter(m => m.type === 'timeout' && m.player === 2).length;
+  if (p1Timeouts >= 3 || p2Timeouts >= 3) return true;
+  return false;
 }
 
 async function joinLobby(gameId, p2Bowls) {
@@ -4280,6 +4295,13 @@ async function doResumeLobby(game) {
   _replaying = true;
   replayMoves(moves);
   _replaying = false;
+  if (state === 'game-over') {
+    if (sb && onlineGameId) {
+      await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+      localStorage.removeItem('bowls_activeGame');
+    }
+    return;
+  }
   // Catch anything inserted between the fetch above and the channel subscribing.
   reconcileMoves();
 }
