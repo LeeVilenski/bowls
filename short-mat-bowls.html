@@ -2718,16 +2718,19 @@ function drawAimUI() {
 
 
 // Hit areas for canvas-drawn buttons (in canvas px)
-const PANEL_BTN = { w: 34, h: 28, x1: 2, x2: 404, y: 174 };
+const PANEL_BTN = { w: 40, h: 32, x1: 2, x2: 404, y: 182 };
 
 function drawPanelBtn(cx, y, label, bg, fg) {
   const bx = cx - PANEL_BTN.w/2;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
   ctx.fillStyle = bg;
   ctx.beginPath();
-  ctx.roundRect(bx, y, PANEL_BTN.w, PANEL_BTN.h, 5);
+  ctx.roundRect(bx, y, PANEL_BTN.w, PANEL_BTN.h, 7);
   ctx.fill();
+  ctx.restore();
   ctx.fillStyle = fg;
-  ctx.font = 'bold 9px Segoe UI';
+  ctx.font = 'bold 12px Segoe UI';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, cx, y + PANEL_BTN.h/2);
@@ -2735,19 +2738,20 @@ function drawPanelBtn(cx, y, label, bg, fg) {
 }
 
 function drawSidePanels() {
-  const SP=38, SC=19; // panel width, panel centre x
+  const SP=46, SC=23; // panel width, panel centre x
   // Left — P1
-  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,SP,H);
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,SP,H);
   // Label (above score)
-  ctx.fillStyle=C.p1; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-  ctx.fillText('P1',SC,16);
+  ctx.fillStyle=C.p1; ctx.font='bold 12px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.fillText('P1',SC,18);
   // Score
-  ctx.font='bold 22px Segoe UI';
-  ctx.fillText(scores[0],SC,38);
+  ctx.font='bold 26px Segoe UI';
+  ctx.fillText(scores[0],SC,44);
   // Bowl dots
+  const dotY0 = 64, dotGap = 26, dotR = 8;
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===1).length > i;
-    ctx.beginPath(); ctx.arc(SC,58+i*24,7,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(SC,dotY0+i*dotGap,dotR,0,Math.PI*2);
     ctx.globalAlpha = bowled ? 0.25 : 1;
     ctx.fillStyle = C.p1; ctx.fill();
     ctx.globalAlpha = 1;
@@ -2762,15 +2766,15 @@ function drawSidePanels() {
   }
 
   // Right — P2/AI
-  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(W-SP,0,SP,H);
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(W-SP,0,SP,H);
   const lbl2 = mode==='vs-ai'? AI_PLAYERS[aiLevel].name.split(' ')[0] : (mode==='online'?'Opp':'P2');
-  ctx.fillStyle=C.p2; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
-  ctx.fillText(lbl2,W-SC,16);
-  ctx.font='bold 22px Segoe UI';
-  ctx.fillText(scores[1],W-SC,38);
+  ctx.fillStyle=C.p2; ctx.font='bold 12px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText(lbl2,W-SC,18);
+  ctx.font='bold 26px Segoe UI';
+  ctx.fillText(scores[1],W-SC,44);
   for (let i=0;i<BPP;i++) {
     const bowled = bowls.filter(b=>b.player===2).length > i;
-    ctx.beginPath(); ctx.arc(W-SC,58+i*24,7,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(W-SC,dotY0+i*dotGap,dotR,0,Math.PI*2);
     ctx.globalAlpha = bowled ? 0.25 : 1;
     ctx.fillStyle = C.p2; ctx.fill();
     ctx.globalAlpha = 1;
@@ -2789,7 +2793,7 @@ function drawSidePanels() {
     const cur=playerForTurn(turnIdx);
     const ax=cur===1?SC:W-SC;
     ctx.fillStyle='#fbbf24';
-    ctx.beginPath(); ctx.arc(ax,46,5,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ax,52,5,0,Math.PI*2); ctx.fill();
   }
 
   // Online connection / presence indicator: a dot plus a status word.
@@ -3408,7 +3412,7 @@ function handlePointerDown(p) {
   }
 
   // Canvas-drawn panel buttons
-  const SP=38, SC=19;
+  const SP=46, SC=23;
   if (hitPanelBtn(p, SC)) {
     if (state !== 'idle') {
       gameMenuOpen = true; concedeConfirm = false;
