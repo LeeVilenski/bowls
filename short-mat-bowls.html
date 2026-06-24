@@ -2737,8 +2737,8 @@ function drawSidePanels() {
     }
   }
 
-  // Shot clock — only shown when under 60s remaining and bowls aren't moving
-  if (mode === 'online' && shotClockStart && shotClockLimit && state !== 'moving') {
+  // Shot clock — only shown when a player is actively aiming and the camera has settled
+  if (mode === 'online' && shotClockStart && shotClockLimit && state === 'aim' && cam.phase === 'idle') {
     const remRaw = Math.max(0, shotClockRemaining());
     // Ease the displayed value toward the true remaining time so small offset
     // corrections don't make the number jump; snap on a big gap (new turn).
@@ -4057,6 +4057,7 @@ function onOpponentClockStart(start) {
   if (mode !== 'online' || !start) return;
   if (playerForTurn(turnIdx) === localPlayer) return;
   shotClockStart = start;
+  clockDisplayMs = -1;
 }
 
 function formatClock(ms) {
