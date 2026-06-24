@@ -262,6 +262,30 @@ button:active { opacity: .7; }
 }
 #btnLeaderboard:hover { background: #334155; color: #e2e8f0; }
 
+/* Auth / Account */
+.auth-user { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.auth-avatar {
+  width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+  background: #1d4ed8; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px; color: #fff; flex-shrink: 0;
+}
+.auth-info { flex: 1; min-width: 0; }
+.auth-name { font-size: 13px; font-weight: 600; color: #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-email { font-size: 11px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-sync { font-size: 10px; color: #22c55e; margin-top: 6px; }
+.auth-sync.syncing { color: #fbbf24; }
+.auth-sync.error { color: #ef4444; }
+#btnSignOut {
+  font-size: 11px; padding: 6px 12px; background: #1e293b; color: #94a3b8;
+  border: 1px solid #334155; border-radius: 6px; flex-shrink: 0;
+}
+#btnGoogleSignIn {
+  width: 100%; padding: 10px; font-size: 13px; font-weight: 600;
+  background: #fff; color: #333; border: none; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.auth-hint { font-size: 10px; color: #64748b; margin-top: 6px; text-align: center; }
+
 /* XP / Rating */
 .xp-card { margin-bottom: 4px; }
 .xp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -529,6 +553,10 @@ button:active { opacity: .7; }
     <div class="spl-card">
       <div class="spl-head">Identity</div>
       <div class="spl-row"><span class="spl-lbl">Name</span><input type="text" id="profile-name" maxlength="20" placeholder="Enter name..."></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Account</div>
+      <div id="auth-section"></div>
     </div>
     <div class="spl-card">
       <div class="spl-head">Default Bowls</div>
@@ -5218,17 +5246,212 @@ async function getOpponentElo() {
 
 async function syncPlayerToServer(data) {
   if (!initSupabase()) return;
-  const deviceId = getDeviceId();
+  const playerId = getPlayerId();
   const row = {
-    device_id: deviceId,
+    device_id: playerId,
     display_name: netDisplayName || 'Anonymous',
     xp: data.xp,
     level: data.level,
     elo: data.elo
   };
-  await sb.from('players').upsert(row, { onConflict: 'device_id' }).then(({ error }) => {
-    if (error) console.error('syncPlayer', error);
+  try {
+    const extended = Object.assign({}, row, {
+      match_history: loadHistory(),
+      stats: loadStats(),
+      profile: loadProfile()
+    });
+    const { error } = await sb.from('players').upsert(extended, { onConflict: 'device_id' });
+    if (!error) { updateAuthSyncStatus('synced'); return; }
+    throw error;
+  } catch {
+    await sb.from('players').upsert(row, { onConflict: 'device_id' }).then(({ error }) => {
+      if (error) console.error('syncPlayer', error);
+      else updateAuthSyncStatus('synced');
+    });
+  }
+}
+
+// ── Google OAuth & Cloud Sync ───────────────────────────────────
+let authUser = null;
+
+function getPlayerId() {
+  return authUser ? authUser.id : getDeviceId();
+}
+
+async function initAuth() {
+  if (!initSupabase()) return;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      authUser = session.user;
+      await onSignIn(session.user, false);
+    }
+  } catch (e) { console.error('initAuth', e); }
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      authUser = session.user;
+      onSignIn(session.user, true);
+    } else if (event === 'SIGNED_OUT') {
+      authUser = null;
+      onSignOut();
+    }
   });
+  updateAuthUI();
+}
+
+async function signInWithGoogle() {
+  if (!initSupabase()) return;
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href.split('?')[0].split('#')[0] }
+  });
+  if (error) console.error('signIn error', error);
+}
+
+async function doSignOut() {
+  if (!initSupabase()) return;
+  await sb.auth.signOut();
+  authUser = null;
+  onSignOut();
+}
+
+async function onSignIn(user, isRedirect) {
+  if (!user.user_metadata?.full_name) {
+    // no metadata yet
+  }
+  if (!localStorage.getItem('bowls_name') && user.user_metadata?.full_name) {
+    const name = user.user_metadata.full_name.slice(0, 20);
+    localStorage.setItem('bowls_name', name);
+    netDisplayName = name;
+    const nameInput = document.getElementById('profile-name');
+    if (nameInput) nameInput.value = name;
+    const lobbyInput = document.getElementById('lobby-name');
+    if (lobbyInput) lobbyInput.value = name;
+  }
+  updateAuthUI();
+  if (isRedirect) await restoreFromCloud(user);
+}
+
+function onSignOut() {
+  updateAuthUI();
+}
+
+async function restoreFromCloud(user) {
+  if (!initSupabase()) return;
+  updateAuthSyncStatus('syncing');
+  try {
+    const { data: cloud } = await sb.from('players')
+      .select('*').eq('device_id', user.id).single();
+
+    const localXP = loadXP();
+
+    if (cloud && cloud.xp != null) {
+      if (cloud.xp >= localXP.xp) {
+        saveXP({ xp: cloud.xp, level: cloud.level || 1, elo: cloud.elo || ELO_DEFAULT });
+        if (cloud.display_name && cloud.display_name !== 'Anonymous') {
+          localStorage.setItem('bowls_name', cloud.display_name);
+          netDisplayName = cloud.display_name;
+        }
+      }
+      if (cloud.match_history && Array.isArray(cloud.match_history)) {
+        const localHist = loadHistory();
+        const merged = mergeHistories(localHist, cloud.match_history);
+        saveHistory(merged);
+      }
+      if (cloud.stats && typeof cloud.stats === 'object') {
+        const localStats = loadStats();
+        const merged = mergeStats(localStats, cloud.stats);
+        saveStats(merged);
+      }
+      if (cloud.profile && typeof cloud.profile === 'object') {
+        const localProf = loadProfile();
+        if (!localProf.p1idx && cloud.profile.p1idx != null) saveProfile(cloud.profile);
+      }
+    }
+
+    const oldDeviceId = getDeviceId();
+    if (oldDeviceId !== user.id) {
+      const { data: oldRow } = await sb.from('players')
+        .select('xp').eq('device_id', oldDeviceId).single();
+      if (oldRow) {
+        const xp = loadXP();
+        if (oldRow.xp <= xp.xp) {
+          await sb.from('players').delete().eq('device_id', oldDeviceId);
+        }
+      }
+    }
+
+    const xpNow = loadXP();
+    await syncPlayerToServer(xpNow);
+    updateAuthSyncStatus('synced');
+  } catch (e) {
+    console.error('restoreFromCloud', e);
+    updateAuthSyncStatus('error');
+    const xpNow = loadXP();
+    await syncPlayerToServer(xpNow);
+  }
+}
+
+function mergeHistories(local, cloud) {
+  const seen = new Set();
+  const all = [];
+  for (const h of [...local, ...cloud]) {
+    const key = h.date + '|' + h.opponent;
+    if (!seen.has(key)) { seen.add(key); all.push(h); }
+  }
+  all.sort((a, b) => b.date - a.date);
+  return all.slice(0, MAX_HISTORY);
+}
+
+function mergeStats(local, cloud) {
+  const merged = {};
+  for (const k of Object.keys(local)) {
+    const lv = local[k] || 0, cv = cloud[k] || 0;
+    merged[k] = Math.max(lv, cv);
+  }
+  return merged;
+}
+
+function updateAuthUI() {
+  const el = document.getElementById('auth-section');
+  if (!el) return;
+  if (authUser) {
+    const email = authUser.email || '';
+    const name = authUser.user_metadata?.full_name || email;
+    const avatar = authUser.user_metadata?.avatar_url;
+    const avatarHtml = avatar
+      ? `<img class="auth-avatar" src="${escHtml(avatar)}" alt="">`
+      : `<div class="auth-avatar">${(name[0] || '?').toUpperCase()}</div>`;
+    el.innerHTML =
+      `<div class="auth-user">${avatarHtml}` +
+      `<div class="auth-info"><div class="auth-name">${escHtml(name)}</div>` +
+      `<div class="auth-email">${escHtml(email)}</div></div>` +
+      `<button id="btnSignOut">Sign Out</button></div>` +
+      `<div class="auth-sync" id="auth-sync-status"></div>`;
+    document.getElementById('btnSignOut').onclick = doSignOut;
+  } else {
+    el.innerHTML =
+      `<button id="btnGoogleSignIn">` +
+      `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>` +
+      `Sign in with Google</button>` +
+      `<div class="auth-hint">Sign in to sync data across devices</div>`;
+    document.getElementById('btnGoogleSignIn').onclick = signInWithGoogle;
+  }
+}
+
+function updateAuthSyncStatus(state) {
+  const el = document.getElementById('auth-sync-status');
+  if (!el) return;
+  if (state === 'synced') {
+    el.className = 'auth-sync';
+    el.textContent = '☁️ Data synced to cloud';
+  } else if (state === 'syncing') {
+    el.className = 'auth-sync syncing';
+    el.textContent = '☁️ Syncing...';
+  } else if (state === 'error') {
+    el.className = 'auth-sync error';
+    el.textContent = '⚠️ Sync failed — basic data saved';
+  }
 }
 
 function showXPToast(gained, eloDelta) {
@@ -5263,6 +5486,7 @@ function showProfilePanel() {
   renderProfileStats();
   renderMatchHistory();
   renderXPCard();
+  updateAuthUI();
   document.getElementById('profile-panel').classList.add('show');
 }
 
@@ -5459,6 +5683,7 @@ const _savedGame = loadSavedGame();
 showSplash();
 suspendedGame = _savedGame;
 syncResumeBtn();
+initAuth();
 
 window.addEventListener('beforeunload', () => {
   if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
