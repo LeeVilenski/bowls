@@ -958,6 +958,8 @@ let lastJackHitter = null;   // player who last struck the jack
 let mouse    = { x: 0, y: 0, down: false };
 let aimActive = false;
 let headOverlay = false;
+let headShowRings = true;
+let headShowDists = true;
 
 // ── Swipe control state ───────────────────────────────────────────
 let aimAngle     = null;   // null = recalculate default toward jack
@@ -3138,53 +3140,55 @@ function drawHeadOverlay() {
     const jp = toScr(jack.x, jack.y);
 
     // Concentric distance rings centered on jack (broadcast-style)
-    const ringSpacingMat = MAT.h * 0.04;
-    const maxRings = 7;
-    for (let i = 1; i <= maxRings; i++) {
-      const rMat = ringSpacingMat * i;
-      const rScr = rMat * scale;
-      const alpha = 0.18 - i * 0.02;
-      if (alpha <= 0) break;
+    if (headShowRings) {
+      const ringSpacingMat = MAT.h * 0.04;
+      const maxRings = 7;
+      for (let i = 1; i <= maxRings; i++) {
+        const rMat = ringSpacingMat * i;
+        const rScr = rMat * scale;
+        const alpha = 0.18 - i * 0.02;
+        if (alpha <= 0) break;
 
-      // Filled band between this ring and the previous
-      if (i % 2 === 1) {
-        const rInner = (i === 1) ? 0 : (ringSpacingMat * (i - 1)) * scale;
+        if (i % 2 === 1) {
+          const rInner = (i === 1) ? 0 : (ringSpacingMat * (i - 1)) * scale;
+          ctx.beginPath();
+          ctx.arc(jp.x, jp.y, rScr, 0, Math.PI * 2);
+          if (rInner > 0) { ctx.moveTo(jp.x + rInner, jp.y); ctx.arc(jp.x, jp.y, rInner, 0, Math.PI * 2, true); }
+          ctx.fillStyle = `rgba(147,197,253,${alpha * 0.5})`;
+          ctx.fill();
+        }
+
         ctx.beginPath();
         ctx.arc(jp.x, jp.y, rScr, 0, Math.PI * 2);
-        if (rInner > 0) { ctx.moveTo(jp.x + rInner, jp.y); ctx.arc(jp.x, jp.y, rInner, 0, Math.PI * 2, true); }
-        ctx.fillStyle = `rgba(147,197,253,${alpha * 0.5})`;
-        ctx.fill();
+        ctx.strokeStyle = `rgba(147,197,253,${alpha})`;
+        ctx.lineWidth = i === 1 ? 1.5 : 1;
+        ctx.stroke();
       }
-
-      ctx.beginPath();
-      ctx.arc(jp.x, jp.y, rScr, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(147,197,253,${alpha})`;
-      ctx.lineWidth = i === 1 ? 1.5 : 1;
-      ctx.stroke();
     }
 
     // Distance lines from each bowl to jack
-    for (const e of dists) {
-      const bp = toScr(e.b.x, e.b.y);
-      ctx.beginPath();
-      ctx.moveTo(bp.x, bp.y);
-      ctx.lineTo(jp.x, jp.y);
-      ctx.strokeStyle = e.b.player === 1 ? 'rgba(96,165,250,0.4)' : 'rgba(248,113,113,0.4)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 2]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+    if (headShowDists) {
+      for (const e of dists) {
+        const bp = toScr(e.b.x, e.b.y);
+        ctx.beginPath();
+        ctx.moveTo(bp.x, bp.y);
+        ctx.lineTo(jp.x, jp.y);
+        ctx.strokeStyle = e.b.player === 1 ? 'rgba(96,165,250,0.4)' : 'rgba(248,113,113,0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 2]);
+        ctx.stroke();
+        ctx.setLineDash([]);
 
-      // Distance label at midpoint
-      const lx = (bp.x + jp.x) / 2, ly = (bp.y + jp.y) / 2;
-      const distMM = (e.d / MAT.h * 13000).toFixed(0);
-      ctx.font = '9px Segoe UI';
-      const tw = ctx.measureText(distMM + 'mm').width;
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(lx - tw/2 - 2, ly - 12, tw + 4, 12);
-      ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillText(distMM + 'mm', lx, ly);
+        const lx = (bp.x + jp.x) / 2, ly = (bp.y + jp.y) / 2;
+        const distMM = (e.d / MAT.h * 13000).toFixed(0);
+        ctx.font = '9px Segoe UI';
+        const tw = ctx.measureText(distMM + 'mm').width;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(lx - tw/2 - 2, ly - 12, tw + 4, 12);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText(distMM + 'mm', lx, ly);
+      }
     }
 
     // Draw jack
@@ -3347,6 +3351,23 @@ function drawHeadOverlay() {
   }
 
   ctx.restore();
+
+  // Toggle buttons (top-right of view)
+  const togBtnW = 52, togBtnH = 24, togGap = 6;
+  const togX = viewX + viewW - togBtnW - 4;
+  const togRingsY = viewY + 6;
+  const togDistsY = togRingsY + togBtnH + togGap;
+
+  for (const [label, on, ty] of [['RINGS', headShowRings, togRingsY], ['DIST', headShowDists, togDistsY]]) {
+    ctx.fillStyle = on ? 'rgba(13,148,136,0.85)' : 'rgba(30,41,59,0.85)';
+    ctx.beginPath(); ctx.roundRect(togX, ty, togBtnW, togBtnH, 5); ctx.fill();
+    ctx.strokeStyle = on ? '#5eead4' : '#475569';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(togX, ty, togBtnW, togBtnH, 5); ctx.stroke();
+    ctx.fillStyle = on ? '#fff' : '#94a3b8';
+    ctx.font = 'bold 9px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, togX + togBtnW / 2, ty + togBtnH / 2);
+  }
 
   // Broadcast-style scoreboard panel
   {
@@ -3549,6 +3570,23 @@ function handlePointerDown(p) {
   if (gameMenuOpen) {
     handleGameMenuTap(p);
     mouse.down = false; return;
+  }
+
+  // Head overlay toggle buttons
+  if (headOverlay) {
+    const viewX = 42, viewY = 20, viewW = W - 84;
+    const togBtnW = 52, togBtnH = 24, togGap = 6;
+    const togX = viewX + viewW - togBtnW - 4;
+    const togRingsY = viewY + 6;
+    const togDistsY = togRingsY + togBtnH + togGap;
+    if (p.x >= togX && p.x <= togX + togBtnW) {
+      if (p.y >= togRingsY && p.y <= togRingsY + togBtnH) {
+        headShowRings = !headShowRings; mouse.down = false; return;
+      }
+      if (p.y >= togDistsY && p.y <= togDistsY + togBtnH) {
+        headShowDists = !headShowDists; mouse.down = false; return;
+      }
+    }
   }
 
   // Overlay button hit-tests
