@@ -3353,7 +3353,7 @@ function drawHeadOverlay() {
     const p1Label = 'P1';
     const p2Label = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0].toUpperCase() : 'P2';
     const rowH = 22, nameW = 90, scoreW = 28, panelW = nameW + scoreW;
-    const panelX = viewX, panelY = viewY + viewH + 6;
+    const panelX = viewX + 4, panelY = viewY + viewH - 3 * rowH - 4;
 
     // Header row
     ctx.fillStyle = 'rgba(100,116,139,0.85)';
@@ -3413,10 +3413,10 @@ function drawHeadOverlay() {
     ctx.textBaseline = 'alphabetic';
   }
 
-  // Title — right-aligned to leave room for shot panel
+  // Title
   ctx.fillStyle = '#e2e8f0';
-  ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-  ctx.fillText('OVERHEAD VIEW', viewX + viewW, viewY + viewH + 14);
+  ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('OVERHEAD VIEW', W / 2, viewY + viewH + 6);
 }
 
 // ── Main loop ─────────────────────────────────────────────────────
