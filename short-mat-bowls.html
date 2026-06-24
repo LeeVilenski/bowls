@@ -63,6 +63,7 @@ button:active { opacity: .7; }
   background: #0a0f1e;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column; align-items: center;
+  justify-content: center;
   padding-top: max(env(safe-area-inset-top), 12px);
   padding-bottom: max(env(safe-area-inset-bottom), 16px);
 }
@@ -73,7 +74,7 @@ button:active { opacity: .7; }
   display: flex; flex-direction: column; gap: 12px;
 }
 .spl-title {
-  text-align: center; padding: 10px 0 2px;
+  text-align: center; padding: 18px 0 10px;
   font-size: 26px; font-weight: 900; color: #fff; letter-spacing: -0.5px;
 }
 .spl-title em { color: #60a5fa; font-style: normal; }
@@ -96,6 +97,25 @@ button:active { opacity: .7; }
   border-radius: 6px; border: 1px solid #334155; min-height: 30px;
 }
 .seg button.sel { background: #1d4ed8; color: #fff; border-color: #3b82f6; }
+.pill-seg {
+  display: flex; position: relative;
+  background: #1e293b; border-radius: 10px; padding: 3px;
+  width: 100%;
+}
+.pill-seg .pill-track {
+  position: absolute; top: 3px; bottom: 3px;
+  background: #1d4ed8; border-radius: 8px;
+  transition: left 0.25s cubic-bezier(0.4,0,0.2,1), width 0.25s cubic-bezier(0.4,0,0.2,1);
+  z-index: 0;
+}
+.pill-seg button {
+  flex: 1; position: relative; z-index: 1;
+  padding: 8px 0; font-size: 12px; font-weight: 700;
+  background: transparent; color: #64748b;
+  border: none; border-radius: 8px; min-height: 34px;
+  transition: color 0.2s;
+}
+.pill-seg button.sel { color: #fff; }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
 .sw {
   width: 26px; height: 26px; border-radius: 50%;
@@ -123,6 +143,12 @@ button:active { opacity: .7; }
   color: #fff; border-radius: 12px; border: none; width: 100%;
   box-shadow: 0 4px 20px rgba(109,40,217,0.35); letter-spacing: 0.3px;
 }
+#btnResume {
+  padding: 14px; font-size: 15px; font-weight: 700;
+  background: transparent; color: #94a3b8; border-radius: 12px;
+  border: 2px solid #334155; width: 100%; letter-spacing: 0.3px;
+}
+#btnResume:hover { border-color: #475569; color: #e2e8f0; }
 #btnAch, #btnProfile {
   padding: 10px; font-size: 13px; font-weight: 700;
   background: #1e293b; color: #94a3b8; border-radius: 10px;
@@ -475,13 +501,10 @@ button:active { opacity: .7; }
   <div id="spl-inner">
     <div class="spl-title">Short Mat <em>Bowls</em></div>
 
-    <div class="spl-card">
-      <div class="spl-head">Mode</div>
-      <div class="spl-row"><div class="seg" id="sMode"></div></div>
-    </div>
+    <div class="pill-seg" id="sMode"></div>
 
     <button id="btnStart">Start Game</button>
-    <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
+    <button id="btnResume" style="display:none">Resume Game</button>
     <button id="btnProfile">👤 Profile</button>
     <button id="btnAch">🏆 Achievements</button>
     <button id="btnLeaderboard">📊 Rankings</button>
@@ -1787,16 +1810,24 @@ function drawOverlayUI() {
   // Fire mode button (left side) — only during local aim
   if (state === 'aim' && !(mode==='online' && playerForTurn(turnIdx)!==localPlayer)) {
     const fx = btnW/2 + 6, fy = btnY;
-    ctx.fillStyle = fireModeActive ? '#dc2626' : 'rgba(127,29,29,0.7)';
+    ctx.save();
+    ctx.shadowColor = fireModeActive ? 'rgba(220,38,38,0.5)' : 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = fireModeActive ? '#dc2626' : '#7f1d1d';
     ctx.beginPath(); ctx.roundRect(fx - btnW/2, fy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.restore();
     ctx.fillStyle = fireModeActive ? '#fff' : '#fca5a5';
     ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(fireModeActive ? 'FIRE ●' : 'FIRE', fx, fy);
 
     // Show Head button (right side) — toggles overhead top-down view
     const hx = W - btnW/2 - 6, hy = btnY;
-    ctx.fillStyle = headOverlay ? '#0d9488' : 'rgba(13,94,88,0.7)';
+    ctx.save();
+    ctx.shadowColor = headOverlay ? 'rgba(13,148,136,0.5)' : 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = headOverlay ? '#0d9488' : '#134e4a';
     ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.restore();
     ctx.fillStyle = headOverlay ? '#fff' : '#5eead4';
     ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
@@ -1805,8 +1836,12 @@ function drawOverlayUI() {
   // Head button also available after end finishes and at game over
   if (state === 'end-result' || state === 'game-over') {
     const hx = W - btnW/2 - 6, hy = btnY;
-    ctx.fillStyle = headOverlay ? '#0d9488' : 'rgba(13,94,88,0.7)';
+    ctx.save();
+    ctx.shadowColor = headOverlay ? 'rgba(13,148,136,0.5)' : 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = headOverlay ? '#0d9488' : '#134e4a';
     ctx.beginPath(); ctx.roundRect(hx - btnW/2, hy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.restore();
     ctx.fillStyle = headOverlay ? '#fff' : '#5eead4';
     ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(headOverlay ? '⬇ MAT' : '👁 HEAD', hx, hy);
@@ -1815,8 +1850,12 @@ function drawOverlayUI() {
   // FF button (right side) — only during moving
   if (state === 'moving') {
     const ffx = W - btnW/2 - 6, ffy = btnY;
-    ctx.fillStyle = ffModeActive ? '#7c3aed' : 'rgba(30,58,95,0.7)';
+    ctx.save();
+    ctx.shadowColor = ffModeActive ? 'rgba(124,58,237,0.5)' : 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = ffModeActive ? '#7c3aed' : '#1e3a5f';
     ctx.beginPath(); ctx.roundRect(ffx - btnW/2, ffy - btnH/2, btnW, btnH, btnR); ctx.fill();
+    ctx.restore();
     ctx.fillStyle = ffModeActive ? '#fff' : '#93c5fd';
     ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('⏩ 3×', ffx, ffy);
@@ -2657,11 +2696,23 @@ function drawAimUI() {
     ctx.fillText(label, ax, arrowY); ctx.textBaseline = 'alphabetic';
   }
 
-  // Hint text
+  // Hint text — floating banner above bias arrows
   if (aimLiveSpeed === 0) {
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px Segoe UI';
+    const hintText = 'tap mat to position · swipe up to deliver';
+    const hintY = H - 150;
+    ctx.font = 'bold 14px Segoe UI';
     ctx.textAlign = 'center';
-    ctx.fillText('tap mat to position · ↑ swipe to deliver', P.cx, H - 85);
+    const tw = ctx.measureText(hintText).width;
+    const padX = 14, padY = 8, hintH = 28;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath(); ctx.roundRect(P.cx - tw/2 - padX, hintY - hintH/2, tw + padX*2, hintH, 14); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(hintText, P.cx, hintY);
+    ctx.textBaseline = 'alphabetic';
   }
 }
 
@@ -4122,6 +4173,36 @@ function checkExpiredTimerOnResume() {
 }
 
 // ── Splash screen ─────────────────────────────────────────────────
+function pillSeg(containerId, options, getVal, setVal) {
+  const el = document.getElementById(containerId);
+  const track = document.createElement('div');
+  track.className = 'pill-track';
+  el.appendChild(track);
+  const buttons = [];
+  options.forEach(([label, val], i) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (val === getVal()) b.classList.add('sel');
+    b.onclick = () => {
+      setVal(val);
+      buttons.forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      updatePillTrack(el, track, buttons);
+    };
+    el.appendChild(b);
+    buttons.push(b);
+  });
+  requestAnimationFrame(() => updatePillTrack(el, track, buttons));
+}
+
+function updatePillTrack(container, track, buttons) {
+  const sel = buttons.find(b => b.classList.contains('sel'));
+  if (!sel) { track.style.opacity = '0'; return; }
+  track.style.opacity = '1';
+  track.style.left = sel.offsetLeft + 'px';
+  track.style.width = sel.offsetWidth + 'px';
+}
+
 function seg(containerId, options, getVal, setVal) {
   const el = document.getElementById(containerId);
   options.forEach(([label, val]) => {
@@ -4153,7 +4234,7 @@ function buildSwatches(id, getIdx, setIdx) {
 }
 
 function buildSplash() {
-  seg('sMode', [['1 Player','vs-ai'],['2 Players','vs-player'],['Online','online']], ()=>splashCfg.mode, v=>{
+  pillSeg('sMode', [['1 Player','vs-ai'],['2 Players','vs-player'],['Online','online']], ()=>splashCfg.mode, v=>{
     splashCfg.mode=v;
   });
 
@@ -4309,10 +4390,11 @@ function hideOnlinePanel() {
   unsubscribeLobby();
   if (lobbyClockInterval) { clearInterval(lobbyClockInterval); lobbyClockInterval = null; }
   splashCfg.mode = 'vs-ai';
-  const seg = document.getElementById('sMode');
-  seg.querySelectorAll('button').forEach(b => {
-    b.classList.toggle('sel', b.textContent === '1 Player');
-  });
+  const modeEl = document.getElementById('sMode');
+  const btns = [...modeEl.querySelectorAll('button')];
+  btns.forEach(b => b.classList.toggle('sel', b.textContent === '1 Player'));
+  const track = modeEl.querySelector('.pill-track');
+  if (track) updatePillTrack(modeEl, track, btns);
 }
 
 function buildOnlinePanel() {
