@@ -5683,7 +5683,8 @@ const _savedGame = loadSavedGame();
 showSplash();
 suspendedGame = _savedGame;
 syncResumeBtn();
-initAuth();
+if (typeof supabase !== 'undefined') initAuth();
+else window.addEventListener('load', () => initAuth());
 
 window.addEventListener('beforeunload', () => {
   if (state !== 'idle' && state !== 'game-over' && mode !== 'online') {
