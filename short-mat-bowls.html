@@ -180,13 +180,87 @@ button:active { opacity: .7; }
 .stat-section-head { font-size: 12px; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 1px; padding: 10px 0 4px; margin-top: 4px; border-top: 1px solid #334155; }
 
 .hist-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
-.hist-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; }
+.hist-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; cursor: pointer; }
 .hist-row:last-child { border-bottom: none; }
+.hist-row:active { background: #1e293b; }
 .hist-result { font-size: 14px; font-weight: 800; width: 22px; text-align: center; border-radius: 4px; padding: 2px 0; }
 .hist-win { color: #22c55e; }
 .hist-loss { color: #ef4444; }
-.hist-detail { font-size: 13px; color: #e2e8f0; line-height: 1.4; }
+.hist-detail { font-size: 13px; color: #e2e8f0; line-height: 1.4; flex: 1; }
 .hist-detail small { color: #94a3b8; }
+.hist-arrow { color: #475569; font-size: 16px; flex-shrink: 0; }
+
+/* Opponent profile panel */
+#opponent-panel {
+  position: fixed; inset: 0; z-index: 350; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#opponent-panel.show { display: flex; }
+#opponent-inner { width: 100%; max-width: 440px; }
+#opponent-back {
+  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
+}
+.opp-header { text-align: center; margin-bottom: 16px; }
+.opp-name { font-size: 22px; font-weight: 800; color: #fff; }
+.opp-mode-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px;
+  border-radius: 12px; margin-top: 6px;
+}
+.opp-mode-ai { background: #1e293b; color: #f87171; border: 1px solid #334155; }
+.opp-mode-online { background: #1e293b; color: #60a5fa; border: 1px solid #334155; }
+.opp-mode-local { background: #1e293b; color: #a78bfa; border: 1px solid #334155; }
+.h2h-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; padding: 8px 0;
+}
+.h2h-stat { display: flex; flex-direction: column; align-items: center; }
+.h2h-val { font-size: 24px; font-weight: 800; }
+.h2h-val.wins { color: #22c55e; }
+.h2h-val.losses { color: #ef4444; }
+.h2h-val.draws { color: #fbbf24; }
+.h2h-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+/* Leaderboard panel */
+#leaderboard-panel {
+  position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#leaderboard-panel.show { display: flex; }
+#leaderboard-inner { width: 100%; max-width: 440px; }
+#leaderboard-back {
+  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
+}
+.lb-title { font-size: 20px; font-weight: 800; margin-bottom: 14px; }
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table th {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: #475569; padding: 8px 6px; border-bottom: 1px solid #334155; text-align: left;
+}
+.lb-table th:last-child, .lb-table td:last-child { text-align: right; }
+.lb-table td {
+  font-size: 13px; padding: 10px 6px; border-bottom: 1px solid #1e293b; color: #e2e8f0;
+}
+.lb-rank { font-weight: 800; width: 32px; }
+.lb-rank-1 { color: #fbbf24; }
+.lb-rank-2 { color: #94a3b8; }
+.lb-rank-3 { color: #cd7f32; }
+.lb-name { font-weight: 600; }
+.lb-level { color: #fbbf24; font-weight: 700; font-size: 11px; }
+.lb-elo { font-weight: 700; color: #a78bfa; }
+.lb-me { background: #1e293b; }
+.lb-empty { color: #64748b; font-size: 13px; padding: 20px 0; text-align: center; }
+.lb-loading { color: #64748b; font-size: 13px; padding: 20px 0; text-align: center; }
+#btnLeaderboard {
+  padding: 10px; font-size: 13px; font-weight: 700;
+  background: #1e293b; color: #94a3b8; border-radius: 10px;
+  border: 1px solid #334155; width: 100%; margin-top: -4px;
+}
+#btnLeaderboard:hover { background: #334155; color: #e2e8f0; }
 
 /* XP / Rating */
 .xp-card { margin-bottom: 4px; }
@@ -386,6 +460,7 @@ button:active { opacity: .7; }
     <button id="btnResume" style="display:none;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#15803d,#166534);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(22,101,52,0.35);letter-spacing:0.3px">Resume Game</button>
     <button id="btnProfile">👤 Profile</button>
     <button id="btnAch">🏆 Achievements</button>
+    <button id="btnLeaderboard">📊 Rankings</button>
   </div>
 </div>
 
@@ -491,6 +566,42 @@ button:active { opacity: .7; }
   <div class="toast-text">
     <div class="toast-lbl">Achievement Unlocked</div>
     <div class="toast-name" id="toast-name"></div>
+  </div>
+</div>
+
+<div id="opponent-panel">
+  <div id="opponent-inner">
+    <button id="opponent-back">&larr; Back</button>
+    <div class="opp-header">
+      <div class="opp-name" id="opp-name"></div>
+      <div id="opp-badge"></div>
+    </div>
+    <div class="spl-card xp-card" id="opp-ranking-card">
+      <div class="spl-head">Ranking</div>
+      <div class="xp-header"><span class="xp-level" id="opp-level">Level 1</span><span class="xp-rating" id="opp-rating">Rating: 1000</span></div>
+      <div class="xp-bar-outer"><div class="xp-bar-inner" id="opp-xp-bar"></div></div>
+      <div class="xp-label"><span id="opp-xp-current">0 XP</span><span id="opp-xp-next">Level 2</span></div>
+    </div>
+    <div class="spl-card" id="opp-ai-card" style="display:none">
+      <div class="spl-head">AI Difficulty</div>
+      <div id="opp-ai-info" style="font-size:13px;color:#94a3b8;padding:4px 0;line-height:1.5"></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Head to Head</div>
+      <div class="h2h-grid" id="opp-h2h"></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">Recent Matches</div>
+      <div id="opp-matches"></div>
+    </div>
+  </div>
+</div>
+
+<div id="leaderboard-panel">
+  <div id="leaderboard-inner">
+    <button id="leaderboard-back">&larr; Back</button>
+    <div class="lb-title">Rankings</div>
+    <div id="leaderboard-content"></div>
   </div>
 </div>
 
@@ -5004,7 +5115,8 @@ function renderMatchHistory() {
   const el = document.getElementById('profile-history');
   const history = loadHistory();
   if (!history.length) { el.innerHTML = '<div class="hist-empty">No games played yet</div>'; return; }
-  el.innerHTML = history.slice(0, 20).map(g => {
+  el.innerHTML = '';
+  history.slice(0, 20).forEach(g => {
     const d = new Date(g.date);
     const dateStr = d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
     const result = g.won ? 'W' : 'L';
@@ -5012,10 +5124,15 @@ function renderMatchHistory() {
     const score = `${g.myScore}–${g.oppScore}`;
     const modeLabel = g.mode === 'vs-ai' ? '🤖' : g.mode === 'online' ? '🌐' : '👥';
     const endsPlayed = g.conceded ? '(conceded)' : `${g.ends}/${g.totalEnds} ends`;
-    return `<div class="hist-row"><span class="hist-result ${resultClass}">${result}</span>` +
+    const row = document.createElement('div');
+    row.className = 'hist-row';
+    row.innerHTML = `<span class="hist-result ${resultClass}">${result}</span>` +
       `<span class="hist-detail"><strong>${modeLabel} vs ${g.opponent}</strong><br>` +
-      `<small>${score} · ${endsPlayed} · ${dateStr}</small></span></div>`;
-  }).join('');
+      `<small>${score} · ${endsPlayed} · ${dateStr}</small></span>` +
+      `<span class="hist-arrow">›</span>`;
+    row.onclick = () => showOpponentProfile(g.opponent, g.mode);
+    el.appendChild(row);
+  });
 }
 
 // ── XP & ELO Rating System ──────────────────────────────────────
@@ -5162,6 +5279,179 @@ function applyProfileToSplash() {
   if (prof.size != null) splashCfg.size = prof.size;
   if (prof.biasVal != null) splashCfg.biasVal = prof.biasVal;
 }
+
+// ── Opponent Profile ────────────────────────────────────────────
+function getH2H(opponentName) {
+  const history = loadHistory();
+  const matches = history.filter(g => g.opponent === opponentName);
+  const wins = matches.filter(g => g.won).length;
+  const losses = matches.filter(g => !g.won).length;
+  return { wins, losses, total: matches.length, matches };
+}
+
+function findAIPlayer(name) {
+  return AI_PLAYERS.find(a => a.name === name);
+}
+
+async function fetchOnlineProfile(displayName) {
+  if (!initSupabase()) return null;
+  try {
+    const { data } = await sb.from('players').select('display_name,xp,level,elo')
+      .eq('display_name', displayName).single();
+    return data;
+  } catch { return null; }
+}
+
+async function showOpponentProfile(opponentName, matchMode) {
+  const panel = document.getElementById('opponent-panel');
+  document.getElementById('opp-name').textContent = opponentName;
+
+  const badge = document.getElementById('opp-badge');
+  const rankCard = document.getElementById('opp-ranking-card');
+  const aiCard = document.getElementById('opp-ai-card');
+
+  if (matchMode === 'vs-ai') {
+    badge.innerHTML = '<span class="opp-mode-badge opp-mode-ai">AI Opponent</span>';
+    rankCard.style.display = 'none';
+    const ai = findAIPlayer(opponentName);
+    if (ai) {
+      const tier = AI_PLAYERS.indexOf(ai);
+      const tierNames = ['Beginner', 'Club', 'County', 'Master'];
+      aiCard.style.display = '';
+      document.getElementById('opp-ai-info').innerHTML =
+        `<div style="font-weight:700;color:#e2e8f0;margin-bottom:4px">${tierNames[tier]} Tier</div>` +
+        `<div>${ai.bio}</div>`;
+    } else {
+      aiCard.style.display = 'none';
+    }
+  } else if (matchMode === 'online') {
+    badge.innerHTML = '<span class="opp-mode-badge opp-mode-online">Online Player</span>';
+    aiCard.style.display = 'none';
+    rankCard.style.display = '';
+    document.getElementById('opp-level').textContent = 'Loading...';
+    document.getElementById('opp-rating').textContent = '';
+    document.getElementById('opp-xp-bar').style.width = '0%';
+    document.getElementById('opp-xp-current').textContent = '';
+    document.getElementById('opp-xp-next').textContent = '';
+    const profile = await fetchOnlineProfile(opponentName);
+    if (profile) {
+      const lvl = calcLevel(profile.xp || 0);
+      document.getElementById('opp-level').textContent = `Level ${profile.level || 1}`;
+      document.getElementById('opp-rating').textContent = `Rating: ${profile.elo || 1000}`;
+      const pct = lvl.xpForNext > 0 ? Math.round(lvl.xpIntoLevel / lvl.xpForNext * 100) : 100;
+      document.getElementById('opp-xp-bar').style.width = pct + '%';
+      document.getElementById('opp-xp-current').textContent = `${lvl.xpIntoLevel} / ${lvl.xpForNext} XP`;
+      document.getElementById('opp-xp-next').textContent = `Level ${(profile.level || 1) + 1}`;
+    } else {
+      document.getElementById('opp-level').textContent = 'Unknown';
+      document.getElementById('opp-rating').textContent = '';
+      document.getElementById('opp-xp-bar').style.width = '0%';
+      document.getElementById('opp-xp-current').textContent = 'No data available';
+      document.getElementById('opp-xp-next').textContent = '';
+    }
+  } else {
+    badge.innerHTML = '<span class="opp-mode-badge opp-mode-local">Local Player</span>';
+    rankCard.style.display = 'none';
+    aiCard.style.display = 'none';
+  }
+
+  const h2h = getH2H(opponentName);
+  document.getElementById('opp-h2h').innerHTML =
+    `<div class="h2h-stat"><span class="h2h-val wins">${h2h.wins}</span><span class="h2h-lbl">Wins</span></div>` +
+    `<div class="h2h-stat"><span class="h2h-val draws">${h2h.total}</span><span class="h2h-lbl">Played</span></div>` +
+    `<div class="h2h-stat"><span class="h2h-val losses">${h2h.losses}</span><span class="h2h-lbl">Losses</span></div>`;
+
+  const matchesEl = document.getElementById('opp-matches');
+  if (!h2h.matches.length) {
+    matchesEl.innerHTML = '<div class="hist-empty">No matches found</div>';
+  } else {
+    matchesEl.innerHTML = h2h.matches.slice(0, 10).map(g => {
+      const d = new Date(g.date);
+      const dateStr = d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+      const result = g.won ? 'W' : 'L';
+      const resultClass = g.won ? 'hist-win' : 'hist-loss';
+      const score = `${g.myScore}–${g.oppScore}`;
+      const endsPlayed = g.conceded ? '(conceded)' : `${g.ends}/${g.totalEnds} ends`;
+      return `<div class="hist-row" style="cursor:default"><span class="hist-result ${resultClass}">${result}</span>` +
+        `<span class="hist-detail"><strong>${score}</strong><br>` +
+        `<small>${endsPlayed} · ${dateStr}</small></span></div>`;
+    }).join('');
+  }
+
+  panel.classList.add('show');
+}
+
+document.getElementById('opponent-back').onclick = () => {
+  document.getElementById('opponent-panel').classList.remove('show');
+};
+
+// ── Leaderboard ─────────────────────────────────────────────────
+async function loadLeaderboard() {
+  const content = document.getElementById('leaderboard-content');
+  content.innerHTML = '<div class="lb-loading">Loading rankings...</div>';
+
+  if (!initSupabase()) {
+    content.innerHTML = '<div class="lb-empty">Online connection required for rankings</div>';
+    return;
+  }
+
+  try {
+    const { data, error } = await sb.from('players').select('display_name,xp,level,elo')
+      .order('elo', { ascending: false }).limit(50);
+    if (error) throw error;
+    if (!data || !data.length) {
+      content.innerHTML = '<div class="lb-empty">No players ranked yet</div>';
+      return;
+    }
+
+    const myName = localStorage.getItem('bowls_name') || '';
+    let html = '<table class="lb-table"><thead><tr>' +
+      '<th>#</th><th>Player</th><th>Level</th><th>Rating</th></tr></thead><tbody>';
+
+    data.forEach((p, i) => {
+      const rank = i + 1;
+      const rankClass = rank <= 3 ? ` lb-rank-${rank}` : '';
+      const isMe = myName && p.display_name === myName;
+      const rowClass = isMe ? ' lb-me' : '';
+      html += `<tr class="${rowClass}">` +
+        `<td class="lb-rank${rankClass}">${rank}</td>` +
+        `<td class="lb-name">${escHtml(p.display_name || 'Anonymous')}</td>` +
+        `<td class="lb-level">Lv.${p.level || 1}</td>` +
+        `<td class="lb-elo">${p.elo || 1000}</td></tr>`;
+    });
+
+    html += '</tbody></table>';
+
+    const myData = loadXP();
+    const myRank = data.findIndex(p => myName && p.display_name === myName);
+    if (myRank === -1 && myName) {
+      html += `<div class="spl-card" style="margin-top:12px;text-align:center">` +
+        `<div style="font-size:11px;color:#64748b;margin-bottom:4px">Your Position</div>` +
+        `<div style="font-size:13px;color:#e2e8f0"><strong>${escHtml(myName)}</strong> · ` +
+        `Lv.${myData.level} · Rating: ${myData.elo}</div>` +
+        `<div style="font-size:11px;color:#475569;margin-top:4px">Play online to appear in rankings</div></div>`;
+    }
+
+    content.innerHTML = html;
+  } catch (e) {
+    console.error('loadLeaderboard', e);
+    content.innerHTML = '<div class="lb-empty">Failed to load rankings</div>';
+  }
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+document.getElementById('btnLeaderboard').onclick = () => {
+  document.getElementById('leaderboard-panel').classList.add('show');
+  loadLeaderboard();
+};
+document.getElementById('leaderboard-back').onclick = () => {
+  document.getElementById('leaderboard-panel').classList.remove('show');
+};
 
 buildSplash();
 applyProfileToSplash();
