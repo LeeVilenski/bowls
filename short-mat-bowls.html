@@ -125,10 +125,10 @@ button:active { opacity: .7; }
 .sw.sel { border-color: #fff; transform: scale(1.2); }
 .spl-row input[type=range] { flex: 1; accent-color: #60a5fa; }
 .rval { font-size: 12px; font-weight: 700; color: #60a5fa; min-width: 18px; text-align: right; }
-.bg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .bg-opt {
-  height: 52px; border-radius: 10px; border: 2.5px solid transparent;
-  font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.9);
+  height: 36px; border-radius: 8px; border: 2.5px solid transparent;
+  font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
 }
@@ -160,12 +160,26 @@ button:active { opacity: .7; }
   position: fixed; inset: 0; z-index: 250; background: #0a0f1e;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: none; flex-direction: column; align-items: center;
-  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+  padding: max(env(safe-area-inset-top),8px) 10px 0;
 }
 #game-settings-panel.show { display: flex; }
 #game-settings-inner {
   width: 100%; max-width: 440px;
-  display: flex; flex-direction: column; gap: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 70px;
+}
+#gs-top-bar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 2px;
+}
+#gs-top-bar .spl-title { padding: 0; font-size: 18px; flex: 1; text-align: left; }
+#game-settings-back { margin-bottom: 0 !important; }
+#btnStartGame {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 260;
+  padding: 14px; font-size: 15px; font-weight: 800;
+  background: linear-gradient(135deg,#1d4ed8,#6d28d9); color: #fff;
+  border-radius: 0; border: none; width: 100%;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.5); letter-spacing: 0.3px;
+  padding-bottom: max(env(safe-area-inset-bottom), 14px);
 }
 
 #profile-panel {
@@ -177,9 +191,19 @@ button:active { opacity: .7; }
 #profile-panel.show { display: flex; }
 #profile-inner { width: 100%; max-width: 440px; }
 #game-settings-back, #profile-back {
-  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  padding: 6px 14px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
 }
+#game-settings-inner .spl-card { padding: 8px 12px; gap: 6px; }
+#game-settings-inner .spl-row { min-height: 28px; gap: 6px; }
+#game-settings-inner .spl-head { font-size: 9px; margin-bottom: -2px; }
+.surface-detail-toggle {
+  font-size: 10px; color: #60a5fa; cursor: pointer; padding: 2px 0;
+  background: none; border: none; font-weight: 600; min-height: auto;
+}
+.surface-detail-toggle:hover { text-decoration: underline; }
+.surface-sliders { display: none; flex-direction: column; gap: 6px; }
+.surface-sliders.show { display: flex; }
 .profile-title { font-size: 20px; font-weight: 800; margin-bottom: 14px; }
 #profile-name {
   width: 100%; padding: 10px 14px; font-size: 14px; font-weight: 600;
@@ -513,8 +537,10 @@ button:active { opacity: .7; }
 
 <div id="game-settings-panel">
   <div id="game-settings-inner">
-    <button id="game-settings-back">&larr; Back</button>
-    <div class="spl-title" style="font-size:20px">Game Settings</div>
+    <div id="gs-top-bar">
+      <button id="game-settings-back">&larr; Back</button>
+      <div class="spl-title">Game Settings</div>
+    </div>
 
     <div class="spl-card">
       <div class="spl-head">Game</div>
@@ -535,20 +561,23 @@ button:active { opacity: .7; }
     <div class="spl-card">
       <div class="spl-head">Surface</div>
       <div class="spl-row"><span class="spl-lbl">Preset</span><div class="seg" id="sSurface"></div></div>
-      <div class="spl-row">
-        <span class="spl-lbl">Speed</span>
-        <input type="range" id="sSpeedSlider" min="0" max="100" step="1" value="50">
-        <span class="rval" id="sSpeedLbl">50</span>
-      </div>
-      <div class="spl-row">
-        <span class="spl-lbl">Bend ◀</span>
-        <input type="range" id="sBendLeftSlider" min="0" max="100" step="1" value="50">
-        <span class="rval" id="sBendLeftLbl">50</span>
-      </div>
-      <div class="spl-row">
-        <span class="spl-lbl">Bend ▶</span>
-        <input type="range" id="sBendRightSlider" min="0" max="100" step="1" value="50">
-        <span class="rval" id="sBendRightLbl">50</span>
+      <button class="surface-detail-toggle" id="sSurfaceToggle">Adjust speed &amp; bend ▾</button>
+      <div class="surface-sliders" id="sSurfaceSliders">
+        <div class="spl-row">
+          <span class="spl-lbl">Speed</span>
+          <input type="range" id="sSpeedSlider" min="0" max="100" step="1" value="50">
+          <span class="rval" id="sSpeedLbl">50</span>
+        </div>
+        <div class="spl-row">
+          <span class="spl-lbl">Bend ◀</span>
+          <input type="range" id="sBendLeftSlider" min="0" max="100" step="1" value="50">
+          <span class="rval" id="sBendLeftLbl">50</span>
+        </div>
+        <div class="spl-row">
+          <span class="spl-lbl">Bend ▶</span>
+          <input type="range" id="sBendRightSlider" min="0" max="100" step="1" value="50">
+          <span class="rval" id="sBendRightLbl">50</span>
+        </div>
       </div>
     </div>
 
@@ -557,7 +586,7 @@ button:active { opacity: .7; }
       <div class="bg-grid" id="sBg"></div>
     </div>
 
-    <button id="btnStartGame" style="padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,#1d4ed8,#6d28d9);color:#fff;border-radius:12px;border:none;width:100%;box-shadow:0 4px 20px rgba(109,40,217,0.35);letter-spacing:0.3px">Start Game</button>
+    <button id="btnStartGame">Start Game</button>
   </div>
 </div>
 
@@ -4352,6 +4381,12 @@ function buildGameSettingsPanel() {
   });
 
   document.getElementById('game-settings-back').onclick = hideGameSettingsPanel;
+  document.getElementById('sSurfaceToggle').onclick = () => {
+    const sl = document.getElementById('sSurfaceSliders');
+    const btn = document.getElementById('sSurfaceToggle');
+    const open = sl.classList.toggle('show');
+    btn.textContent = open ? 'Hide speed & bend ▴' : 'Adjust speed & bend ▾';
+  };
   document.getElementById('btnStartGame').onclick = () => {
     suspendedGame = null; clearSavedGame(); syncResumeBtn();
     hideGameSettingsPanel();
