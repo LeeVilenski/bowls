@@ -169,9 +169,17 @@ button:active { opacity: .7; }
   padding-bottom: 70px;
 }
 #gs-top-bar {
-  display: flex; align-items: center; gap: 10px; margin-bottom: 2px;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 0;
 }
-#gs-top-bar .spl-title { padding: 0; font-size: 18px; flex: 1; text-align: left; }
+#gs-top-bar .gs-header { flex: 1; text-align: left; }
+#gs-top-bar .gs-header .gs-title {
+  font-size: 18px; font-weight: 900; color: #fff; letter-spacing: -0.3px;
+}
+#gs-top-bar .gs-header .gs-title em { color: #60a5fa; font-style: normal; }
+#gs-top-bar .gs-header .gs-subtitle {
+  font-size: 10px; color: #64748b; font-weight: 600; letter-spacing: 0.5px;
+  text-transform: uppercase; margin-top: 1px;
+}
 #game-settings-back { margin-bottom: 0 !important; }
 #btnStartGame {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 260;
@@ -539,7 +547,10 @@ button:active { opacity: .7; }
   <div id="game-settings-inner">
     <div id="gs-top-bar">
       <button id="game-settings-back">&larr; Back</button>
-      <div class="spl-title">Game Settings</div>
+      <div class="gs-header">
+        <div class="gs-title">New <em>Match</em></div>
+        <div class="gs-subtitle" id="gs-mode-label">vs AI</div>
+      </div>
     </div>
 
     <div class="spl-card">
@@ -4291,6 +4302,9 @@ function showGameSettingsPanel() {
   document.getElementById('p2BowlsHead').textContent = isAI
     ? AI_PLAYERS[splashCfg.aiLevel].name + ' Bowls'
     : 'Player 2 Bowls';
+  document.getElementById('gs-mode-label').textContent = isAI
+    ? 'Solo — vs ' + AI_PLAYERS[splashCfg.aiLevel].name
+    : 'Local — 2 Player';
   document.getElementById('game-settings-panel').classList.add('show');
 }
 
@@ -4309,6 +4323,7 @@ function buildGameSettingsPanel() {
     splashCfg.aiLevel=v;
     document.getElementById('aiBio').textContent = AI_PLAYERS[v].bio;
     document.getElementById('p2BowlsHead').textContent = AI_PLAYERS[v].name + ' Bowls';
+    document.getElementById('gs-mode-label').textContent = 'Solo — vs ' + AI_PLAYERS[v].name;
   });
   document.getElementById('aiBio').textContent = AI_PLAYERS[splashCfg.aiLevel].bio;
 
