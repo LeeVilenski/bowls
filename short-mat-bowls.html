@@ -433,6 +433,17 @@ button:active { opacity: .7; }
   background: #1e293b; color: #e2e8f0; font-size: 13px; font-family: inherit;
 }
 #lobby-name-row input::placeholder { color: #475569; }
+#join-code-row { display: flex; gap: 8px; align-items: center; }
+#join-code-row input {
+  flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155;
+  background: #1e293b; color: #e2e8f0; font-size: 13px; font-family: inherit;
+  text-transform: uppercase; letter-spacing: 2px;
+}
+#join-code-row input::placeholder { color: #475569; letter-spacing: normal; text-transform: none; }
+#btnJoinCode {
+  padding: 8px 16px; font-size: 13px; font-weight: 700; flex-shrink: 0;
+  background: #1e293b; color: #93c5fd; border-radius: 8px; border: 1px solid #334155;
+}
 .lobby-section { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #475569; margin-top: 4px; }
 #lobby-list { display: flex; flex-direction: column; gap: 6px; }
 .lobby-row {
@@ -730,6 +741,10 @@ button:active { opacity: .7; }
       <input type="text" id="lobby-name" placeholder="Your display name" maxlength="20" autocomplete="off">
     </div>
     <button id="btnCreateGame">Create Game</button>
+    <div id="join-code-row">
+      <input type="text" id="join-code-input" placeholder="Enter game code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <button id="btnJoinCode">Join</button>
+    </div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
       <span class="lobby-section">Open Games</span>
       <button id="btnRefreshLobby">Refresh</button>
@@ -753,6 +768,7 @@ button:active { opacity: .7; }
       <div class="spl-head">Game</div>
       <div class="spl-row"><span class="spl-lbl">Ends</span><div style="display:flex;align-items:center;gap:8px;flex:1"><input type="range" id="cEndsSlider" min="1" max="21" value="6" style="flex:1"><span id="cEndsLbl" style="min-width:20px;text-align:center;font-size:13px;font-weight:600">6</span></div></div>
       <div class="spl-row"><span class="spl-lbl">Time</span><div class="seg" id="cTime"></div></div>
+      <div class="spl-row"><span class="spl-lbl">Visibility</span><div class="seg" id="cVisibility"></div></div>
     </div>
     <div class="spl-card">
       <div class="spl-head">Surface</div>
@@ -3877,7 +3893,8 @@ async function listLobbies() {
   if (netDisplayName) q = q.neq('host_name', netDisplayName);
   const { data, error } = await q.order('created_at', { ascending: false });
   if (error) { console.error('listLobbies', error); return []; }
-  return data || [];
+  // Private games are joinable by code only — keep them out of the public lobby.
+  return (data || []).filter(g => !(g.settings && g.settings.private));
 }
 
 async function listMyGames() {
@@ -4574,7 +4591,7 @@ function buildGameSettingsPanel() {
 let createCfg = {
   ends: 6, timeControl: '1m', size: 3, biasVal: 1.0,
   p1idx: 0, p1design: 0,
-  speedVal: 50, bendLeft: 50, bendRight: 50, bg: 'hardwood'
+  speedVal: 50, bendLeft: 50, bendRight: 50, bg: 'hardwood', private: false
 };
 let onlinePanelBuilt = false;
 
@@ -4623,6 +4640,10 @@ function buildOnlinePanel() {
   document.getElementById('online-back').onclick = hideOnlinePanel;
   document.getElementById('btnRefreshLobby').onclick = refreshLobby;
   document.getElementById('btnCreateGame').onclick = showCreatePanel;
+  document.getElementById('btnJoinCode').onclick = joinByCode;
+  document.getElementById('join-code-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); joinByCode(); }
+  });
 
   subscribeLobby(() => refreshLobby());
 }
@@ -4721,6 +4742,21 @@ function buildJoinBowlPanel() {
     pendingJoinGameId = null;
     document.getElementById('join-bowl-panel').classList.remove('show');
   };
+}
+
+async function joinByCode() {
+  if (!netDisplayName) { alert('Please enter a display name'); return; }
+  const input = document.getElementById('join-code-input');
+  const code = (input.value || '').trim().toUpperCase();
+  if (!code) return;
+  if (!initSupabase()) { alert('Online play is unavailable right now'); return; }
+  const { data, error } = await sb.from('games').select('id,status,host_name').eq('id', code).maybeSingle();
+  if (error) { console.error('joinByCode', error); alert('Could not look up that game'); return; }
+  if (!data) { alert('No game found with that code'); return; }
+  if (data.host_name === netDisplayName) { alert("That's your own game"); return; }
+  if (data.status !== 'waiting') { alert('That game is no longer available to join'); return; }
+  input.value = '';
+  doJoinLobby(data.id, data);
 }
 
 function doJoinLobby(gameId, gameRow) {
@@ -4947,6 +4983,7 @@ function buildCreatePanel() {
   cES.value = createCfg.ends; cEL.textContent = createCfg.ends;
   cES.oninput = () => { createCfg.ends = +cES.value; cEL.textContent = cES.value; };
   cseg('cTime', TIME_CONTROLS.map(t => [t.label, t.value]), ()=>createCfg.timeControl, v=>createCfg.timeControl=v);
+  cseg('cVisibility', [['Public', false], ['Private', true]], ()=>createCfg.private, v=>createCfg.private=v);
 
   // Surface
   const spdS = document.getElementById('cSpeedSlider'), spdL = document.getElementById('cSpeedLbl');
@@ -5011,11 +5048,24 @@ async function doCreateGame() {
     ends: createCfg.ends, size: createCfg.size, biasVal: createCfg.biasVal,
     speedVal: createCfg.speedVal, bendLeft: createCfg.bendLeft, bendRight: createCfg.bendRight,
     bg: createCfg.bg, p1Color: createCfg.p1idx, p1Design: createCfg.p1design,
+    private: !!createCfg.private,
   };
   const code = await createLobby(settings, createCfg.timeControl);
   if (!code) { alert('Could not create game'); return; }
 
-  document.getElementById('waiting-code').textContent = code;
+  // Private games aren't listed in the lobby, so show the code to share.
+  // Public games are joined from the lobby, so the code stays hidden.
+  const codeEl = document.getElementById('waiting-code');
+  const msgEl = document.getElementById('waiting-msg');
+  if (createCfg.private) {
+    codeEl.textContent = code;
+    codeEl.style.display = '';
+    msgEl.textContent = 'Share this code — waiting for opponent…';
+  } else {
+    codeEl.textContent = '';
+    codeEl.style.display = 'none';
+    msgEl.textContent = 'Waiting for opponent…';
+  }
   document.getElementById('waiting-view').classList.add('show');
   document.getElementById('btnSubmitCreate').style.display = 'none';
 
