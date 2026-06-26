@@ -992,6 +992,7 @@ let replayShotIdx = 0;
 let replayCursor = 0;          // float frame index within the current shot
 let replayPlaying = true;
 let replayScrubbing = false;
+let replayView = 'overhead';   // 'overhead' | 'perspective'
 const REPLAY_SPEEDS = [0.25, 0.5, 1, 2, 4];
 let replaySpeed = 1;
 
@@ -1585,8 +1586,10 @@ function commitReplayShot() {
 }
 
 function replayAvailable() {
+  // Deliberately excludes 'aim' — the delivery end is busy there (doormat
+  // repositioning, bias, FIRE/HEAD), so a button would cover the mat.
   return mode !== 'online' && replayShots.length > 0 && !replayActive &&
-    ['camera-return', 'end-result', 'jack-off-side', 'place-jack', 'aim'].includes(state);
+    ['camera-return', 'end-result', 'jack-off-side', 'place-jack'].includes(state);
 }
 
 function enterReplay() {
@@ -1598,6 +1601,7 @@ function enterReplay() {
   replaySpeed = 1;
   replayPlaying = true;
   replayScrubbing = false;
+  replayView = 'overhead';
   headOverlay = false;
   state = 'replay';
 }
@@ -1619,11 +1623,13 @@ function replayInterpFrame(frames, cursor) {
   const lerp = (a, b) => a + (b - a) * t;
   const bowls = f0.bowls.map((b0, k) => {
     const b1 = f1.bowls[k] || b0;
+    const vx = b1.x - b0.x, vy = b1.y - b0.y;  // frame delta drives spin/grip-line direction
     return {
       x: lerp(b0.x, b1.x), y: lerp(b0.y, b1.y),
       player: b0.player, design: b0.design,
       restProgress: lerp(b0.restProgress, b1.restProgress),
       offMat: b0.offMat, toucher: b0.toucher, inDitch: b0.inDitch,
+      vx, vy, stopped: Math.hypot(vx, vy) < 0.05,
     };
   });
   let jk = null;
@@ -1993,30 +1999,46 @@ function draw() {
 
 // ── Replay view & controls ────────────────────────────────────────
 function replayBtnRects() {
-  const w = 64, h = 54, gap = 10, n = 5;
+  const ids = ['exit', 'prev', 'play', 'next', 'speed', 'view'];
+  const w = 60, h = 54, gap = 8, n = ids.length;
   const total = n * w + (n - 1) * gap;
   const x0 = (W - total) / 2, y = H - 64;
-  return ['exit', 'prev', 'play', 'next', 'speed'].map((id, i) =>
-    ({ id, x: x0 + i * (w + gap), y, w, h }));
+  return ids.map((id, i) => ({ id, x: x0 + i * (w + gap), y, w, h }));
 }
 function replayTrackRect() { return { x: 46, y: H - 96, w: W - 92, h: 8 }; }
 function replayEntryRect() {
-  const btnH = 84, btnY = H - 80;
-  if (state === 'aim') return { cx: W / 2, cy: btnY, w: 104, h: btnH };
-  return { cx: 156 / 2 + 6, cy: btnY, w: 156, h: btnH };
+  // Bottom-left slot — only shown in states where it's vacant (never during aim).
+  return { cx: 156 / 2 + 6, cy: H - 80, w: 156, h: 84 };
 }
 
 function drawReplay() {
   const shot = replayShots[replayShotIdx];
   if (!shot) { exitReplay(); return; }
   const frame = replayInterpFrame(shot.frames, replayCursor);
-  // Render the recorded frame through the existing overhead renderer by
-  // briefly swapping the live arrays it reads from.
+  // Both renderers read the live bowls/jack globals, so briefly swap in the
+  // recorded frame, draw, then restore.
   const sb = bowls, sj = jack;
   bowls = frame.bowls; jack = frame.jack;
-  drawHeadOverlay();
+  if (replayView === 'perspective') {
+    drawReplayPerspective();
+  } else {
+    drawHeadOverlay();
+  }
   bowls = sb; jack = sj;
   drawReplayUI(shot);
+}
+
+// Original angled view, full mat (no camera tracking), driven by a recorded frame.
+function drawReplayPerspective() {
+  ctx.fillStyle = '#0a0e14';
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(38, 0, W - 76, H); ctx.clip();
+  drawFloor();
+  drawMat();
+  if (jack && !jack.offMat) drawJack();
+  for (const b of bowls) drawBowl(b);
+  ctx.restore();
 }
 
 function drawReplayUI(shot) {
@@ -2027,7 +2049,8 @@ function drawReplayUI(shot) {
   ctx.fillStyle = '#5eead4';
   ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const who = shot.shooter ? `  ·  P${shot.shooter}` : '';
-  ctx.fillText(`⟲ REPLAY  ·  Shot ${replayShotIdx + 1}/${replayShots.length}${who}`, W / 2, H - 116);
+  const viewLbl = replayView === 'overhead' ? 'Overhead' : 'Original';
+  ctx.fillText(`⟲ REPLAY  ·  Shot ${replayShotIdx + 1}/${replayShots.length}${who}  ·  ${viewLbl}`, W / 2, H - 116);
 
   // Scrub track + handle
   const t = replayTrackRect();
@@ -2046,17 +2069,19 @@ function drawReplayUI(shot) {
     exit: '✕', prev: '⏮',
     play: replayPlaying ? '❚❚' : (atEnd ? '↻' : '▶'),
     next: '⏭', speed: replaySpeed + '×',
+    view: replayView === 'overhead' ? '👁' : '⬇',
   };
   for (const r of replayBtnRects()) {
     const disabled = (r.id === 'prev' && replayShotIdx === 0) ||
                      (r.id === 'next' && replayShotIdx === replayShots.length - 1);
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
-    ctx.fillStyle = disabled ? '#0f172a' : (r.id === 'exit' ? '#7f1d1d' : (r.id === 'play' ? '#0d9488' : '#1e293b'));
+    ctx.fillStyle = disabled ? '#0f172a'
+      : (r.id === 'exit' ? '#7f1d1d' : (r.id === 'play' ? '#0d9488' : (r.id === 'view' ? '#134e4a' : '#1e293b')));
     ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill();
     ctx.restore();
-    ctx.fillStyle = disabled ? '#475569' : (r.id === 'exit' ? '#fca5a5' : '#e2e8f0');
-    ctx.font = `bold ${r.id === 'speed' ? 18 : 20}px Segoe UI`;
+    ctx.fillStyle = disabled ? '#475569' : (r.id === 'exit' ? '#fca5a5' : (r.id === 'view' ? '#5eead4' : '#e2e8f0'));
+    ctx.font = `bold ${r.id === 'speed' ? 17 : 19}px Segoe UI`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(labels[r.id], r.x + r.w / 2, r.y + r.h / 2 + 1);
   }
@@ -2075,7 +2100,7 @@ function handleReplayTap(p) {
   const shot = replayShots[replayShotIdx];
   if (!shot) { exitReplay(); return; }
   // RINGS / DIST toggles (top-right of the overhead view) stay live in replay
-  {
+  if (replayView === 'overhead') {
     const viewX = 42, viewY = 20, viewW = W - 84;
     const togBtnW = 52, togBtnH = 24, togGap = 6;
     const togX = viewX + viewW - togBtnW - 4;
@@ -2100,6 +2125,9 @@ function handleReplayTap(p) {
     }
     if (r.id === 'speed') {
       replaySpeed = REPLAY_SPEEDS[(REPLAY_SPEEDS.indexOf(replaySpeed) + 1) % REPLAY_SPEEDS.length]; return;
+    }
+    if (r.id === 'view') {
+      replayView = replayView === 'overhead' ? 'perspective' : 'overhead'; return;
     }
   }
 }
@@ -2196,9 +2224,9 @@ function drawOverlayUI() {
     ctx.beginPath(); ctx.roundRect(r.cx - r.w / 2, r.cy - r.h / 2, r.w, r.h, btnR); ctx.fill();
     ctx.restore();
     ctx.fillStyle = '#5eead4';
-    ctx.font = `bold ${state === 'aim' ? 26 : 20}px Segoe UI`;
+    ctx.font = 'bold 20px Segoe UI';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(state === 'aim' ? '⟲' : '⟲ REPLAY', r.cx, r.cy);
+    ctx.fillText('⟲ REPLAY', r.cx, r.cy);
     ctx.textBaseline = 'alphabetic';
   }
 }
