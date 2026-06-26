@@ -469,6 +469,7 @@ button:active { opacity: .7; }
   background: #22c55e; color: #fff;
 }
 .my-game-badge.waiting { background: #475569; }
+.my-game-code { font-size: 11px; font-weight: 700; color: #60a5fa; font-family: monospace; letter-spacing: 1px; }
 .my-game-turn { font-size: 10px; font-weight: 700; }
 .my-game-turn.you { color: #22c55e; }
 .my-game-turn.them { color: #94a3b8; }
@@ -761,7 +762,7 @@ button:active { opacity: .7; }
       <button id="create-back">&larr; Back</button>
       <div class="gs-header">
         <div class="gs-title">Create <em>Match</em></div>
-        <div class="gs-subtitle">Online — waiting for opponent</div>
+        <div class="gs-subtitle">Online match settings</div>
       </div>
     </div>
     <div class="spl-card">
@@ -797,7 +798,7 @@ button:active { opacity: .7; }
       <div class="bg-grid" id="cBg"></div>
     </div>
     <div class="cg-profile-note">Bowls use your Profile defaults — change them in your Profile</div>
-    <button id="btnSubmitCreate">Create &amp; Wait</button>
+    <button id="btnSubmitCreate">Create Game</button>
     <div id="waiting-view">
       <div id="waiting-code"></div>
       <div id="waiting-msg" class="pulse">Waiting for opponent...</div>
@@ -3814,6 +3815,7 @@ let opponentAcked = false, localAcked = false;
 let netDisplayName = localStorage.getItem('bowls_name') || '';
 let moveSubscription = null;
 let lobbySubscription = null;
+let pendingHostGameId = null;
 let peerLatencyMs = -1;
 let pingInterval = null;
 let reconnectTimer = null;
@@ -3899,12 +3901,15 @@ async function listLobbies() {
 
 async function listMyGames() {
   if (!initSupabase() || !netDisplayName) return [];
-  const { data, error } = await sb.from('games').select('*').eq('status', 'active')
+  const { data: activeData, error: activeErr } = await sb.from('games').select('*').eq('status', 'active')
     .or(`host_name.eq.${netDisplayName},guest_name.eq.${netDisplayName}`);
-  if (error) { console.error('listMyGames', error); return []; }
-  const games = data || [];
+  const { data: waitingData, error: waitingErr } = await sb.from('games').select('*').eq('status', 'waiting')
+    .eq('host_name', netDisplayName);
+  if (activeErr) console.error('listMyGames active', activeErr);
+  if (waitingErr) console.error('listMyGames waiting', waitingErr);
   const liveGames = [];
-  for (const g of games) {
+  for (const g of (waitingData || [])) { liveGames.push(g); }
+  for (const g of (activeData || [])) {
     const { data: lastMove } = await sb.from('moves').select('player,created_at,type')
       .eq('game_id', g.id).order('move_num', { ascending: false }).limit(1);
     g._lastMove = lastMove && lastMove[0] ? lastMove[0] : null;
@@ -4170,6 +4175,7 @@ function cleanupNet() {
   _pendingSends = [];
   hostGameStarted = false;
   _shotPreviewApplied = false;
+  pendingHostGameId = null;
 }
 
 // ── Remote move handler ──────────────────────────────────────────
@@ -4678,6 +4684,20 @@ async function refreshLobby() {
     myGames.forEach(g => {
       const row = document.createElement('div');
       row.className = 'my-game-row';
+      if (g.status === 'waiting') {
+        const isPrivate = g.settings && g.settings.private;
+        const codeHtml = isPrivate ? `<span class="my-game-code">${esc(g.id)}</span>` : '';
+        row.innerHTML = `<span class="my-game-opp">Awaiting opponent</span>` +
+          codeHtml +
+          `<span class="my-game-badge waiting">Waiting</span>`;
+        row.onclick = () => doCancelWaitingGame(g.id);
+        myEl.appendChild(row);
+        if (pendingHostGameId === g.id && g.guest_name) {
+          pendingHostGameId = null;
+          onGuestJoined(g);
+        }
+        return;
+      }
       const isHost = g.host_name === netDisplayName;
       const opp = isHost ? (g.guest_name || '?') : g.host_name;
       const lm = g._lastMove;
@@ -5053,31 +5073,21 @@ async function doCreateGame() {
   const code = await createLobby(settings, createCfg.timeControl);
   if (!code) { alert('Could not create game'); return; }
 
-  // Private games aren't listed in the lobby, so show the code to share.
-  // Public games are joined from the lobby, so the code stays hidden.
-  const codeEl = document.getElementById('waiting-code');
-  const msgEl = document.getElementById('waiting-msg');
-  if (createCfg.private) {
-    codeEl.textContent = code;
-    codeEl.style.display = '';
-    msgEl.textContent = 'Share this code — waiting for opponent…';
-  } else {
-    codeEl.textContent = '';
-    codeEl.style.display = 'none';
-    msgEl.textContent = 'Waiting for opponent…';
-  }
-  document.getElementById('waiting-view').classList.add('show');
-  document.getElementById('btnSubmitCreate').style.display = 'none';
-
   shotClockLimit = getTimeControlMs(createCfg.timeControl);
+  pendingHostGameId = code;
 
+  hideCreatePanel();
   subscribeLobby(async () => {
-    if (!sb) return;
-    const { data } = await sb.from('games').select('*').eq('id', code).single();
+    if (!pendingHostGameId || !sb) { refreshLobby(); return; }
+    const { data } = await sb.from('games').select('*').eq('id', pendingHostGameId).single();
     if (data && data.status === 'active' && data.guest_name) {
+      pendingHostGameId = null;
       onGuestJoined(data);
+    } else {
+      refreshLobby();
     }
   });
+  refreshLobby();
 }
 
 function onGuestJoined(game) {
@@ -5108,6 +5118,14 @@ async function finishJoinAsHost(game) {
   localStorage.setItem('bowls_localPlayer', '1');
   document.getElementById('splash').classList.add('hidden');
   startGame();
+}
+
+async function doCancelWaitingGame(gameId) {
+  if (!confirm('Cancel this game?')) return;
+  await deleteLobby(gameId);
+  if (pendingHostGameId === gameId) pendingHostGameId = null;
+  if (onlineGameId === gameId) { onlineGameId = ''; localPlayer = 0; }
+  refreshLobby();
 }
 
 async function doCancelCreate() {
