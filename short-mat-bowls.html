@@ -320,6 +320,62 @@ button:active { opacity: .7; }
 }
 #btnLeaderboard:hover { background: #334155; color: #e2e8f0; }
 
+/* Tournaments */
+#btnTournaments {
+  padding: 10px; font-size: 13px; font-weight: 700;
+  background: #1e293b; color: #94a3b8; border-radius: 10px;
+  border: 1px solid #334155; width: 100%; margin-top: -4px;
+}
+#btnTournaments:hover { background: #334155; color: #e2e8f0; }
+#tournament-setup-panel, #tournament-hub-panel {
+  position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#tournament-setup-panel.show, #tournament-hub-panel.show { display: flex; }
+#tour-setup-inner, #tour-hub-inner { width: 100%; max-width: 440px; }
+#tour-setup-back, #tour-hub-back {
+  padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
+}
+.tour-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.tour-sub { font-size: 12px; color: #64748b; margin-bottom: 14px; }
+.tour-section { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+  color: #475569; margin: 16px 0 8px; }
+.tour-champ { font-size: 17px; font-weight: 800; color: #fbbf24; text-align: center;
+  padding: 14px; background: #1e293b; border: 1px solid #3f3f1f; border-radius: 12px; margin-bottom: 8px; }
+.tour-matchlist { display: flex; flex-direction: column; gap: 6px; }
+.tour-match { display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+  background: #111a2e; border: 1px solid #1e293b; border-radius: 8px; }
+.tour-p { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: #cbd5e1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tour-p:last-of-type { text-align: right; }
+.tour-p.tour-win { color: #22c55e; font-weight: 800; }
+.tour-vs { font-size: 10px; color: #475569; flex: 0 0 auto; }
+.tour-score { font-size: 13px; font-weight: 800; color: #a78bfa; flex: 0 0 auto; min-width: 42px; text-align: right; }
+.tour-pending { font-size: 12px; color: #475569; flex: 0 0 auto; min-width: 42px; text-align: right; }
+.tour-play { flex: 0 0 auto; padding: 6px 14px; font-size: 12px; font-weight: 700;
+  background: #2563eb; color: #fff; border: none; border-radius: 7px; }
+.tour-play:hover { background: #1d4ed8; }
+.tour-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+#tour-create, .tour-btn { padding: 13px; font-size: 15px; font-weight: 800;
+  background: #2563eb; color: #fff; border: none; border-radius: 12px; width: 100%; margin-top: 16px; }
+#tour-create:hover, .tour-btn:hover { background: #1d4ed8; }
+.tour-btn-secondary { padding: 11px; font-size: 13px; font-weight: 700;
+  background: #1e293b; color: #f87171; border: 1px solid #334155; border-radius: 10px; width: 100%; }
+.tour-comp { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.tour-comp-kind { font-size: 16px; flex: 0 0 auto; }
+.tour-comp-name { flex: 1; min-width: 0; background: #0f172a; border: 1px solid #334155;
+  color: #e2e8f0; border-radius: 7px; padding: 7px 9px; font-size: 13px; }
+.tour-comp-spacer { flex: 1; }
+.tour-comp-del { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px;
+  background: #1e293b; color: #f87171; border: 1px solid #334155; font-size: 12px; }
+.tour-ai-seg { flex: 1; min-width: 0; flex-wrap: wrap; }
+.tour-add-row { display: flex; gap: 8px; margin-top: 10px; }
+.tour-add { flex: 1; padding: 8px; font-size: 12px; font-weight: 700;
+  background: #0f172a; color: #93c5fd; border: 1px dashed #334155; border-radius: 8px; }
+
 /* Auth / Account */
 .auth-user { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
 .auth-avatar {
@@ -578,6 +634,7 @@ button:active { opacity: .7; }
     <button id="btnProfile">👤 Profile</button>
     <button id="btnAch">🏆 Achievements</button>
     <button id="btnLeaderboard">📊 Rankings</button>
+    <button id="btnTournaments">🏆 Tournaments</button>
   </div>
 </div>
 
@@ -816,6 +873,20 @@ button:active { opacity: .7; }
     </div>
     <button id="btnJoinConfirm">Join Game</button>
     <button id="btnJoinCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="tournament-setup-panel">
+  <div id="tour-setup-inner">
+    <button id="tour-setup-back">&larr; Back</button>
+    <div id="tour-setup-content"></div>
+  </div>
+</div>
+
+<div id="tournament-hub-panel">
+  <div id="tour-hub-inner">
+    <button id="tour-hub-back">&larr; Back</button>
+    <div id="tour-hub-content"></div>
   </div>
 </div>
 
@@ -1896,6 +1967,7 @@ function advanceEnd() {
 async function gameOver() {
   state = 'game-over';
   clearSavedGame();
+  if (activeTourMatch && mode !== 'online') { onTourMatchComplete(); return; }
   checkAchievements('game_over');
   const me = myPlayerIdx();
   const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
@@ -1930,6 +2002,10 @@ function doConcede() {
 async function finishConcede(concedingPlayer) {
   state = 'game-over';
   clearSavedGame();
+  if (activeTourMatch && mode !== 'online') {
+    onTourMatchComplete(concedingPlayer === 1 ? activeTourMatch.p2 : activeTourMatch.p1);
+    return;
+  }
   checkAchievements('game_over', { concede: true, concedingPlayer });
   const me = myPlayerIdx();
   const conWon = concedingPlayer !== me;
@@ -2430,6 +2506,9 @@ function settlePhysics() {
 }
 
 function exitToMenu() {
+  // Leaving a tournament match abandons it (replayable from the hub) — drop the
+  // live pointer so a later normal game isn't mis-routed back into the tournament.
+  if (activeTourMatch) { activeTourMatch = null; persistTour(); }
   if (state === 'moving') settlePhysics();
   suspendedGame = buildSuspendedState();
   saveGameState(suspendedGame);
@@ -5444,6 +5523,7 @@ async function doCancelCreate() {
 }
 
 function applyAndStart() {
+  if (activeTourMatch) { activeTourMatch = null; persistTour(); }
   ENDS     = splashCfg.ends;
   mode     = splashCfg.mode;
   aiLevel  = splashCfg.aiLevel;
@@ -5488,6 +5568,7 @@ function backToLobby() {
 
 function showSplash() {
   clearTimeout(aiTimer);
+  if (activeTourMatch) { activeTourMatch = null; persistTour(); }
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
   gameMenuOpen = false;
@@ -6380,8 +6461,387 @@ document.getElementById('leaderboard-back').onclick = () => {
   document.getElementById('leaderboard-panel').classList.remove('show');
 };
 
+// ── Offline tournaments ───────────────────────────────────────────
+// A single active tournament (round-robin or knockout) persisted to
+// localStorage. Matches that involve a local human are played live through
+// the normal engine; AI-vs-AI matches are auto-simulated so the player only
+// ever plays their own games and the bracket/table still progresses.
+const TOUR_KEY = 'bowls_tournament';
+const TOUR_PTS_WIN = 2, TOUR_PTS_DRAW = 1;
+let activeTour = null;       // current tournament object
+let activeTourMatch = null;  // { matchId, p1, p2 } engine orientation while a match is live
+let tourSetup = null;        // working state for the setup form
+
+function loadTourSaved() { try { return JSON.parse(localStorage.getItem(TOUR_KEY)) || null; } catch { return null; } }
+function persistTour() {
+  if (activeTour) localStorage.setItem(TOUR_KEY, JSON.stringify({ tour: activeTour, live: activeTourMatch }));
+  else localStorage.removeItem(TOUR_KEY);
+}
+function clearTour() { activeTour = null; activeTourMatch = null; localStorage.removeItem(TOUR_KEY); }
+function restoreTour() {
+  const s = loadTourSaved();
+  if (s && s.tour) { activeTour = s.tour; activeTourMatch = s.live || null; }
+}
+
+function compById(t, id) { return t.competitors.find(c => c.id === id) || null; }
+function matchById(t, id) { return t.matches.find(m => m.id === id) || null; }
+function compName(t, id) { if (id === 'BYE') return 'Bye'; if (!id) return 'TBD'; const c = compById(t, id); return c ? c.name : '?'; }
+function compTag(t, id)  { const c = id && id !== 'BYE' && compById(t, id); return c && c.kind === 'ai' ? ' 🤖' : ''; }
+
+function mkMatch(id, round, p1, p2) {
+  const ready = !!(p1 && p2);
+  return { id, round, p1, p2, status: ready ? 'ready' : 'pending', s1: 0, s2: 0, winner: null, next: null, nextSlot: null, bye: false };
+}
+
+// Round-robin fixtures via the circle method.
+function genRoundRobin(comps) {
+  let ids = comps.map(c => c.id);
+  if (ids.length % 2) ids = ids.concat([null]);   // odd → bye placeholder rotates through
+  const n = ids.length, half = n / 2, matches = [];
+  let arr = ids.slice(), mid = 0;
+  for (let r = 0; r < n - 1; r++) {
+    for (let i = 0; i < half; i++) {
+      const a = arr[i], b = arr[n - 1 - i];
+      if (a !== null && b !== null) matches.push(mkMatch('m' + (mid++), r, a, b));
+    }
+    arr = [arr[0], arr[n - 1], ...arr.slice(1, n - 1)];   // rotate, first fixed
+  }
+  return matches;
+}
+
+// Standard seeding order for a bracket of `n` slots (n a power of two).
+function seedOrder(n) {
+  let pls = [1, 2];
+  for (let r = 1; r < Math.log2(n); r++) {
+    const out = [], sum = Math.pow(2, r + 1) + 1;
+    for (const p of pls) { out.push(p); out.push(sum - p); }
+    pls = out;
+  }
+  return pls;
+}
+
+// Single-elimination bracket. Seed = competitor input order; field padded to a
+// power of two with byes given to the top seeds.
+function genKnockout(comps) {
+  const seeds = comps.map(c => c.id);
+  let size = 1; while (size < seeds.length) size *= 2;
+  const slots = seedOrder(size).map(s => (s <= seeds.length ? seeds[s - 1] : 'BYE'));
+  const matches = [];
+  let mid = 0, prev = [], round = 0;
+  for (let i = 0; i < size; i += 2) prev.push(mkMatch('k' + (mid++), round, slots[i], slots[i + 1]));
+  matches.push(...prev);
+  round++;
+  while (prev.length > 1) {
+    const next = [];
+    for (let i = 0; i < prev.length; i += 2) {
+      const m = mkMatch('k' + (mid++), round, null, null);
+      prev[i].next = m.id;     prev[i].nextSlot = 1;
+      prev[i + 1].next = m.id; prev[i + 1].nextSlot = 2;
+      next.push(m);
+    }
+    matches.push(...next);
+    prev = next; round++;
+  }
+  return matches;
+}
+
+// Plausible AI-vs-AI scoreline driven by the two skill levels. Plays extra ends
+// until decisive so the result can always feed a knockout slot.
+function simulateAIMatch(ends, lvlA, lvlB) {
+  const sA = lvlA + 1, sB = lvlB + 1;
+  let s1 = 0, s2 = 0, e = 0;
+  while (e < ends || s1 === s2) {
+    e++;
+    const pts = (() => { const r = Math.random(); return r < 0.5 ? 1 : r < 0.8 ? 2 : r < 0.95 ? 3 : 4; })();
+    if (Math.random() < sA / (sA + sB)) s1 += pts; else s2 += pts;
+    if (e >= ends && s1 !== s2) break;
+    if (e > ends + 40) { if (s1 === s2) s1++; break; }
+  }
+  return { s1, s2, winner: s1 > s2 ? 1 : 2 };
+}
+
+function settleMatch(t, m, s1, s2, winnerId, isBye) {
+  m.status = 'done'; m.s1 = s1; m.s2 = s2; m.winner = winnerId; m.bye = !!isBye;
+  if (m.next) {
+    const nm = matchById(t, m.next);
+    if (m.nextSlot === 1) nm.p1 = winnerId; else nm.p2 = winnerId;
+    if (nm.p1 && nm.p2) nm.status = 'ready';
+  }
+}
+
+// Resolve everything that doesn't need a human: byes auto-advance and AI-vs-AI
+// matches are simulated. Loops until stable so knockout chains cascade.
+function resolveAuto(t) {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of t.matches) {
+      if (m.status === 'done') continue;
+      if (m.p1 === 'BYE' && m.p2 && m.p2 !== 'BYE') { settleMatch(t, m, 0, 0, m.p2, true); changed = true; continue; }
+      if (m.p2 === 'BYE' && m.p1 && m.p1 !== 'BYE') { settleMatch(t, m, 0, 0, m.p1, true); changed = true; continue; }
+      if (m.p1 && m.p2 && m.p1 !== 'BYE' && m.p2 !== 'BYE') {
+        const a = compById(t, m.p1), b = compById(t, m.p2);
+        if (a.kind === 'ai' && b.kind === 'ai') {
+          const r = simulateAIMatch(t.ends, a.aiLevel, b.aiLevel);
+          settleMatch(t, m, r.s1, r.s2, r.winner === 1 ? m.p1 : m.p2, false);
+          changed = true;
+        }
+      }
+    }
+  }
+}
+
+function standings(t) {
+  const tbl = {};
+  for (const c of t.competitors) tbl[c.id] = { id: c.id, p: 0, w: 0, d: 0, l: 0, sf: 0, sa: 0, pts: 0 };
+  for (const m of t.matches) {
+    if (m.status !== 'done' || m.bye) continue;
+    const A = tbl[m.p1], B = tbl[m.p2];
+    A.p++; B.p++; A.sf += m.s1; A.sa += m.s2; B.sf += m.s2; B.sa += m.s1;
+    if (m.s1 > m.s2)      { A.w++; B.l++; A.pts += TOUR_PTS_WIN; }
+    else if (m.s2 > m.s1) { B.w++; A.l++; B.pts += TOUR_PTS_WIN; }
+    else                  { A.d++; B.d++; A.pts += TOUR_PTS_DRAW; B.pts += TOUR_PTS_DRAW; }
+  }
+  return Object.values(tbl).sort((x, y) => y.pts - x.pts || (y.sf - y.sa) - (x.sf - x.sa) || y.sf - x.sf);
+}
+
+function checkTourComplete(t) {
+  if (t.format === 'knockout') {
+    const final = t.matches.reduce((a, b) => (b.round > a.round ? b : a), t.matches[0]);
+    if (final.status === 'done') { t.status = 'finished'; t.champion = final.winner; }
+  } else if (t.matches.every(m => m.status === 'done')) {
+    t.status = 'finished'; t.champion = standings(t)[0].id;
+  }
+}
+
+function isPlayable(t, m) {
+  if (m.status !== 'ready') return false;
+  if (!m.p1 || !m.p2 || m.p1 === 'BYE' || m.p2 === 'BYE') return false;
+  const a = compById(t, m.p1), b = compById(t, m.p2);
+  return a.kind === 'human' || b.kind === 'human';
+}
+
+// ── Match runner ──────────────────────────────────────────────────
+function startTournamentMatch(t, m) {
+  const a = compById(t, m.p1), b = compById(t, m.p2);
+  let eP1 = m.p1, eP2 = m.p2;                       // put the human at engine P1 if exactly one human
+  if (a.kind === 'ai' && b.kind === 'human') { eP1 = m.p2; eP2 = m.p1; }
+  const e2 = compById(t, eP2);
+  ENDS = t.ends;
+  mode = (e2.kind === 'ai') ? 'vs-ai' : 'vs-player';
+  if (e2.kind === 'ai') aiLevel = e2.aiLevel;
+  C.p1 = BOWL_COLOURS[0].main; C.p1d = BOWL_COLOURS[0].dark;
+  C.p2 = BOWL_COLOURS[1].main; C.p2d = BOWL_COLOURS[1].dark;
+  document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
+  activeTourMatch = { matchId: m.id, p1: eP1, p2: eP2 };
+  persistTour();
+  document.getElementById('tournament-hub-panel').classList.remove('show');
+  document.getElementById('splash').classList.add('hidden');
+  startGame();
+}
+
+function playTourMatch(matchId) {
+  const t = activeTour, m = matchById(t, matchId);
+  if (!m || !isPlayable(t, m)) return;
+  startTournamentMatch(t, m);
+}
+
+// Called from gameOver/finishConcede when a tournament match finishes.
+function onTourMatchComplete(forcedWinnerCompId) {
+  const t = activeTour, lm = activeTourMatch;
+  if (!t || !lm) return;
+  const m = matchById(t, lm.matchId);
+  const s1 = scores[0], s2 = scores[1];                 // engine P1/P2 scores
+  const ms1 = (m.p1 === lm.p1) ? s1 : s2;               // re-orient to the match's stored p1/p2
+  const ms2 = (m.p1 === lm.p1) ? s2 : s1;
+  const winnerId = forcedWinnerCompId || (s1 > s2 ? lm.p1 : lm.p2);
+  settleMatch(t, m, ms1, ms2, winnerId, false);
+  activeTourMatch = null;
+  resolveAuto(t);
+  checkTourComplete(t);
+  persistTour();
+  clearTimeout(aiTimer);
+  resetCam(); resetAim();
+  state = 'idle'; syncFireBtn();
+  document.getElementById('splash').classList.remove('hidden');
+  openTourHub();
+}
+
+// ── Setup form ────────────────────────────────────────────────────
+function openTourSetup() {
+  hideTourPanels();
+  tourSetup = {
+    name: 'Tournament', format: 'round-robin', ends: 4,
+    comps: [
+      { kind: 'human', name: 'You', aiLevel: 1 },
+      { kind: 'ai', name: AI_PLAYERS[1].name, aiLevel: 1 },
+      { kind: 'ai', name: AI_PLAYERS[2].name, aiLevel: 2 },
+    ],
+  };
+  renderTourSetup();
+  document.getElementById('splash').classList.remove('hidden');
+  document.getElementById('tournament-setup-panel').classList.add('show');
+}
+
+function renderTourSetup() {
+  const s = tourSetup;
+  document.getElementById('tour-setup-content').innerHTML =
+    `<div class="tour-title">🏆 New Tournament</div>` +
+    `<div class="spl-card"><div class="spl-head">Format</div>` +
+      `<div class="spl-row"><span class="spl-lbl">Name</span><input type="text" id="tour-name" maxlength="24" value="${escHtml(s.name)}" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:7px;padding:7px 9px;font-size:13px"></div>` +
+      `<div class="spl-row"><span class="spl-lbl">Type</span><div class="seg" id="tour-format"></div></div>` +
+      `<div class="spl-row"><span class="spl-lbl">Ends</span><div style="display:flex;align-items:center;gap:8px;flex:1"><input type="range" id="tour-ends" min="1" max="13" value="${s.ends}" style="flex:1"><span id="tour-ends-lbl" style="min-width:20px;text-align:center;font-size:13px;font-weight:600">${s.ends}</span></div></div></div>` +
+    `<div class="spl-card"><div class="spl-head">Competitors <span id="tour-comp-count" style="color:#64748b;font-weight:600"></span></div>` +
+      `<div id="tour-comp-list"></div>` +
+      `<div class="tour-add-row"><button class="tour-add" id="tour-add-human">+ Human</button><button class="tour-add" id="tour-add-ai">+ AI</button></div></div>` +
+    `<button id="tour-create">Create Tournament</button>`;
+  document.getElementById('tour-name').oninput = e => s.name = e.target.value;
+  seg('tour-format', [['Round Robin', 'round-robin'], ['Knockout', 'knockout']], () => s.format, v => s.format = v);
+  const es = document.getElementById('tour-ends'), esl = document.getElementById('tour-ends-lbl');
+  es.oninput = () => { s.ends = +es.value; esl.textContent = es.value; };
+  document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1 }); renderTourComps(); } };
+  document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l }); renderTourComps(); } };
+  document.getElementById('tour-create').onclick = createTournament;
+  renderTourComps();
+}
+
+function renderTourComps() {
+  const s = tourSetup, list = document.getElementById('tour-comp-list');
+  document.getElementById('tour-comp-count').textContent = `(${s.comps.length}/8)`;
+  list.innerHTML = '';
+  s.comps.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'tour-comp';
+    if (c.kind === 'human') {
+      row.innerHTML = `<span class="tour-comp-kind">👤</span><input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}"><button class="tour-comp-del">✕</button>`;
+      row.querySelector('.tour-comp-name').oninput = e => c.name = e.target.value;
+    } else {
+      row.innerHTML = `<span class="tour-comp-kind">🤖</span><div class="seg tour-ai-seg"></div><button class="tour-comp-del">✕</button>`;
+      const segEl = row.querySelector('.tour-ai-seg');
+      AI_PLAYERS.forEach((a, li) => {
+        const b = document.createElement('button');
+        b.textContent = a.name.split(' ')[0]; b.title = a.name;
+        if (li === c.aiLevel) b.classList.add('sel');
+        b.onclick = () => { c.aiLevel = li; c.name = AI_PLAYERS[li].name; segEl.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+        segEl.appendChild(b);
+      });
+    }
+    row.querySelector('.tour-comp-del').onclick = () => { if (s.comps.length > 2) { s.comps.splice(i, 1); renderTourComps(); } };
+    list.appendChild(row);
+  });
+}
+
+function createTournament() {
+  const s = tourSetup;
+  if (s.comps.length < 2) { alert('Add at least 2 competitors'); return; }
+  const comps = s.comps.map((c, i) => ({ id: 'c' + i, kind: c.kind, name: (c.name || '').trim() || ('Player ' + (i + 1)), aiLevel: c.aiLevel || 0 }));
+  const t = { id: 't' + Date.now(), name: (s.name || '').trim() || 'Tournament', format: s.format, ends: s.ends, status: 'running', competitors: comps, matches: [], champion: null };
+  t.matches = (s.format === 'knockout') ? genKnockout(comps) : genRoundRobin(comps);
+  activeTour = t; activeTourMatch = null;
+  resolveAuto(t); checkTourComplete(t); persistTour();
+  document.getElementById('tournament-setup-panel').classList.remove('show');
+  openTourHub();
+}
+
+// ── Hub ───────────────────────────────────────────────────────────
+function openTourHub() {
+  if (!activeTour) { openTourSetup(); return; }
+  hideTourPanels();
+  renderTourHub();
+  document.getElementById('splash').classList.remove('hidden');
+  document.getElementById('tournament-hub-panel').classList.add('show');
+  syncTourBtn();
+}
+
+function roundName(count) {
+  if (count === 1) return 'Final';
+  if (count === 2) return 'Semi-finals';
+  if (count === 4) return 'Quarter-finals';
+  return count + '-player round';
+}
+
+function matchRow(t, m) {
+  const n1 = escHtml(compName(t, m.p1)) + compTag(t, m.p1);
+  const n2 = escHtml(compName(t, m.p2)) + compTag(t, m.p2);
+  const w1 = m.status === 'done' && m.winner === m.p1 ? ' tour-win' : '';
+  const w2 = m.status === 'done' && m.winner === m.p2 ? ' tour-win' : '';
+  let right;
+  if (m.bye) right = `<span class="tour-pending">bye</span>`;
+  else if (m.status === 'done') right = `<span class="tour-score">${m.s1}–${m.s2}</span>`;
+  else if (isPlayable(t, m)) right = `<button class="tour-play" data-play="${m.id}">Play</button>`;
+  else right = `<span class="tour-pending">—</span>`;
+  return `<div class="tour-match"><span class="tour-p${w1}">${n1}</span><span class="tour-vs">v</span><span class="tour-p${w2}">${n2}</span>${right}</div>`;
+}
+
+function renderStandings(t) {
+  let h = `<div class="tour-section">Standings</div><table class="lb-table"><thead><tr>` +
+    `<th>#</th><th>Player</th><th>P</th><th>W</th><th>D</th><th>L</th><th>+/-</th><th>Pts</th></tr></thead><tbody>`;
+  standings(t).forEach((r, i) => {
+    const diff = r.sf - r.sa, champ = t.status === 'finished' && t.champion === r.id;
+    h += `<tr class="${champ ? 'lb-me' : ''}"><td class="lb-rank${i < 3 ? ' lb-rank-' + (i + 1) : ''}">${i + 1}</td>` +
+      `<td class="lb-name">${escHtml(compName(t, r.id))}${compTag(t, r.id)}</td>` +
+      `<td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td>` +
+      `<td>${diff > 0 ? '+' : ''}${diff}</td><td class="lb-elo">${r.pts}</td></tr>`;
+  });
+  return h + `</tbody></table>`;
+}
+
+function renderTourHub() {
+  const t = activeTour;
+  let h = `<div class="tour-title">${escHtml(t.name)}</div>` +
+    `<div class="tour-sub">${t.format === 'knockout' ? 'Knockout' : 'Round Robin'} · ${t.competitors.length} players · ${t.ends} ends</div>`;
+  if (t.status === 'finished') h += `<div class="tour-champ">🏆 ${escHtml(compName(t, t.champion))} wins!</div>`;
+  if (t.format === 'round-robin') {
+    h += renderStandings(t);
+    h += `<div class="tour-section">Fixtures</div><div class="tour-matchlist">`;
+    t.matches.forEach(m => { if (!m.bye) h += matchRow(t, m); });
+    h += `</div>`;
+  } else {
+    const rounds = {};
+    t.matches.forEach(m => (rounds[m.round] = rounds[m.round] || []).push(m));
+    Object.keys(rounds).map(Number).sort((a, b) => a - b).forEach(r => {
+      h += `<div class="tour-section">${roundName(rounds[r].length)}</div><div class="tour-matchlist">`;
+      rounds[r].forEach(m => h += matchRow(t, m));
+      h += `</div>`;
+    });
+  }
+  h += `<div class="tour-actions">`;
+  if (t.status === 'finished') h += `<button class="tour-btn" id="tour-new">New tournament</button>`;
+  h += `<button class="tour-btn-secondary" id="tour-abandon">Abandon tournament</button></div>`;
+  const el = document.getElementById('tour-hub-content');
+  el.innerHTML = h;
+  el.querySelectorAll('[data-play]').forEach(b => b.onclick = () => playTourMatch(b.getAttribute('data-play')));
+  const ab = document.getElementById('tour-abandon');
+  if (ab) ab.onclick = () => { if (confirm('Abandon this tournament?')) { clearTour(); hideTourPanels(); syncTourBtn(); } };
+  const nw = document.getElementById('tour-new');
+  if (nw) nw.onclick = () => { clearTour(); hideTourPanels(); syncTourBtn(); openTourSetup(); };
+}
+
+function hideTourPanels() {
+  document.getElementById('tournament-setup-panel').classList.remove('show');
+  document.getElementById('tournament-hub-panel').classList.remove('show');
+}
+
+function syncTourBtn() {
+  const b = document.getElementById('btnTournaments');
+  if (b) b.textContent = (activeTour && activeTour.status !== 'finished') ? '🏆 Resume Tournament' : '🏆 Tournaments';
+}
+
+function initTournaments() {
+  restoreTour();
+  syncTourBtn();
+  document.getElementById('btnTournaments').onclick = () => {
+    if (activeTour && activeTour.status !== 'finished') openTourHub();
+    else if (activeTour && activeTour.status === 'finished') openTourHub();
+    else openTourSetup();
+  };
+  document.getElementById('tour-setup-back').onclick = () => document.getElementById('tournament-setup-panel').classList.remove('show');
+  document.getElementById('tour-hub-back').onclick = () => document.getElementById('tournament-hub-panel').classList.remove('show');
+}
+
 buildSplash();
 applyProfileToSplash();
+initTournaments();
 const _savedGame = loadSavedGame();
 showSplash();
 suspendedGame = _savedGame;
