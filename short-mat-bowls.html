@@ -978,6 +978,23 @@ let headOverlay = false;
 let headShowRings = true;
 let headShowDists = true;
 
+// ── Replay system ─────────────────────────────────────────────────
+// Each delivery is recorded frame-by-frame while the bowls are moving, then
+// played back over the existing overhead view. Buffers cover the current end;
+// the final shot of the previous end is carried over so it stays watchable
+// after the end advances (prevents misclicking past the chance to review it).
+let replayShots = [];          // [{ shooter, frames:[{bowls, jack}] }]
+const REPLAY_MAX_SHOTS = 8;
+let _recFrames = null;         // frame buffer for the in-flight delivery
+let replayActive = false;
+let replayReturnState = null;  // game state to restore on exit
+let replayShotIdx = 0;
+let replayCursor = 0;          // float frame index within the current shot
+let replayPlaying = true;
+let replayScrubbing = false;
+const REPLAY_SPEEDS = [0.25, 0.5, 1, 2, 4];
+let replaySpeed = 1;
+
 // ── Swipe control state ───────────────────────────────────────────
 let aimAngle     = null;   // null = recalculate default toward jack
 let aimBaseAngle = 0;      // aimAngle when current drag started
@@ -1428,6 +1445,7 @@ function startGame() {
   if (mode !== 'online') { rngSeed = Date.now(); }
   seededRng = mulberry32(rngSeed);
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
+  replayShots=[]; _recFrames=null;
   jackOwner=1; turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
   shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
@@ -1439,6 +1457,10 @@ function startGame() {
 
 function startEnd() {
   bowls=[]; jack=null; turnIdx=0; lastJackHitter=null;
+  // Carry over only the previous end's final delivery so it can still be
+  // reviewed from the new end (a misclick past "tap to continue" won't lose it).
+  replayShots = replayShots.length ? [replayShots[replayShots.length - 1]] : [];
+  _recFrames = null;
   localAcked = false; opponentAcked = false; pendingMoves = [];
   resetCam(); resetAim();
   state='place-jack'; syncFireBtn();
@@ -1532,10 +1554,84 @@ function deliverBowl(player, angle, speed) {
               player, bias:biasDirs[player-1], stopped:false, offMat:false, toucher:false, inDitch:false,
               rotAngle:0, trail:[], restProgress:0, delivering:true,
               design:splashCfg[`p${player}design`]});
+  _recFrames = [];        // begin recording this delivery (online excluded)
+  if (mode !== 'online') recordReplayFrame();
   resetAim();
   state = 'moving'; msgText = ''; syncFireBtn(); syncFFBtn();
   cam.phase = 'tracking';
   cam.pendingNext = false;
+}
+
+// ── Replay recording & playback ───────────────────────────────────
+// Capture one lightweight positional snapshot per rendered frame. Only the
+// fields the overhead renderer reads are stored, so buffers stay tiny.
+function recordReplayFrame() {
+  if (!_recFrames) return;
+  _recFrames.push({
+    bowls: bowls.map(b => ({
+      x: b.x, y: b.y, player: b.player, design: b.design,
+      restProgress: b.restProgress || 0,
+      offMat: !!b.offMat, toucher: !!b.toucher, inDitch: !!b.inDitch,
+    })),
+    jack: jack ? { x: jack.x, y: jack.y, offMat: !!jack.offMat, inDitch: !!jack.inDitch } : null,
+  });
+}
+
+function commitReplayShot() {
+  if (!_recFrames || _recFrames.length === 0) { _recFrames = null; return; }
+  replayShots.push({ shooter: (typeof _preShot !== 'undefined' && _preShot) ? _preShot.player : null, frames: _recFrames });
+  if (replayShots.length > REPLAY_MAX_SHOTS) replayShots.shift();
+  _recFrames = null;
+}
+
+function replayAvailable() {
+  return mode !== 'online' && replayShots.length > 0 && !replayActive &&
+    ['camera-return', 'end-result', 'jack-off-side', 'place-jack', 'aim'].includes(state);
+}
+
+function enterReplay() {
+  if (replayShots.length === 0) return;
+  replayReturnState = state;
+  replayActive = true;
+  replayShotIdx = replayShots.length - 1;
+  replayCursor = 0;
+  replaySpeed = 1;
+  replayPlaying = true;
+  replayScrubbing = false;
+  headOverlay = false;
+  state = 'replay';
+}
+
+function exitReplay() {
+  replayActive = false;
+  replayScrubbing = false;
+  state = replayReturnState || 'aim';
+  replayReturnState = null;
+}
+
+// Linear-interpolated frame for smooth slow-motion / scrubbing. Bowl count is
+// constant within a single delivery, so index correspondence is safe.
+function replayInterpFrame(frames, cursor) {
+  const i = Math.max(0, Math.min(frames.length - 1, Math.floor(cursor)));
+  const j = Math.min(frames.length - 1, i + 1);
+  const t = cursor - i;
+  const f0 = frames[i], f1 = frames[j];
+  const lerp = (a, b) => a + (b - a) * t;
+  const bowls = f0.bowls.map((b0, k) => {
+    const b1 = f1.bowls[k] || b0;
+    return {
+      x: lerp(b0.x, b1.x), y: lerp(b0.y, b1.y),
+      player: b0.player, design: b0.design,
+      restProgress: lerp(b0.restProgress, b1.restProgress),
+      offMat: b0.offMat, toucher: b0.toucher, inDitch: b0.inDitch,
+    };
+  });
+  let jk = null;
+  if (f0.jack) {
+    const j1 = f1.jack || f0.jack;
+    jk = { x: lerp(f0.jack.x, j1.x), y: lerp(f0.jack.y, j1.y), offMat: f0.jack.offMat, inDitch: f0.jack.inDitch };
+  }
+  return { bowls, jack: jk };
 }
 
 const BPP = 4; let ENDS = 6;
@@ -1716,6 +1812,7 @@ function _doOnAllStopped() {
 }
 
 function onAllStopped() {
+  commitReplayShot();
   if (jack && jack.offSide) { handleJackOffSide(); return; }
   // Trigger hold + return before next turn
   if (cam.phase === 'tracking' || cam.phase === 'hold') {
@@ -1876,6 +1973,7 @@ function drawFloor() {
 
 function draw() {
   ctx.clearRect(0,0,W,H);
+  if (state === 'replay') { drawReplay(); return; }
   ctx.save();
   ctx.beginPath(); ctx.rect(38, 0, W - 76, H); ctx.clip();
   applyCameraTransform();
@@ -1891,6 +1989,119 @@ function draw() {
   if (headOverlay) drawHeadOverlay();
   drawOverlayUI();
   drawGameMenu();
+}
+
+// ── Replay view & controls ────────────────────────────────────────
+function replayBtnRects() {
+  const w = 64, h = 54, gap = 10, n = 5;
+  const total = n * w + (n - 1) * gap;
+  const x0 = (W - total) / 2, y = H - 64;
+  return ['exit', 'prev', 'play', 'next', 'speed'].map((id, i) =>
+    ({ id, x: x0 + i * (w + gap), y, w, h }));
+}
+function replayTrackRect() { return { x: 46, y: H - 96, w: W - 92, h: 8 }; }
+function replayEntryRect() {
+  const btnH = 84, btnY = H - 80;
+  if (state === 'aim') return { cx: W / 2, cy: btnY, w: 104, h: btnH };
+  return { cx: 156 / 2 + 6, cy: btnY, w: 156, h: btnH };
+}
+
+function drawReplay() {
+  const shot = replayShots[replayShotIdx];
+  if (!shot) { exitReplay(); return; }
+  const frame = replayInterpFrame(shot.frames, replayCursor);
+  // Render the recorded frame through the existing overhead renderer by
+  // briefly swapping the live arrays it reads from.
+  const sb = bowls, sj = jack;
+  bowls = frame.bowls; jack = frame.jack;
+  drawHeadOverlay();
+  bowls = sb; jack = sj;
+  drawReplayUI(shot);
+}
+
+function drawReplayUI(shot) {
+  const last = shot.frames.length - 1 || 1;
+  const prog = Math.max(0, Math.min(1, replayCursor / last));
+
+  // Caption
+  ctx.fillStyle = '#5eead4';
+  ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const who = shot.shooter ? `  ·  P${shot.shooter}` : '';
+  ctx.fillText(`⟲ REPLAY  ·  Shot ${replayShotIdx + 1}/${replayShots.length}${who}`, W / 2, H - 116);
+
+  // Scrub track + handle
+  const t = replayTrackRect();
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.roundRect(t.x, t.y, t.w, t.h, 4); ctx.fill();
+  ctx.fillStyle = '#0d9488';
+  ctx.beginPath(); ctx.roundRect(t.x, t.y, t.w * prog, t.h, 4); ctx.fill();
+  const hx = t.x + t.w * prog;
+  ctx.beginPath(); ctx.arc(hx, t.y + t.h / 2, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#5eead4'; ctx.fill();
+  ctx.strokeStyle = '#0f3d3a'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Control buttons
+  const atEnd = replayCursor >= shot.frames.length - 1;
+  const labels = {
+    exit: '✕', prev: '⏮',
+    play: replayPlaying ? '❚❚' : (atEnd ? '↻' : '▶'),
+    next: '⏭', speed: replaySpeed + '×',
+  };
+  for (const r of replayBtnRects()) {
+    const disabled = (r.id === 'prev' && replayShotIdx === 0) ||
+                     (r.id === 'next' && replayShotIdx === replayShots.length - 1);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = disabled ? '#0f172a' : (r.id === 'exit' ? '#7f1d1d' : (r.id === 'play' ? '#0d9488' : '#1e293b'));
+    ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = disabled ? '#475569' : (r.id === 'exit' ? '#fca5a5' : '#e2e8f0');
+    ctx.font = `bold ${r.id === 'speed' ? 18 : 20}px Segoe UI`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(labels[r.id], r.x + r.w / 2, r.y + r.h / 2 + 1);
+  }
+  ctx.textBaseline = 'alphabetic';
+}
+
+function replaySetCursorFromX(px) {
+  const shot = replayShots[replayShotIdx];
+  if (!shot) return;
+  const t = replayTrackRect();
+  const frac = Math.max(0, Math.min(1, (px - t.x) / t.w));
+  replayCursor = frac * (shot.frames.length - 1);
+}
+
+function handleReplayTap(p) {
+  const shot = replayShots[replayShotIdx];
+  if (!shot) { exitReplay(); return; }
+  // RINGS / DIST toggles (top-right of the overhead view) stay live in replay
+  {
+    const viewX = 42, viewY = 20, viewW = W - 84;
+    const togBtnW = 52, togBtnH = 24, togGap = 6;
+    const togX = viewX + viewW - togBtnW - 4;
+    const togRingsY = viewY + 6, togDistsY = togRingsY + togBtnH + togGap;
+    if (p.x >= togX && p.x <= togX + togBtnW) {
+      if (p.y >= togRingsY && p.y <= togRingsY + togBtnH) { headShowRings = !headShowRings; return; }
+      if (p.y >= togDistsY && p.y <= togDistsY + togBtnH) { headShowDists = !headShowDists; return; }
+    }
+  }
+  const t = replayTrackRect();
+  if (p.x >= t.x - 14 && p.x <= t.x + t.w + 14 && p.y >= t.y - 18 && p.y <= t.y + t.h + 18) {
+    replayScrubbing = true; replayPlaying = false; replaySetCursorFromX(p.x); return;
+  }
+  for (const r of replayBtnRects()) {
+    if (p.x < r.x || p.x > r.x + r.w || p.y < r.y || p.y > r.y + r.h) continue;
+    if (r.id === 'exit') return exitReplay();
+    if (r.id === 'prev') { if (replayShotIdx > 0) { replayShotIdx--; replayCursor = 0; replayPlaying = true; } return; }
+    if (r.id === 'next') { if (replayShotIdx < replayShots.length - 1) { replayShotIdx++; replayCursor = 0; replayPlaying = true; } return; }
+    if (r.id === 'play') {
+      if (!replayPlaying && replayCursor >= shot.frames.length - 1) replayCursor = 0;
+      replayPlaying = !replayPlaying; return;
+    }
+    if (r.id === 'speed') {
+      replaySpeed = REPLAY_SPEEDS[(REPLAY_SPEEDS.indexOf(replaySpeed) + 1) % REPLAY_SPEEDS.length]; return;
+    }
+  }
 }
 
 function drawOverlayUI() {
@@ -1974,6 +2185,21 @@ function drawOverlayUI() {
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (let i = 0; i < lines.length; i++)
       ctx.fillText(lines[i], W / 2, topY + i * lineHeight);
+  }
+
+  // Replay entry button — once a delivery has been recorded (local play only)
+  if (replayAvailable()) {
+    const r = replayEntryRect();
+    ctx.save();
+    ctx.shadowColor = 'rgba(13,148,136,0.45)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = '#0f3d3a';
+    ctx.beginPath(); ctx.roundRect(r.cx - r.w / 2, r.cy - r.h / 2, r.w, r.h, btnR); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#5eead4';
+    ctx.font = `bold ${state === 'aim' ? 26 : 20}px Segoe UI`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(state === 'aim' ? '⟲' : '⟲ REPLAY', r.cx, r.cy);
+    ctx.textBaseline = 'alphabetic';
   }
 }
 
@@ -3511,11 +3737,24 @@ function loop() {
   checkShotClock();
   if (state==='moving') {
     const steps = ffModeActive ? 3 : 1;
+    let settled = false;
     for (let s = 0; s < steps; s++) {
       for (const b of bowls) stepObj(b, b.bias);
       stepObj(jack, null);
       stepCollisions();
-      if (allStopped()) { onAllStopped(); break; }
+      if (allStopped()) { settled = true; break; }
+    }
+    recordReplayFrame();          // one snapshot per rendered frame → real-time playback
+    if (settled) onAllStopped();
+  }
+  if (state==='replay') {
+    const shot = replayShots[replayShotIdx];
+    if (shot && replayPlaying && !replayScrubbing) {
+      replayCursor += replaySpeed;
+      if (replayCursor >= shot.frames.length - 1) {
+        replayCursor = shot.frames.length - 1;
+        replayPlaying = false;     // hold on the final frame
+      }
     }
   }
   // Remove hitBlock bowls after 2 seconds
@@ -3587,6 +3826,17 @@ function handlePointerDown(p) {
   if (gameMenuOpen) {
     handleGameMenuTap(p);
     mouse.down = false; return;
+  }
+
+  // Replay playback — controls own all taps while watching
+  if (state === 'replay') { handleReplayTap(p); return; }
+
+  // Replay entry button
+  if (replayAvailable()) {
+    const r = replayEntryRect();
+    if (p.x >= r.cx - r.w / 2 && p.x <= r.cx + r.w / 2 && p.y >= r.cy - r.h / 2 && p.y <= r.cy + r.h / 2) {
+      enterReplay(); mouse.down = false; return;
+    }
   }
 
   // Head overlay toggle buttons
@@ -3707,6 +3957,7 @@ function handlePointerDown(p) {
 
 function handlePointerMove(p) {
   mouse.x = p.x; mouse.y = p.y;
+  if (state === 'replay') { if (replayScrubbing) replaySetCursorFromX(p.x); return; }
   if (state !== 'aim' || !mouse.down) return;
 
   // Live power fraction from upward distance
@@ -3721,6 +3972,7 @@ function handlePointerMove(p) {
 }
 
 function handlePointerUp() {
+  if (state === 'replay') { replayScrubbing = false; mouse.down = false; return; }
   if (state === 'aim' && mouse.down) {
     const pct = swipeDistPct();
     if (pct > 0) {
