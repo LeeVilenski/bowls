@@ -364,13 +364,17 @@ button:active { opacity: .7; }
 #tour-create:hover, .tour-btn:hover { background: #1d4ed8; }
 .tour-btn-secondary { padding: 11px; font-size: 13px; font-weight: 700;
   background: #1e293b; color: #f87171; border: 1px solid #334155; border-radius: 10px; width: 100%; }
-.tour-comp { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.tour-comp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; }
 .tour-comp-kind { font-size: 16px; flex: 0 0 auto; }
 .tour-comp-name { flex: 1; min-width: 0; background: #0f172a; border: 1px solid #334155;
   color: #e2e8f0; border-radius: 7px; padding: 7px 9px; font-size: 13px; }
 .tour-comp-spacer { flex: 1; }
 .tour-comp-del { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px;
   background: #1e293b; color: #f87171; border: 1px solid #334155; font-size: 12px; }
+.tour-comp-bowls { width: 100%; display: flex; align-items: center; gap: 6px; padding: 2px 0 0 28px; flex-wrap: wrap; }
+.tour-comp-bowls .sw { width: 20px; height: 20px; }
+.tour-comp-bowls .seg { font-size: 11px; margin-left: 6px; }
+.tour-comp-bowls .seg button { padding: 3px 6px; font-size: 11px; }
 .tour-ai-seg { flex: 1; min-width: 0; flex-wrap: wrap; }
 .tour-add-row { display: flex; gap: 8px; margin-top: 10px; }
 .tour-add { flex: 1; padding: 8px; font-size: 12px; font-weight: 700;
@@ -730,6 +734,10 @@ button:active { opacity: .7; }
     <div class="spl-card">
       <div class="spl-head">Statistics</div>
       <div id="profile-stats"></div>
+    </div>
+    <div class="spl-card">
+      <div class="spl-head">🏆 Tournaments</div>
+      <div id="profile-tour-stats"></div>
     </div>
     <div class="spl-card">
       <div class="spl-head">Match History</div>
@@ -2301,6 +2309,10 @@ function drawOverlayUI() {
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (let i = 0; i < lines.length; i++)
       ctx.fillText(lines[i], W / 2, topY + i * lineHeight);
+    if (tourMatchPending) {
+      ctx.font = '14px Segoe UI'; ctx.fillStyle = '#94a3b8';
+      ctx.fillText('Tap to continue', W / 2, topY + lines.length * lineHeight + 8);
+    }
   }
 
   // Replay entry button — once a delivery has been recorded (local play only)
@@ -4024,7 +4036,8 @@ function handlePointerDown(p) {
   }
   if (hitPanelBtn(p, W-SC)) {
     if (state === 'idle' || state === 'game-over') {
-      showSplash();
+      if (tourMatchPending) finishTourMatchReturn();
+      else showSplash();
     }
     mouse.down = false; return;
   }
@@ -4080,6 +4093,8 @@ function handlePointerDown(p) {
         headOverlay = false;
         advanceEnd();
       }
+    } else if (state === 'game-over' && tourMatchPending) {
+      finishTourMatchReturn();
     }
   } else if (state === 'jack-off-side') {
     startEnd();
@@ -5568,6 +5583,7 @@ function backToLobby() {
 
 function showSplash() {
   clearTimeout(aiTimer);
+  tourMatchPending = false;
   if (activeTourMatch) { activeTourMatch = null; persistTour(); }
   cleanupNet();
   concedeConfirm = false; clearTimeout(concedeConfirmTimer);
@@ -5625,6 +5641,13 @@ function loadStats() {
   catch { return def; }
 }
 function saveStats(s) { localStorage.setItem(STATS_KEY, JSON.stringify(s)); }
+
+const TOUR_STATS_KEY = 'bowls_tour_stats';
+function loadTourStats() {
+  const def = { played:0, won:0, matchesPlayed:0, matchesWon:0, matchesDrawn:0, shotsFor:0, shotsAgainst:0 };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem(TOUR_STATS_KEY))); } catch { return def; }
+}
+function saveTourStats(s) { localStorage.setItem(TOUR_STATS_KEY, JSON.stringify(s)); }
 
 let achToastQueue = [];
 let achToastActive = false;
@@ -5912,6 +5935,30 @@ function renderProfileStats() {
     statRow('Best Margin', localBestMargin);
 }
 
+function renderTourProfileStats() {
+  const ts = loadTourStats();
+  const el = document.getElementById('profile-tour-stats');
+  if (!ts.played && !ts.matchesPlayed) {
+    el.innerHTML = '<div class="hist-empty">No tournaments played yet</div>';
+    return;
+  }
+  const tourWinPct = ts.played > 0 ? Math.round(ts.won / ts.played * 100) : 0;
+  const matchWinPct = ts.matchesPlayed > 0 ? Math.round(ts.matchesWon / ts.matchesPlayed * 100) : 0;
+  const matchLosses = ts.matchesPlayed - ts.matchesWon - ts.matchesDrawn;
+  const shotDiff = ts.shotsFor - ts.shotsAgainst;
+  el.innerHTML =
+    statBar('Tournaments Won', tourWinPct + '%', tourWinPct, 'green') +
+    statRow('Tournaments Played', ts.played) +
+    statRow('Tournaments Won', ts.won) +
+    '<div class="stat-section-head">Tournament Matches</div>' +
+    statBar('Match Win Rate', matchWinPct + '%', matchWinPct, 'blue') +
+    statRow('Matches Played', ts.matchesPlayed) +
+    statRow('W / D / L', ts.matchesWon + ' / ' + ts.matchesDrawn + ' / ' + matchLosses) +
+    statRow('Shots For', ts.shotsFor) +
+    statRow('Shots Against', ts.shotsAgainst) +
+    statRow('Shot Difference', (shotDiff > 0 ? '+' : '') + shotDiff);
+}
+
 function statBar(label, valText, pct, color) {
   return `<div class="stat-row"><span class="stat-lbl">${label}</span>` +
     `<div class="stat-bar-wrap"><div class="stat-bar ${color}" style="width:${pct}%"></div></div>` +
@@ -5934,13 +5981,14 @@ function renderMatchHistory() {
     const result = g.won ? 'W' : 'L';
     const resultClass = g.won ? 'hist-win' : 'hist-loss';
     const score = `${g.myScore}–${g.oppScore}`;
-    const modeLabel = g.mode === 'vs-ai' ? '🤖' : g.mode === 'online' ? '🌐' : '👥';
+    const modeLabel = g.mode === 'tournament' ? '🏆' : g.mode === 'vs-ai' ? '🤖' : g.mode === 'online' ? '🌐' : '👥';
     const endsPlayed = g.conceded ? '(conceded)' : `${g.ends}/${g.totalEnds} ends`;
+    const tourLabel = g.tournament ? ` · ${g.tournament}` : '';
     const row = document.createElement('div');
     row.className = 'hist-row';
     row.innerHTML = `<span class="hist-result ${resultClass}">${result}</span>` +
       `<span class="hist-detail"><strong>${modeLabel} vs ${g.opponent}</strong><br>` +
-      `<small>${score} · ${endsPlayed} · ${dateStr}</small></span>` +
+      `<small>${score} · ${endsPlayed}${tourLabel} · ${dateStr}</small></span>` +
       `<span class="hist-arrow">›</span>`;
     row.onclick = () => showOpponentProfile(g.opponent, g.mode);
     el.appendChild(row);
@@ -6268,6 +6316,7 @@ function renderXPCard() {
 function showProfilePanel() {
   buildProfilePanel();
   renderProfileStats();
+  renderTourProfileStats();
   renderMatchHistory();
   renderXPCard();
   updateAuthUI();
@@ -6470,6 +6519,7 @@ const TOUR_KEY = 'bowls_tournament';
 const TOUR_PTS_WIN = 2, TOUR_PTS_DRAW = 1;
 let activeTour = null;       // current tournament object
 let activeTourMatch = null;  // { matchId, p1, p2 } engine orientation while a match is live
+let tourMatchPending = false; // true while showing match result before returning to hub
 let tourSetup = null;        // working state for the setup form
 
 function loadTourSaved() { try { return JSON.parse(localStorage.getItem(TOUR_KEY)) || null; } catch { return null; } }
@@ -6606,11 +6656,20 @@ function standings(t) {
 }
 
 function checkTourComplete(t) {
+  if (t.status === 'finished') return;
+  let justFinished = false;
   if (t.format === 'knockout') {
     const final = t.matches.reduce((a, b) => (b.round > a.round ? b : a), t.matches[0]);
-    if (final.status === 'done') { t.status = 'finished'; t.champion = final.winner; }
+    if (final.status === 'done') { t.status = 'finished'; t.champion = final.winner; justFinished = true; }
   } else if (t.matches.every(m => m.status === 'done')) {
-    t.status = 'finished'; t.champion = standings(t)[0].id;
+    t.status = 'finished'; t.champion = standings(t)[0].id; justFinished = true;
+  }
+  if (justFinished) {
+    const ts = loadTourStats();
+    ts.played++;
+    const champ = compById(t, t.champion);
+    if (champ && champ.kind === 'human') ts.won++;
+    saveTourStats(ts);
   }
 }
 
@@ -6630,8 +6689,13 @@ function startTournamentMatch(t, m) {
   ENDS = t.ends;
   mode = (e2.kind === 'ai') ? 'vs-ai' : 'vs-player';
   if (e2.kind === 'ai') aiLevel = e2.aiLevel;
-  C.p1 = BOWL_COLOURS[0].main; C.p1d = BOWL_COLOURS[0].dark;
-  C.p2 = BOWL_COLOURS[1].main; C.p2d = BOWL_COLOURS[1].dark;
+  const e1 = compById(t, eP1);
+  const c1Idx = e1.bowlIdx != null ? e1.bowlIdx : 0;
+  const c2Idx = e2.bowlIdx != null ? e2.bowlIdx : 1;
+  C.p1 = BOWL_COLOURS[c1Idx].main; C.p1d = BOWL_COLOURS[c1Idx].dark;
+  C.p2 = BOWL_COLOURS[c2Idx].main; C.p2d = BOWL_COLOURS[c2Idx].dark;
+  splashCfg.p1design = e1.designIdx || 0;
+  splashCfg.p2design = e2.designIdx || 0;
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
   activeTourMatch = { matchId: m.id, p1: eP1, p2: eP2 };
   persistTour();
@@ -6651,16 +6715,55 @@ function onTourMatchComplete(forcedWinnerCompId) {
   const t = activeTour, lm = activeTourMatch;
   if (!t || !lm) return;
   const m = matchById(t, lm.matchId);
-  const s1 = scores[0], s2 = scores[1];                 // engine P1/P2 scores
-  const ms1 = (m.p1 === lm.p1) ? s1 : s2;               // re-orient to the match's stored p1/p2
+  const s1 = scores[0], s2 = scores[1];
+  const ms1 = (m.p1 === lm.p1) ? s1 : s2;
   const ms2 = (m.p1 === lm.p1) ? s2 : s1;
   const winnerId = forcedWinnerCompId || (s1 > s2 ? lm.p1 : lm.p2);
   settleMatch(t, m, ms1, ms2, winnerId, false);
-  activeTourMatch = null;
   resolveAuto(t);
   checkTourComplete(t);
   persistTour();
   clearTimeout(aiTimer);
+
+  const me = myPlayerIdx();
+  const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
+  const isConcede = !!forcedWinnerCompId;
+  if (isConcede) {
+    checkAchievements('game_over', { concede: true, concedingPlayer: won ? (me === 1 ? 2 : 1) : me });
+  } else {
+    checkAchievements('game_over');
+  }
+  const oppComp = compById(t, lm.p2);
+  const oppName = oppComp ? oppComp.name : 'Opponent';
+  recordGame({
+    date: Date.now(), opponent: oppName, mode: 'tournament',
+    myScore: scores[me - 1], oppScore: scores[me === 1 ? 1 : 0],
+    ends: isConcede ? endNum : endNum - 1, totalEnds: ENDS,
+    won, conceded: isConcede, tournament: t.name
+  });
+  awardXP(won, isConcede);
+
+  const ts = loadTourStats();
+  ts.matchesPlayed++;
+  if (ms1 === ms2) ts.matchesDrawn++;
+  else if (won) ts.matchesWon++;
+  ts.shotsFor += scores[me - 1];
+  ts.shotsAgainst += scores[me === 1 ? 1 : 0];
+  saveTourStats(ts);
+
+  const winName = compName(t, winnerId);
+  let res;
+  if (isConcede) res = `${winName} wins (conceded) ${ms1}–${ms2}`;
+  else if (ms1 === ms2) res = `Draw! ${ms1}–${ms2}`;
+  else res = `${winName} wins ${ms1}–${ms2}`;
+  tourMatchPending = true;
+  msg(`Game over — ${res}`);
+}
+
+function finishTourMatchReturn() {
+  tourMatchPending = false;
+  activeTourMatch = null;
+  persistTour();
   resetCam(); resetAim();
   state = 'idle'; syncFireBtn();
   document.getElementById('splash').classList.remove('hidden');
@@ -6673,7 +6776,7 @@ function openTourSetup() {
   tourSetup = {
     name: 'Tournament', format: 'round-robin', ends: 4,
     comps: [
-      { kind: 'human', name: 'You', aiLevel: 1 },
+      { kind: 'human', name: 'You', aiLevel: 1, bowlIdx: 0, designIdx: 0 },
       { kind: 'ai', name: AI_PLAYERS[1].name, aiLevel: 1 },
       { kind: 'ai', name: AI_PLAYERS[2].name, aiLevel: 2 },
     ],
@@ -6699,7 +6802,7 @@ function renderTourSetup() {
   seg('tour-format', [['Round Robin', 'round-robin'], ['Knockout', 'knockout']], () => s.format, v => s.format = v);
   const es = document.getElementById('tour-ends'), esl = document.getElementById('tour-ends-lbl');
   es.oninput = () => { s.ends = +es.value; esl.textContent = es.value; };
-  document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1 }); renderTourComps(); } };
+  document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0 }); renderTourComps(); } };
   document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l }); renderTourComps(); } };
   document.getElementById('tour-create').onclick = createTournament;
   renderTourComps();
@@ -6713,8 +6816,28 @@ function renderTourComps() {
     const row = document.createElement('div');
     row.className = 'tour-comp';
     if (c.kind === 'human') {
-      row.innerHTML = `<span class="tour-comp-kind">👤</span><input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}"><button class="tour-comp-del">✕</button>`;
+      if (c.bowlIdx == null) c.bowlIdx = i % BOWL_COLOURS.length;
+      if (c.designIdx == null) c.designIdx = 0;
+      row.innerHTML = `<span class="tour-comp-kind">👤</span><input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}"><button class="tour-comp-del">✕</button>` +
+        `<div class="tour-comp-bowls"><span class="tour-bowl-sw"></span><div class="seg tour-design-seg"></div></div>`;
       row.querySelector('.tour-comp-name').oninput = e => c.name = e.target.value;
+      const swWrap = row.querySelector('.tour-bowl-sw');
+      BOWL_COLOURS.forEach((col, ci) => {
+        const sw = document.createElement('div');
+        sw.className = 'sw' + (ci === c.bowlIdx ? ' sel' : '');
+        sw.style.background = col.main;
+        sw.title = col.name;
+        sw.onclick = () => { c.bowlIdx = ci; swWrap.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === ci)); };
+        swWrap.appendChild(sw);
+      });
+      const dSeg = row.querySelector('.tour-design-seg');
+      BOWL_DESIGNS.forEach((name, di) => {
+        const b = document.createElement('button');
+        b.textContent = name;
+        if (di === c.designIdx) b.classList.add('sel');
+        b.onclick = () => { c.designIdx = di; dSeg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+        dSeg.appendChild(b);
+      });
     } else {
       row.innerHTML = `<span class="tour-comp-kind">🤖</span><div class="seg tour-ai-seg"></div><button class="tour-comp-del">✕</button>`;
       const segEl = row.querySelector('.tour-ai-seg');
@@ -6734,7 +6857,7 @@ function renderTourComps() {
 function createTournament() {
   const s = tourSetup;
   if (s.comps.length < 2) { alert('Add at least 2 competitors'); return; }
-  const comps = s.comps.map((c, i) => ({ id: 'c' + i, kind: c.kind, name: (c.name || '').trim() || ('Player ' + (i + 1)), aiLevel: c.aiLevel || 0 }));
+  const comps = s.comps.map((c, i) => ({ id: 'c' + i, kind: c.kind, name: (c.name || '').trim() || ('Player ' + (i + 1)), aiLevel: c.aiLevel || 0, bowlIdx: c.bowlIdx != null ? c.bowlIdx : i % BOWL_COLOURS.length, designIdx: c.designIdx || 0 }));
   const t = { id: 't' + Date.now(), name: (s.name || '').trim() || 'Tournament', format: s.format, ends: s.ends, status: 'running', competitors: comps, matches: [], champion: null };
   t.matches = (s.format === 'knockout') ? genKnockout(comps) : genRoundRobin(comps);
   activeTour = t; activeTourMatch = null;
