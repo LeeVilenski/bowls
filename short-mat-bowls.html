@@ -4538,9 +4538,9 @@ function buildGameSettingsPanel() {
   }
 
   const surfacePresets = [
-    ['Fast', { speedVal: 75, bendLeft: 75, bendRight: 75 }],
+    ['Fast', { speedVal: 75, bendLeft: 66, bendRight: 66 }],
     ['Medium', { speedVal: 50, bendLeft: 50, bendRight: 50 }],
-    ['Slow', { speedVal: 25, bendLeft: 25, bendRight: 25 }],
+    ['Slow', { speedVal: 25, bendLeft: 33, bendRight: 33 }],
     ['Wonky', { speedVal: 45, bendLeft: 80, bendRight: 20 }],
     ['Uneven', { speedVal: 60, bendLeft: 30, bendRight: 70 }],
   ];
@@ -5014,9 +5014,9 @@ function buildCreatePanel() {
   brS.oninput = () => { createCfg.bendRight = +brS.value; brL.textContent = brS.value; };
 
   const surfPresets = [
-    ['Fast', { speedVal:75, bendLeft:75, bendRight:75 }],
+    ['Fast', { speedVal:75, bendLeft:66, bendRight:66 }],
     ['Medium', { speedVal:50, bendLeft:50, bendRight:50 }],
-    ['Slow', { speedVal:25, bendLeft:25, bendRight:25 }],
+    ['Slow', { speedVal:25, bendLeft:33, bendRight:33 }],
   ];
   const cSurf = document.getElementById('cSurface');
   surfPresets.forEach(([label, vals]) => {
