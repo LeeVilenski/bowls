@@ -736,6 +736,10 @@ button:active { opacity: .7; }
       <div id="profile-stats"></div>
     </div>
     <div class="spl-card">
+      <div class="spl-head">🏆 Tournaments</div>
+      <div id="profile-tour-stats"></div>
+    </div>
+    <div class="spl-card">
       <div class="spl-head">Match History</div>
       <div id="profile-history"></div>
     </div>
@@ -5638,6 +5642,13 @@ function loadStats() {
 }
 function saveStats(s) { localStorage.setItem(STATS_KEY, JSON.stringify(s)); }
 
+const TOUR_STATS_KEY = 'bowls_tour_stats';
+function loadTourStats() {
+  const def = { played:0, won:0, matchesPlayed:0, matchesWon:0, matchesDrawn:0, shotsFor:0, shotsAgainst:0 };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem(TOUR_STATS_KEY))); } catch { return def; }
+}
+function saveTourStats(s) { localStorage.setItem(TOUR_STATS_KEY, JSON.stringify(s)); }
+
 let achToastQueue = [];
 let achToastActive = false;
 
@@ -5924,6 +5935,30 @@ function renderProfileStats() {
     statRow('Best Margin', localBestMargin);
 }
 
+function renderTourProfileStats() {
+  const ts = loadTourStats();
+  const el = document.getElementById('profile-tour-stats');
+  if (!ts.played && !ts.matchesPlayed) {
+    el.innerHTML = '<div class="hist-empty">No tournaments played yet</div>';
+    return;
+  }
+  const tourWinPct = ts.played > 0 ? Math.round(ts.won / ts.played * 100) : 0;
+  const matchWinPct = ts.matchesPlayed > 0 ? Math.round(ts.matchesWon / ts.matchesPlayed * 100) : 0;
+  const matchLosses = ts.matchesPlayed - ts.matchesWon - ts.matchesDrawn;
+  const shotDiff = ts.shotsFor - ts.shotsAgainst;
+  el.innerHTML =
+    statBar('Tournaments Won', tourWinPct + '%', tourWinPct, 'green') +
+    statRow('Tournaments Played', ts.played) +
+    statRow('Tournaments Won', ts.won) +
+    '<div class="stat-section-head">Tournament Matches</div>' +
+    statBar('Match Win Rate', matchWinPct + '%', matchWinPct, 'blue') +
+    statRow('Matches Played', ts.matchesPlayed) +
+    statRow('W / D / L', ts.matchesWon + ' / ' + ts.matchesDrawn + ' / ' + matchLosses) +
+    statRow('Shots For', ts.shotsFor) +
+    statRow('Shots Against', ts.shotsAgainst) +
+    statRow('Shot Difference', (shotDiff > 0 ? '+' : '') + shotDiff);
+}
+
 function statBar(label, valText, pct, color) {
   return `<div class="stat-row"><span class="stat-lbl">${label}</span>` +
     `<div class="stat-bar-wrap"><div class="stat-bar ${color}" style="width:${pct}%"></div></div>` +
@@ -5946,13 +5981,14 @@ function renderMatchHistory() {
     const result = g.won ? 'W' : 'L';
     const resultClass = g.won ? 'hist-win' : 'hist-loss';
     const score = `${g.myScore}–${g.oppScore}`;
-    const modeLabel = g.mode === 'vs-ai' ? '🤖' : g.mode === 'online' ? '🌐' : '👥';
+    const modeLabel = g.mode === 'tournament' ? '🏆' : g.mode === 'vs-ai' ? '🤖' : g.mode === 'online' ? '🌐' : '👥';
     const endsPlayed = g.conceded ? '(conceded)' : `${g.ends}/${g.totalEnds} ends`;
+    const tourLabel = g.tournament ? ` · ${g.tournament}` : '';
     const row = document.createElement('div');
     row.className = 'hist-row';
     row.innerHTML = `<span class="hist-result ${resultClass}">${result}</span>` +
       `<span class="hist-detail"><strong>${modeLabel} vs ${g.opponent}</strong><br>` +
-      `<small>${score} · ${endsPlayed} · ${dateStr}</small></span>` +
+      `<small>${score} · ${endsPlayed}${tourLabel} · ${dateStr}</small></span>` +
       `<span class="hist-arrow">›</span>`;
     row.onclick = () => showOpponentProfile(g.opponent, g.mode);
     el.appendChild(row);
@@ -6280,6 +6316,7 @@ function renderXPCard() {
 function showProfilePanel() {
   buildProfilePanel();
   renderProfileStats();
+  renderTourProfileStats();
   renderMatchHistory();
   renderXPCard();
   updateAuthUI();
@@ -6619,11 +6656,20 @@ function standings(t) {
 }
 
 function checkTourComplete(t) {
+  if (t.status === 'finished') return;
+  let justFinished = false;
   if (t.format === 'knockout') {
     const final = t.matches.reduce((a, b) => (b.round > a.round ? b : a), t.matches[0]);
-    if (final.status === 'done') { t.status = 'finished'; t.champion = final.winner; }
+    if (final.status === 'done') { t.status = 'finished'; t.champion = final.winner; justFinished = true; }
   } else if (t.matches.every(m => m.status === 'done')) {
-    t.status = 'finished'; t.champion = standings(t)[0].id;
+    t.status = 'finished'; t.champion = standings(t)[0].id; justFinished = true;
+  }
+  if (justFinished) {
+    const ts = loadTourStats();
+    ts.played++;
+    const champ = compById(t, t.champion);
+    if (champ && champ.kind === 'human') ts.won++;
+    saveTourStats(ts);
   }
 }
 
@@ -6679,8 +6725,33 @@ function onTourMatchComplete(forcedWinnerCompId) {
   persistTour();
   clearTimeout(aiTimer);
 
-  const winName = compName(t, winnerId);
+  const me = myPlayerIdx();
+  const won = scores[me - 1] > scores[me === 1 ? 1 : 0];
   const isConcede = !!forcedWinnerCompId;
+  if (isConcede) {
+    checkAchievements('game_over', { concede: true, concedingPlayer: won ? (me === 1 ? 2 : 1) : me });
+  } else {
+    checkAchievements('game_over');
+  }
+  const oppComp = compById(t, lm.p2);
+  const oppName = oppComp ? oppComp.name : 'Opponent';
+  recordGame({
+    date: Date.now(), opponent: oppName, mode: 'tournament',
+    myScore: scores[me - 1], oppScore: scores[me === 1 ? 1 : 0],
+    ends: isConcede ? endNum : endNum - 1, totalEnds: ENDS,
+    won, conceded: isConcede, tournament: t.name
+  });
+  awardXP(won, isConcede);
+
+  const ts = loadTourStats();
+  ts.matchesPlayed++;
+  if (ms1 === ms2) ts.matchesDrawn++;
+  else if (won) ts.matchesWon++;
+  ts.shotsFor += scores[me - 1];
+  ts.shotsAgainst += scores[me === 1 ? 1 : 0];
+  saveTourStats(ts);
+
+  const winName = compName(t, winnerId);
   let res;
   if (isConcede) res = `${winName} wins (conceded) ${ms1}–${ms2}`;
   else if (ms1 === ms2) res = `Draw! ${ms1}–${ms2}`;
