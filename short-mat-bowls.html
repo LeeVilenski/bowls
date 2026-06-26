@@ -2186,8 +2186,8 @@ function resumeGame() {
   RB = 10 + splashCfg.size;
   biasMult = splashCfg.biasVal;
   friction = sg.friction != null ? sg.friction : 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
-  biasMultLeft = sg.biasMultLeft != null ? sg.biasMultLeft : (splashCfg.bendLeft / 50) ** 2 * 0.15;
-  biasMultRight = sg.biasMultRight != null ? sg.biasMultRight : (splashCfg.bendRight / 50) ** 2 * 0.15;
+  biasMultLeft = sg.biasMultLeft != null ? sg.biasMultLeft : (splashCfg.bendLeft / 100) * 0.20;
+  biasMultRight = sg.biasMultRight != null ? sg.biasMultRight : (splashCfg.bendRight / 100) * 0.20;
   bgStyle = sg.bgStyle || splashCfg.bg;
   resetCam(); resetAim(); updateHUD();
   document.getElementById('splash').classList.add('hidden');
@@ -4951,8 +4951,8 @@ function applyOnlineSettings(s, seed) {
   biasMult = splashCfg.biasVal;
   bgStyle = splashCfg.bg;
   friction = 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
-  biasMultLeft = (splashCfg.bendLeft / 50) ** 2 * 0.15;
-  biasMultRight = (splashCfg.bendRight / 50) ** 2 * 0.15;
+  biasMultLeft = (splashCfg.bendLeft / 100) * 0.20;
+  biasMultRight = (splashCfg.bendRight / 100) * 0.20;
   const col = BOWL_COLOURS[splashCfg.p1idx];
   C.p1 = col.main; C.p1d = col.dark;
   const col2 = BOWL_COLOURS[splashCfg.p2idx];
@@ -5149,9 +5149,9 @@ function applyAndStart() {
 
   // Surface: speed 0→0.9930 (slow), 50→0.9955 (medium), 100→0.9975 (fast)
   friction = 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
-  // Bend: quadratic curve — 0→0.0, 50→0.15 (old default), 100→0.60
-  biasMultLeft  = (splashCfg.bendLeft / 50) ** 2 * 0.15;
-  biasMultRight = (splashCfg.bendRight / 50) ** 2 * 0.15;
+  // Bend: linear — 0→0.0, 50→0.10, 100→0.20
+  biasMultLeft  = (splashCfg.bendLeft / 100) * 0.20;
+  biasMultRight = (splashCfg.bendRight / 100) * 0.20;
 
   const col = BOWL_COLOURS[splashCfg.p1idx];
   C.p1 = col.main; C.p1d = col.dark;
