@@ -2010,6 +2010,13 @@ function replayEntryRect() {
   // Bottom-left slot — only shown in states where it's vacant (never during aim).
   return { cx: 156 / 2 + 6, cy: H - 80, w: 156, h: 84 };
 }
+// During aim the bottom row is busy (FIRE / doormat / HEAD), so the replay
+// entry lives as a compact button in the empty left side-panel column instead,
+// where it never covers the mat or the swipe zone.
+function replaySideRect() { return { x: 23 - PANEL_BTN.w / 2, y: 224, w: PANEL_BTN.w, h: PANEL_BTN.h }; }
+function replaySideAvailable() {
+  return mode !== 'online' && replayShots.length > 0 && !replayActive && state === 'aim';
+}
 
 function drawReplay() {
   const shot = replayShots[replayShotIdx];
@@ -2228,6 +2235,11 @@ function drawOverlayUI() {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('⟲ REPLAY', r.cx, r.cy);
     ctx.textBaseline = 'alphabetic';
+  }
+
+  // Aim-time replay — compact side-panel button (keeps the delivery mat clear)
+  if (replaySideAvailable()) {
+    drawPanelBtn(23, replaySideRect().y, '⟲', '#0f3d3a', '#5eead4');
   }
 }
 
@@ -3859,10 +3871,17 @@ function handlePointerDown(p) {
   // Replay playback — controls own all taps while watching
   if (state === 'replay') { handleReplayTap(p); return; }
 
-  // Replay entry button
+  // Replay entry button (bottom-left, end transitions)
   if (replayAvailable()) {
     const r = replayEntryRect();
     if (p.x >= r.cx - r.w / 2 && p.x <= r.cx + r.w / 2 && p.y >= r.cy - r.h / 2 && p.y <= r.cy + r.h / 2) {
+      enterReplay(); mouse.down = false; return;
+    }
+  }
+  // Replay entry button (compact side-panel, during aim)
+  if (replaySideAvailable()) {
+    const r = replaySideRect();
+    if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
       enterReplay(); mouse.down = false; return;
     }
   }
