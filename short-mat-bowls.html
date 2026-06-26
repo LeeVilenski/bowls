@@ -846,7 +846,9 @@ let blockAnim = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, va: 0, active: false, rese
 // Delivery lines: 1370mm long from ditch toward centre, ±330mm from centre line
 // Delivery mat:   610mm long × 356mm wide, sits in ditch zone against fender
 const L = {
-  DITCH:     0.055, // ditch line — widened for gameplay (real is 0.023)
+  DITCH:     0.0273, // ditch line — moved one bowl-length toward the fender; with the
+                     // touch-to-die rule below this keeps the playable length the same
+                     // while letting a bowl roll a full bowl-length further before dying
   DEAD:      0.30,  // dead line — moved closer to delivery end for more playing area
   JACK_N:    0.093, // jack line near tip (from far end, toward centre)
   JACK_F:    0.22,  // jack line far tip — extended toward centre for wider placement zone
@@ -1137,13 +1139,16 @@ function stepObj(obj, bias) {
     const farDitchY = yFromFar(L.DITCH);
     const farDeadY  = yFromFar(L.DEAD);
     const r_obj = obj === jack ? RJ : RB;
-    // Dead only when the ENTIRE ball has cleared the ditch line (not just the centre)
+    // Dead as soon as the ball TOUCHES the ditch line (real bowls rule: a bowl
+    // touching the ditch line is dead — it need not fully cross it).
     const inFarDitch = delivDir === 1
-      ? obj.y + r_obj < farDitchY
-      : obj.y - r_obj > farDitchY;
-    // Bowl must reach the far dead area (where the jack lives) to count.
-    // Anything stopping before the far dead line — short or mid-mat — is dead.
-    const didNotReachScoring = delivDir === 1 ? obj.y > farDeadY : obj.y < farDeadY;
+      ? obj.y - r_obj <= farDitchY
+      : obj.y + r_obj >= farDitchY;
+    // Bowl must FULLY clear the dead line to count — a bowl that stops short of,
+    // or merely touching, the dead line is dead (real bowls rule).
+    const didNotReachScoring = delivDir === 1
+      ? obj.y + r_obj >= farDeadY
+      : obj.y - r_obj <= farDeadY;
     if (obj === jack) {
       if (inFarDitch) { obj.inDitch = true; msg('Jack is now dead'); }
     } else {
@@ -3203,7 +3208,7 @@ function drawSidePanels() {
   // Shot holder indicator — above Fire (P1) or Head (P2) button
   if (jack && !jack.offMat) {
     const farDeadY = yFromFar(L.DEAD);
-    const liveBowls = bowls.filter(b => !b.offMat && b.y < farDeadY + RB);
+    const liveBowls = bowls.filter(b => !b.offMat && b.y < farDeadY - RB);
     if (liveBowls.length) {
       const dists = liveBowls
         .map(b => ({ p: b.player, d: Math.hypot(b.x - jack.x, b.y - jack.y) }))
