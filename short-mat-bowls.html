@@ -1034,7 +1034,7 @@ const BOWL_COLOURS = [
 ];
 
 const BOWL_DESIGNS = ['Classic','Speckled','Ringed'];
-let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:1.0, p1idx:0, p2idx:1, p1design:0, p2design:0, aiLevel:1, bg:'hardwood', speedVal:50, bendLeft:50, bendRight:50 };
+let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:1.0, p1biasVal:1.0, p2biasVal:1.0, p1idx:0, p2idx:1, p1design:0, p2design:0, aiLevel:1, bg:'hardwood', speedVal:50, bendLeft:50, bendRight:50 };
 let biasDirs = ['right', 'right']; // per-player bias direction, remembered across turns
 function curBiasDir()          { return biasDirs[playerForTurn(turnIdx) - 1]; }
 function setBiasDir(p, dir)    { biasDirs[p - 1] = dir; }
@@ -2504,7 +2504,7 @@ function buildSuspendedState() {
     scores: [...scores], endNum, jackOwner, turnIdx, delivDir, endHistory: [...endHistory],
     biasDirs: [...biasDirs], aiLevel, jackOffCounts: [...jackOffCounts],
     splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
-    friction, biasMultLeft, biasMultRight, bgStyle,
+    friction, biasMultLeft, biasMultRight, bgStyle, playerBiasMults: [...playerBiasMults],
   };
 }
 
@@ -2550,6 +2550,7 @@ function resumeGame() {
   C.p2 = BOWL_COLOURS[splashCfg.p2idx].main; C.p2d = BOWL_COLOURS[splashCfg.p2idx].dark;
   RB = 10 + splashCfg.size;
   biasMult = splashCfg.biasVal;
+  playerBiasMults = sg.playerBiasMults || [null, null];
   friction = sg.friction != null ? sg.friction : 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
   biasMultLeft = sg.biasMultLeft != null ? sg.biasMultLeft : (splashCfg.bendLeft / 100) * 0.20;
   biasMultRight = sg.biasMultRight != null ? sg.biasMultRight : (splashCfg.bendRight / 100) * 0.20;
@@ -4914,7 +4915,7 @@ function buildGameSettingsPanel() {
 
   buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
   seg('sD2', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p2design, v=>splashCfg.p2design=v);
-  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
+  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.p2biasVal, v=>splashCfg.p2biasVal=v);
 
   const spdSlider = document.getElementById('sSpeedSlider');
   const spdLbl = document.getElementById('sSpeedLbl');
@@ -5127,7 +5128,7 @@ async function refreshLobby() {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-let joinBowlCfg = { p2idx: 2, p2design: 0 };
+let joinBowlCfg = { p2idx: 2, p2design: 0, p2bias: 1.0 };
 let joinBowlPanelBuilt = false;
 let pendingJoinGameId = null;
 
@@ -5185,6 +5186,7 @@ function doJoinLobby(gameId, gameRow) {
   const prof = loadProfile();
   if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
   if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
+  if (prof.biasVal != null) joinBowlCfg.p2bias = prof.biasVal;
   pendingJoinGameId = gameId;
   confirmJoinLobby();
 }
@@ -5194,7 +5196,7 @@ async function confirmJoinLobby() {
   if (!gameId) return;
   pendingJoinGameId = null;
   cleanupNet();
-  const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
+  const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design, p2Bias: joinBowlCfg.p2bias });
   if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
 
   onlineOpponentName = game.host_name || 'Opponent';
@@ -5346,10 +5348,13 @@ function applyOnlineSettings(s, seed) {
   if (s.p1Design != null) splashCfg.p1design = s.p1Design;
   if (s.p2Color != null) splashCfg.p2idx = s.p2Color;
   if (s.p2Design != null) splashCfg.p2design = s.p2Design;
+  const p1Bias = s.biasVal || 1.0;
+  const p2Bias = s.p2Bias != null ? s.p2Bias : p1Bias;
   mode = 'online';
   ENDS = splashCfg.ends;
   RB = 10 + splashCfg.size;
-  biasMult = splashCfg.biasVal;
+  biasMult = p1Bias;
+  playerBiasMults = [p1Bias, p2Bias];
   bgStyle = splashCfg.bg;
   friction = 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
   biasMultLeft = (splashCfg.bendLeft / 100) * 0.20;
@@ -5546,8 +5551,8 @@ function applyAndStart() {
   mode     = splashCfg.mode;
   aiLevel  = splashCfg.aiLevel;
   RB       = 10 + splashCfg.size;          // size 0→10px … size 5→15px
-  biasMult = splashCfg.biasVal;
-  playerBiasMults = [null, null];
+  biasMult = splashCfg.p1biasVal;
+  playerBiasMults = [splashCfg.p1biasVal, splashCfg.p2biasVal];
   bgStyle  = splashCfg.bg;
 
   // Surface: speed 0→0.9930 (slow), 50→0.9955 (medium), 100→0.9975 (fast)
@@ -6338,7 +6343,7 @@ function applyProfileToSplash() {
   if (prof.p1idx != null) splashCfg.p1idx = prof.p1idx;
   if (prof.p1design != null) splashCfg.p1design = prof.p1design;
   if (prof.size != null) splashCfg.size = prof.size;
-  if (prof.biasVal != null) splashCfg.biasVal = prof.biasVal;
+  if (prof.biasVal != null) { splashCfg.biasVal = prof.biasVal; splashCfg.p1biasVal = prof.biasVal; }
 }
 
 // ── Opponent Profile ────────────────────────────────────────────
