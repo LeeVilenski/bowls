@@ -372,6 +372,7 @@ button:active { opacity: .7; }
 .tour-comp-del { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px;
   background: #1e293b; color: #f87171; border: 1px solid #334155; font-size: 12px; }
 .tour-comp-bowls { width: 100%; display: flex; align-items: center; gap: 6px; padding: 2px 0 0 28px; flex-wrap: wrap; }
+.tour-comp-bowls .tour-bowl-sw { display: flex; gap: 5px; flex-wrap: wrap; }
 .tour-comp-bowls .sw { width: 20px; height: 20px; }
 .tour-comp-bowls .seg { font-size: 11px; margin-left: 6px; }
 .tour-comp-bowls .seg button { padding: 3px 6px; font-size: 11px; }
@@ -1033,13 +1034,14 @@ const BOWL_COLOURS = [
 ];
 
 const BOWL_DESIGNS = ['Classic','Speckled','Ringed'];
-let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:1.0, p1idx:0, p2idx:1, p1design:0, p2design:0, aiLevel:1, bg:'hardwood', speedVal:50, bendLeft:50, bendRight:50 };
+let splashCfg = { ends:6, mode:'vs-ai', size:3, biasVal:1.0, p1biasVal:1.0, p2biasVal:1.0, p1idx:0, p2idx:1, p1design:0, p2design:0, aiLevel:1, bg:'hardwood', speedVal:50, bendLeft:50, bendRight:50 };
 let biasDirs = ['right', 'right']; // per-player bias direction, remembered across turns
 function curBiasDir()          { return biasDirs[playerForTurn(turnIdx) - 1]; }
 function setBiasDir(p, dir)    { biasDirs[p - 1] = dir; }
 let biasMult = 0.15;
 let biasMultLeft = 0.15;
 let biasMultRight = 0.15;
+let playerBiasMults = [null, null];
 let friction = FRICTION;
 
 let bowls    = [];
@@ -1574,6 +1576,7 @@ function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End
 function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'online') saveGameState(buildSuspendedState()); }
 
 function promptPlayer(p, opts) {
+  if (playerBiasMults[p - 1] != null) biasMult = playerBiasMults[p - 1];
   const resuming = opts && opts.resuming;
   // Clock start: anchor to the durable previous-move server timestamp + roll
   // grace. This is the one value BOTH devices have identically (it comes from the
@@ -2501,7 +2504,7 @@ function buildSuspendedState() {
     scores: [...scores], endNum, jackOwner, turnIdx, delivDir, endHistory: [...endHistory],
     biasDirs: [...biasDirs], aiLevel, jackOffCounts: [...jackOffCounts],
     splashCfg: Object.assign({}, splashCfg), ENDS_val: ENDS, rngSeed,
-    friction, biasMultLeft, biasMultRight, bgStyle,
+    friction, biasMultLeft, biasMultRight, bgStyle, playerBiasMults: [...playerBiasMults],
   };
 }
 
@@ -2547,6 +2550,7 @@ function resumeGame() {
   C.p2 = BOWL_COLOURS[splashCfg.p2idx].main; C.p2d = BOWL_COLOURS[splashCfg.p2idx].dark;
   RB = 10 + splashCfg.size;
   biasMult = splashCfg.biasVal;
+  playerBiasMults = sg.playerBiasMults || [null, null];
   friction = sg.friction != null ? sg.friction : 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
   biasMultLeft = sg.biasMultLeft != null ? sg.biasMultLeft : (splashCfg.bendLeft / 100) * 0.20;
   biasMultRight = sg.biasMultRight != null ? sg.biasMultRight : (splashCfg.bendRight / 100) * 0.20;
@@ -4911,7 +4915,7 @@ function buildGameSettingsPanel() {
 
   buildSwatches('sP2', ()=>splashCfg.p2idx, i=>splashCfg.p2idx=i);
   seg('sD2', BOWL_DESIGNS.map((n,i)=>[n,i]), ()=>splashCfg.p2design, v=>splashCfg.p2design=v);
-  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.biasVal, v=>splashCfg.biasVal=v);
+  seg('sBias', [['Subtle',0.5],['Gentle',0.75],['Standard',1.0],['Strong',1.5]], ()=>splashCfg.p2biasVal, v=>splashCfg.p2biasVal=v);
 
   const spdSlider = document.getElementById('sSpeedSlider');
   const spdLbl = document.getElementById('sSpeedLbl');
@@ -5124,7 +5128,7 @@ async function refreshLobby() {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-let joinBowlCfg = { p2idx: 2, p2design: 0 };
+let joinBowlCfg = { p2idx: 2, p2design: 0, p2bias: 1.0 };
 let joinBowlPanelBuilt = false;
 let pendingJoinGameId = null;
 
@@ -5182,6 +5186,7 @@ function doJoinLobby(gameId, gameRow) {
   const prof = loadProfile();
   if (prof.p1idx != null) joinBowlCfg.p2idx = prof.p1idx;
   if (prof.p1design != null) joinBowlCfg.p2design = prof.p1design;
+  if (prof.biasVal != null) joinBowlCfg.p2bias = prof.biasVal;
   pendingJoinGameId = gameId;
   confirmJoinLobby();
 }
@@ -5191,7 +5196,7 @@ async function confirmJoinLobby() {
   if (!gameId) return;
   pendingJoinGameId = null;
   cleanupNet();
-  const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design });
+  const game = await joinLobby(gameId, { p2Color: joinBowlCfg.p2idx, p2Design: joinBowlCfg.p2design, p2Bias: joinBowlCfg.p2bias });
   if (!game) { alert('Could not join — game may have started'); document.getElementById('join-bowl-panel').classList.remove('show'); refreshLobby(); return; }
 
   onlineOpponentName = game.host_name || 'Opponent';
@@ -5343,10 +5348,13 @@ function applyOnlineSettings(s, seed) {
   if (s.p1Design != null) splashCfg.p1design = s.p1Design;
   if (s.p2Color != null) splashCfg.p2idx = s.p2Color;
   if (s.p2Design != null) splashCfg.p2design = s.p2Design;
+  const p1Bias = s.biasVal || 1.0;
+  const p2Bias = s.p2Bias != null ? s.p2Bias : p1Bias;
   mode = 'online';
   ENDS = splashCfg.ends;
   RB = 10 + splashCfg.size;
-  biasMult = splashCfg.biasVal;
+  biasMult = p1Bias;
+  playerBiasMults = [p1Bias, p2Bias];
   bgStyle = splashCfg.bg;
   friction = 0.9930 + (splashCfg.speedVal / 100) * 0.0045;
   biasMultLeft = (splashCfg.bendLeft / 100) * 0.20;
@@ -5543,7 +5551,8 @@ function applyAndStart() {
   mode     = splashCfg.mode;
   aiLevel  = splashCfg.aiLevel;
   RB       = 10 + splashCfg.size;          // size 0→10px … size 5→15px
-  biasMult = splashCfg.biasVal;
+  biasMult = splashCfg.p1biasVal;
+  playerBiasMults = [splashCfg.p1biasVal, splashCfg.p2biasVal];
   bgStyle  = splashCfg.bg;
 
   // Surface: speed 0→0.9930 (slow), 50→0.9955 (medium), 100→0.9975 (fast)
@@ -6334,7 +6343,7 @@ function applyProfileToSplash() {
   if (prof.p1idx != null) splashCfg.p1idx = prof.p1idx;
   if (prof.p1design != null) splashCfg.p1design = prof.p1design;
   if (prof.size != null) splashCfg.size = prof.size;
-  if (prof.biasVal != null) splashCfg.biasVal = prof.biasVal;
+  if (prof.biasVal != null) { splashCfg.biasVal = prof.biasVal; splashCfg.p1biasVal = prof.biasVal; }
 }
 
 // ── Opponent Profile ────────────────────────────────────────────
@@ -6696,6 +6705,8 @@ function startTournamentMatch(t, m) {
   C.p2 = BOWL_COLOURS[c2Idx].main; C.p2d = BOWL_COLOURS[c2Idx].dark;
   splashCfg.p1design = e1.designIdx || 0;
   splashCfg.p2design = e2.designIdx || 0;
+  playerBiasMults[0] = e1.biasVal != null ? e1.biasVal : 1.0;
+  playerBiasMults[1] = e2.biasVal != null ? e2.biasVal : 1.0;
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
   activeTourMatch = { matchId: m.id, p1: eP1, p2: eP2 };
   persistTour();
@@ -6776,9 +6787,9 @@ function openTourSetup() {
   tourSetup = {
     name: 'Tournament', format: 'round-robin', ends: 4,
     comps: [
-      { kind: 'human', name: 'You', aiLevel: 1, bowlIdx: 0, designIdx: 0 },
-      { kind: 'ai', name: AI_PLAYERS[1].name, aiLevel: 1 },
-      { kind: 'ai', name: AI_PLAYERS[2].name, aiLevel: 2 },
+      { kind: 'human', name: 'You', aiLevel: 1, bowlIdx: 0, designIdx: 0, biasVal: 1.0 },
+      { kind: 'ai', name: AI_PLAYERS[1].name, aiLevel: 1, bowlIdx: 1, designIdx: 0, biasVal: 1.0 },
+      { kind: 'ai', name: AI_PLAYERS[2].name, aiLevel: 2, bowlIdx: 2, designIdx: 0, biasVal: 1.0 },
     ],
   };
   renderTourSetup();
@@ -6802,8 +6813,8 @@ function renderTourSetup() {
   seg('tour-format', [['Round Robin', 'round-robin'], ['Knockout', 'knockout']], () => s.format, v => s.format = v);
   const es = document.getElementById('tour-ends'), esl = document.getElementById('tour-ends-lbl');
   es.oninput = () => { s.ends = +es.value; esl.textContent = es.value; };
-  document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0 }); renderTourComps(); } };
-  document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l }); renderTourComps(); } };
+  document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
+  document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
   document.getElementById('tour-create').onclick = createTournament;
   renderTourComps();
 }
@@ -6815,31 +6826,15 @@ function renderTourComps() {
   s.comps.forEach((c, i) => {
     const row = document.createElement('div');
     row.className = 'tour-comp';
+    if (c.bowlIdx == null) c.bowlIdx = i % BOWL_COLOURS.length;
+    if (c.designIdx == null) c.designIdx = 0;
     if (c.kind === 'human') {
-      if (c.bowlIdx == null) c.bowlIdx = i % BOWL_COLOURS.length;
-      if (c.designIdx == null) c.designIdx = 0;
       row.innerHTML = `<span class="tour-comp-kind">👤</span><input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}"><button class="tour-comp-del">✕</button>` +
-        `<div class="tour-comp-bowls"><span class="tour-bowl-sw"></span><div class="seg tour-design-seg"></div></div>`;
+        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
       row.querySelector('.tour-comp-name').oninput = e => c.name = e.target.value;
-      const swWrap = row.querySelector('.tour-bowl-sw');
-      BOWL_COLOURS.forEach((col, ci) => {
-        const sw = document.createElement('div');
-        sw.className = 'sw' + (ci === c.bowlIdx ? ' sel' : '');
-        sw.style.background = col.main;
-        sw.title = col.name;
-        sw.onclick = () => { c.bowlIdx = ci; swWrap.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === ci)); };
-        swWrap.appendChild(sw);
-      });
-      const dSeg = row.querySelector('.tour-design-seg');
-      BOWL_DESIGNS.forEach((name, di) => {
-        const b = document.createElement('button');
-        b.textContent = name;
-        if (di === c.designIdx) b.classList.add('sel');
-        b.onclick = () => { c.designIdx = di; dSeg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
-        dSeg.appendChild(b);
-      });
     } else {
-      row.innerHTML = `<span class="tour-comp-kind">🤖</span><div class="seg tour-ai-seg"></div><button class="tour-comp-del">✕</button>`;
+      row.innerHTML = `<span class="tour-comp-kind">🤖</span><div class="seg tour-ai-seg"></div><button class="tour-comp-del">✕</button>` +
+        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
       const segEl = row.querySelector('.tour-ai-seg');
       AI_PLAYERS.forEach((a, li) => {
         const b = document.createElement('button');
@@ -6849,6 +6844,32 @@ function renderTourComps() {
         segEl.appendChild(b);
       });
     }
+    const swWrap = row.querySelector('.tour-bowl-sw');
+    BOWL_COLOURS.forEach((col, ci) => {
+      const sw = document.createElement('div');
+      sw.className = 'sw' + (ci === c.bowlIdx ? ' sel' : '');
+      sw.style.background = col.main;
+      sw.title = col.name;
+      sw.onclick = () => { c.bowlIdx = ci; swWrap.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === ci)); };
+      swWrap.appendChild(sw);
+    });
+    const dSeg = row.querySelector('.tour-design-seg');
+    BOWL_DESIGNS.forEach((name, di) => {
+      const b = document.createElement('button');
+      b.textContent = name;
+      if (di === c.designIdx) b.classList.add('sel');
+      b.onclick = () => { c.designIdx = di; dSeg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+      dSeg.appendChild(b);
+    });
+    if (c.biasVal == null) c.biasVal = 1.0;
+    const bSeg = row.querySelector('.tour-bias-seg');
+    [['Subtle',0.5],['Gentle',0.75],['Std',1.0],['Strong',1.5]].forEach(([label, val]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (val === c.biasVal) b.classList.add('sel');
+      b.onclick = () => { c.biasVal = val; bSeg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+      bSeg.appendChild(b);
+    });
     row.querySelector('.tour-comp-del').onclick = () => { if (s.comps.length > 2) { s.comps.splice(i, 1); renderTourComps(); } };
     list.appendChild(row);
   });
@@ -6857,7 +6878,7 @@ function renderTourComps() {
 function createTournament() {
   const s = tourSetup;
   if (s.comps.length < 2) { alert('Add at least 2 competitors'); return; }
-  const comps = s.comps.map((c, i) => ({ id: 'c' + i, kind: c.kind, name: (c.name || '').trim() || ('Player ' + (i + 1)), aiLevel: c.aiLevel || 0, bowlIdx: c.bowlIdx != null ? c.bowlIdx : i % BOWL_COLOURS.length, designIdx: c.designIdx || 0 }));
+  const comps = s.comps.map((c, i) => ({ id: 'c' + i, kind: c.kind, name: (c.name || '').trim() || ('Player ' + (i + 1)), aiLevel: c.aiLevel || 0, bowlIdx: c.bowlIdx != null ? c.bowlIdx : i % BOWL_COLOURS.length, designIdx: c.designIdx || 0, biasVal: c.biasVal != null ? c.biasVal : 1.0 }));
   const t = { id: 't' + Date.now(), name: (s.name || '').trim() || 'Tournament', format: s.format, ends: s.ends, status: 'running', competitors: comps, matches: [], champion: null };
   t.matches = (s.format === 'knockout') ? genKnockout(comps) : genRoundRobin(comps);
   activeTour = t; activeTourMatch = null;
