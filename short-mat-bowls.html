@@ -335,6 +335,7 @@ button:active { opacity: .7; }
 }
 #tournament-setup-panel.show, #tournament-hub-panel.show { display: flex; }
 #tour-setup-inner, #tour-hub-inner { width: 100%; max-width: 440px; }
+#tour-setup-inner { padding-bottom: 80px; }
 #tour-setup-back, #tour-hub-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
@@ -359,9 +360,17 @@ button:active { opacity: .7; }
   background: #2563eb; color: #fff; border: none; border-radius: 7px; }
 .tour-play:hover { background: #1d4ed8; }
 .tour-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
-#tour-create, .tour-btn { padding: 13px; font-size: 15px; font-weight: 800;
+.tour-btn { padding: 13px; font-size: 15px; font-weight: 800;
   background: #2563eb; color: #fff; border: none; border-radius: 12px; width: 100%; margin-top: 16px; }
-#tour-create:hover, .tour-btn:hover { background: #1d4ed8; }
+.tour-btn:hover { background: #1d4ed8; }
+#tour-create {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 310;
+  padding: 14px; font-size: 15px; font-weight: 800;
+  background: linear-gradient(135deg,#1d4ed8,#6d28d9); color: #fff;
+  border-radius: 0; border: none; width: 100%;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.5); letter-spacing: 0.3px;
+  padding-bottom: max(env(safe-area-inset-bottom), 14px);
+}
 .tour-btn-secondary { padding: 11px; font-size: 13px; font-weight: 700;
   background: #1e293b; color: #f87171; border: 1px solid #334155; border-radius: 10px; width: 100%; }
 .tour-comp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; }
@@ -371,7 +380,16 @@ button:active { opacity: .7; }
 .tour-comp-spacer { flex: 1; }
 .tour-comp-del { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px;
   background: #1e293b; color: #f87171; border: 1px solid #334155; font-size: 12px; }
-.tour-comp-bowls { width: 100%; display: flex; align-items: center; gap: 6px; padding: 2px 0 0 28px; flex-wrap: wrap; }
+.tour-comp-bowls { width: 100%; display: flex; align-items: center; gap: 6px; padding: 6px 0 4px 28px; flex-wrap: wrap; }
+.tour-comp-bowls.collapsed { display: none; }
+.tour-comp-edit { flex: 0 0 auto; height: 28px; padding: 0 8px; display: flex;
+  align-items: center; gap: 5px; font-size: 11px; border-radius: 7px;
+  background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+.tour-comp-edit.open { border-color: #60a5fa; color: #e2e8f0; }
+.tour-comp-edit .tour-edit-chev { font-size: 9px; }
+.tour-bowl-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(255,255,255,0.25); }
+.tour-comp-profile { display: flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  font-size: 11px; color: #64748b; }
 .tour-comp-bowls .tour-bowl-sw { display: flex; gap: 5px; flex-wrap: wrap; }
 .tour-comp-bowls .sw { width: 20px; height: 20px; }
 .tour-comp-bowls .seg { font-size: 11px; margin-left: 6px; }
@@ -6784,10 +6802,15 @@ function finishTourMatchReturn() {
 // ── Setup form ────────────────────────────────────────────────────
 function openTourSetup() {
   hideTourPanels();
+  const prof = loadProfile();
+  const myName = (localStorage.getItem('bowls_name') || '').trim() || 'You';
   tourSetup = {
     name: 'Tournament', format: 'round-robin', ends: 4,
     comps: [
-      { kind: 'human', name: 'You', aiLevel: 1, bowlIdx: 0, designIdx: 0, biasVal: 1.0 },
+      { kind: 'human', name: myName, aiLevel: 1, fromProfile: true,
+        bowlIdx: prof.p1idx != null ? prof.p1idx : 0,
+        designIdx: prof.p1design != null ? prof.p1design : 0,
+        biasVal: prof.biasVal != null ? prof.biasVal : 1.0 },
       { kind: 'ai', name: AI_PLAYERS[1].name, aiLevel: 1, bowlIdx: 1, designIdx: 0, biasVal: 1.0 },
       { kind: 'ai', name: AI_PLAYERS[2].name, aiLevel: 2, bowlIdx: 2, designIdx: 0, biasVal: 1.0 },
     ],
@@ -6828,13 +6851,28 @@ function renderTourComps() {
     row.className = 'tour-comp';
     if (c.bowlIdx == null) c.bowlIdx = i % BOWL_COLOURS.length;
     if (c.designIdx == null) c.designIdx = 0;
+    if (c.biasVal == null) c.biasVal = 1.0;
+
+    // P1 = the local player; their bowls come from the profile and aren't editable here.
+    if (c.fromProfile) {
+      const col = BOWL_COLOURS[c.bowlIdx] || BOWL_COLOURS[0];
+      row.innerHTML = `<span class="tour-comp-kind">👤</span>` +
+        `<input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}">` +
+        `<span class="tour-comp-profile"><span class="tour-bowl-dot" style="background:${col.main}"></span>Profile bowls</span>`;
+      row.querySelector('.tour-comp-name').oninput = e => c.name = e.target.value;
+      list.appendChild(row);
+      return;
+    }
+
     if (c.kind === 'human') {
-      row.innerHTML = `<span class="tour-comp-kind">👤</span><input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}"><button class="tour-comp-del">✕</button>` +
-        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
+      row.innerHTML = `<span class="tour-comp-kind">👤</span><input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}">` +
+        `<button class="tour-comp-edit"></button><button class="tour-comp-del">✕</button>` +
+        `<div class="tour-comp-bowls collapsed"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
       row.querySelector('.tour-comp-name').oninput = e => c.name = e.target.value;
     } else {
-      row.innerHTML = `<span class="tour-comp-kind">🤖</span><div class="seg tour-ai-seg"></div><button class="tour-comp-del">✕</button>` +
-        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
+      row.innerHTML = `<span class="tour-comp-kind">🤖</span><div class="seg tour-ai-seg"></div>` +
+        `<button class="tour-comp-edit"></button><button class="tour-comp-del">✕</button>` +
+        `<div class="tour-comp-bowls collapsed"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
       const segEl = row.querySelector('.tour-ai-seg');
       AI_PLAYERS.forEach((a, li) => {
         const b = document.createElement('button');
@@ -6844,13 +6882,26 @@ function renderTourComps() {
         segEl.appendChild(b);
       });
     }
+
+    // Bowls stay collapsed until the player taps to change them.
+    const bowlsEl = row.querySelector('.tour-comp-bowls');
+    const editBtn = row.querySelector('.tour-comp-edit');
+    const refreshEdit = () => {
+      const col = BOWL_COLOURS[c.bowlIdx] || BOWL_COLOURS[0];
+      const open = !bowlsEl.classList.contains('collapsed');
+      editBtn.innerHTML = `<span class="tour-bowl-dot" style="background:${col.main}"></span><span class="tour-edit-chev">${open ? '▴' : '▾'}</span>`;
+      editBtn.classList.toggle('open', open);
+    };
+    editBtn.title = 'Change bowls';
+    editBtn.onclick = () => { bowlsEl.classList.toggle('collapsed'); refreshEdit(); };
+
     const swWrap = row.querySelector('.tour-bowl-sw');
     BOWL_COLOURS.forEach((col, ci) => {
       const sw = document.createElement('div');
       sw.className = 'sw' + (ci === c.bowlIdx ? ' sel' : '');
       sw.style.background = col.main;
       sw.title = col.name;
-      sw.onclick = () => { c.bowlIdx = ci; swWrap.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === ci)); };
+      sw.onclick = () => { c.bowlIdx = ci; swWrap.querySelectorAll('.sw').forEach((s, j) => s.classList.toggle('sel', j === ci)); refreshEdit(); };
       swWrap.appendChild(sw);
     });
     const dSeg = row.querySelector('.tour-design-seg');
@@ -6861,7 +6912,6 @@ function renderTourComps() {
       b.onclick = () => { c.designIdx = di; dSeg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
       dSeg.appendChild(b);
     });
-    if (c.biasVal == null) c.biasVal = 1.0;
     const bSeg = row.querySelector('.tour-bias-seg');
     [['Subtle',0.5],['Gentle',0.75],['Std',1.0],['Strong',1.5]].forEach(([label, val]) => {
       const b = document.createElement('button');
@@ -6871,6 +6921,7 @@ function renderTourComps() {
       bSeg.appendChild(b);
     });
     row.querySelector('.tour-comp-del').onclick = () => { if (s.comps.length > 2) { s.comps.splice(i, 1); renderTourComps(); } };
+    refreshEdit();
     list.appendChild(row);
   });
 }
