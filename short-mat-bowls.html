@@ -1041,6 +1041,7 @@ function setBiasDir(p, dir)    { biasDirs[p - 1] = dir; }
 let biasMult = 0.15;
 let biasMultLeft = 0.15;
 let biasMultRight = 0.15;
+let playerBiasMults = [null, null];
 let friction = FRICTION;
 
 let bowls    = [];
@@ -1575,6 +1576,7 @@ function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End
 function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'online') saveGameState(buildSuspendedState()); }
 
 function promptPlayer(p, opts) {
+  if (playerBiasMults[p - 1] != null) biasMult = playerBiasMults[p - 1];
   const resuming = opts && opts.resuming;
   // Clock start: anchor to the durable previous-move server timestamp + roll
   // grace. This is the one value BOTH devices have identically (it comes from the
@@ -5545,6 +5547,7 @@ function applyAndStart() {
   aiLevel  = splashCfg.aiLevel;
   RB       = 10 + splashCfg.size;          // size 0→10px … size 5→15px
   biasMult = splashCfg.biasVal;
+  playerBiasMults = [null, null];
   bgStyle  = splashCfg.bg;
 
   // Surface: speed 0→0.9930 (slow), 50→0.9955 (medium), 100→0.9975 (fast)
@@ -6697,6 +6700,8 @@ function startTournamentMatch(t, m) {
   C.p2 = BOWL_COLOURS[c2Idx].main; C.p2d = BOWL_COLOURS[c2Idx].dark;
   splashCfg.p1design = e1.designIdx || 0;
   splashCfg.p2design = e2.designIdx || 0;
+  playerBiasMults[0] = e1.biasVal != null ? e1.biasVal : 1.0;
+  playerBiasMults[1] = e2.biasVal != null ? e2.biasVal : 1.0;
   document.getElementById('lbl2').textContent = mode === 'vs-ai' ? 'AI' : 'P2';
   activeTourMatch = { matchId: m.id, p1: eP1, p2: eP2 };
   persistTour();
@@ -6777,9 +6782,9 @@ function openTourSetup() {
   tourSetup = {
     name: 'Tournament', format: 'round-robin', ends: 4,
     comps: [
-      { kind: 'human', name: 'You', aiLevel: 1, bowlIdx: 0, designIdx: 0 },
-      { kind: 'ai', name: AI_PLAYERS[1].name, aiLevel: 1, bowlIdx: 1, designIdx: 0 },
-      { kind: 'ai', name: AI_PLAYERS[2].name, aiLevel: 2, bowlIdx: 2, designIdx: 0 },
+      { kind: 'human', name: 'You', aiLevel: 1, bowlIdx: 0, designIdx: 0, biasVal: 1.0 },
+      { kind: 'ai', name: AI_PLAYERS[1].name, aiLevel: 1, bowlIdx: 1, designIdx: 0, biasVal: 1.0 },
+      { kind: 'ai', name: AI_PLAYERS[2].name, aiLevel: 2, bowlIdx: 2, designIdx: 0, biasVal: 1.0 },
     ],
   };
   renderTourSetup();
@@ -6803,8 +6808,8 @@ function renderTourSetup() {
   seg('tour-format', [['Round Robin', 'round-robin'], ['Knockout', 'knockout']], () => s.format, v => s.format = v);
   const es = document.getElementById('tour-ends'), esl = document.getElementById('tour-ends-lbl');
   es.oninput = () => { s.ends = +es.value; esl.textContent = es.value; };
-  document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0 }); renderTourComps(); } };
-  document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0 }); renderTourComps(); } };
+  document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
+  document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
   document.getElementById('tour-create').onclick = createTournament;
   renderTourComps();
 }
@@ -6820,11 +6825,11 @@ function renderTourComps() {
     if (c.designIdx == null) c.designIdx = 0;
     if (c.kind === 'human') {
       row.innerHTML = `<span class="tour-comp-kind">👤</span><input class="tour-comp-name" maxlength="16" value="${escHtml(c.name)}"><button class="tour-comp-del">✕</button>` +
-        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div></div>`;
+        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
       row.querySelector('.tour-comp-name').oninput = e => c.name = e.target.value;
     } else {
       row.innerHTML = `<span class="tour-comp-kind">🤖</span><div class="seg tour-ai-seg"></div><button class="tour-comp-del">✕</button>` +
-        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div></div>`;
+        `<div class="tour-comp-bowls"><div class="tour-bowl-sw"></div><div class="seg tour-design-seg"></div><div class="seg tour-bias-seg"></div></div>`;
       const segEl = row.querySelector('.tour-ai-seg');
       AI_PLAYERS.forEach((a, li) => {
         const b = document.createElement('button');
@@ -6851,6 +6856,15 @@ function renderTourComps() {
       b.onclick = () => { c.designIdx = di; dSeg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
       dSeg.appendChild(b);
     });
+    if (c.biasVal == null) c.biasVal = 1.0;
+    const bSeg = row.querySelector('.tour-bias-seg');
+    [['Subtle',0.5],['Gentle',0.75],['Std',1.0],['Strong',1.5]].forEach(([label, val]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (val === c.biasVal) b.classList.add('sel');
+      b.onclick = () => { c.biasVal = val; bSeg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+      bSeg.appendChild(b);
+    });
     row.querySelector('.tour-comp-del').onclick = () => { if (s.comps.length > 2) { s.comps.splice(i, 1); renderTourComps(); } };
     list.appendChild(row);
   });
@@ -6859,7 +6873,7 @@ function renderTourComps() {
 function createTournament() {
   const s = tourSetup;
   if (s.comps.length < 2) { alert('Add at least 2 competitors'); return; }
-  const comps = s.comps.map((c, i) => ({ id: 'c' + i, kind: c.kind, name: (c.name || '').trim() || ('Player ' + (i + 1)), aiLevel: c.aiLevel || 0, bowlIdx: c.bowlIdx != null ? c.bowlIdx : i % BOWL_COLOURS.length, designIdx: c.designIdx || 0 }));
+  const comps = s.comps.map((c, i) => ({ id: 'c' + i, kind: c.kind, name: (c.name || '').trim() || ('Player ' + (i + 1)), aiLevel: c.aiLevel || 0, bowlIdx: c.bowlIdx != null ? c.bowlIdx : i % BOWL_COLOURS.length, designIdx: c.designIdx || 0, biasVal: c.biasVal != null ? c.biasVal : 1.0 }));
   const t = { id: 't' + Date.now(), name: (s.name || '').trim() || 'Tournament', format: s.format, ends: s.ends, status: 'running', competitors: comps, matches: [], champion: null };
   t.matches = (s.format === 'knockout') ? genKnockout(comps) : genRoundRobin(comps);
   activeTour = t; activeTourMatch = null;
