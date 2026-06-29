@@ -5143,15 +5143,17 @@ async function startRankedMatch(rankedMode) {
   if (match) {
     joinBowlCfg.p2idx = prof.p1idx != null ? prof.p1idx : 2;
     joinBowlCfg.p2design = prof.p1design != null ? prof.p1design : 0;
-    joinBowlCfg.p2bias = 1.0;
+    // Bowl bias is the player's own choice — only the mat surface is fixed.
+    joinBowlCfg.p2bias = prof.biasVal != null ? prof.biasVal : 1.0;
     pendingJoinGameId = match.id;
     confirmJoinLobby();
     return;
   }
 
   // Otherwise host a new ranked match and wait for a quick-match opponent.
+  // Mat surface (speed/bend) is standardised; bowl bias stays the player's choice.
   const settings = {
-    ends: 8, size: 3, biasVal: 1.0,
+    ends: 8, size: 3, biasVal: prof.biasVal != null ? prof.biasVal : 1.0,
     speedVal: 50, bendLeft: 50, bendRight: 50, bg: 'hardwood',
     p1Color: prof.p1idx != null ? prof.p1idx : 0,
     p1Design: prof.p1design != null ? prof.p1design : 0,
