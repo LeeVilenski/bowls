@@ -500,18 +500,41 @@ button:active { opacity: .7; }
   padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
 }
 #online-panel.show { display: flex; }
+#online-mode-panel {
+  position: fixed; inset: 0; z-index: 250; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#online-mode-panel.show { display: flex; }
+#online-mode-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
+.omode-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 14px 16px; border-radius: 12px; border: 1px solid #334155;
+  background: #111827; color: #e2e8f0; text-align: left; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.omode-btn:hover { border-color: #3b82f6; }
+.omode-btn.ranked { border-color: #3f3a14; background: #15130a; }
+.omode-btn.ranked:hover { border-color: #eab308; }
+.omode-btn-title { font-size: 16px; font-weight: 800; }
+.omode-btn.ranked .omode-btn-title { color: #fbbf24; }
+.omode-btn-sub { font-size: 11px; color: #94a3b8; font-weight: 500; }
+#ranked-searching { display: none; flex-direction: column; align-items: center; gap: 14px; padding: 30px 0; }
+#ranked-searching.show { display: flex; }
+#ranked-searching-msg { font-size: 14px; color: #94a3b8; }
 #online-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
 .online-title { font-size: 20px; font-weight: 800; text-align: center; padding: 6px 0; }
 #online-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; align-self: flex-start;
 }
-#lobby-name-row { display: flex; gap: 8px; align-items: center; }
-#lobby-name-row input {
+#lobby-name-row, #omode-name-row { display: flex; gap: 8px; align-items: center; }
+#lobby-name-row input, #omode-name-row input {
   flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155;
   background: #1e293b; color: #e2e8f0; font-size: 13px; font-family: inherit;
 }
-#lobby-name-row input::placeholder { color: #475569; }
+#lobby-name-row input::placeholder, #omode-name-row input::placeholder { color: #475569; }
 #join-code-row { display: flex; gap: 8px; align-items: center; }
 #join-code-row input {
   flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155;
@@ -815,6 +838,34 @@ button:active { opacity: .7; }
     <button id="leaderboard-back">&larr; Back</button>
     <div class="lb-title">Rankings</div>
     <div id="leaderboard-content"></div>
+  </div>
+</div>
+
+<div id="online-mode-panel">
+  <div id="online-mode-inner">
+    <button id="online-mode-back">&larr; Back</button>
+    <div class="online-title">Online</div>
+    <div id="omode-name-row" class="lobby-name-row">
+      <input type="text" id="omode-name" placeholder="Your display name" maxlength="20" autocomplete="off">
+    </div>
+    <div id="online-mode-choices" style="display:flex;flex-direction:column;gap:10px">
+      <button class="omode-btn ranked" id="btnRankedSpeed">
+        <span class="omode-btn-title">Ranked Speed</span>
+        <span class="omode-btn-sub">8 ends · 1 minute per shot · affects your rating</span>
+      </button>
+      <button class="omode-btn ranked" id="btnRankedLeisure">
+        <span class="omode-btn-title">Ranked Leisure</span>
+        <span class="omode-btn-sub">8 ends · 1 day per shot · affects your rating</span>
+      </button>
+      <button class="omode-btn" id="btnUnranked">
+        <span class="omode-btn-title">Unranked</span>
+        <span class="omode-btn-sub">Custom games · public or private · no rating change</span>
+      </button>
+    </div>
+    <div id="ranked-searching">
+      <div id="ranked-searching-msg" class="pulse">Searching for an opponent...</div>
+      <button id="btnCancelRanked">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -4221,6 +4272,7 @@ let sb = null;
 let localPlayer = 0;
 let onlineGameId = '';
 let onlineOpponentName = '';
+let onlineRanked = false;   // only ranked online matches affect Elo rating
 let moveNum = 0;
 let shotClockLimit = 0;
 let shotClockStart = 0;
@@ -4315,8 +4367,9 @@ async function listLobbies() {
   if (netDisplayName) q = q.neq('host_name', netDisplayName);
   const { data, error } = await q.order('created_at', { ascending: false });
   if (error) { console.error('listLobbies', error); return []; }
-  // Private games are joinable by code only — keep them out of the public lobby.
-  return (data || []).filter(g => !(g.settings && g.settings.private));
+  // Private games are joinable by code only; ranked games are quick-match only —
+  // keep both out of the public unranked lobby.
+  return (data || []).filter(g => !(g.settings && (g.settings.private || g.settings.ranked)));
 }
 
 async function listMyGames() {
@@ -4888,7 +4941,7 @@ function buildSplash() {
 
   document.getElementById('btnStart').onclick = () => {
     if (splashCfg.mode === 'online') {
-      showOnlinePanel();
+      showOnlineModePanel();
     } else {
       applyProfileToSplash();
       showGameSettingsPanel();
@@ -5033,6 +5086,100 @@ function tickLobbyClocks() {
   });
 }
 
+// ── Online mode chooser (ranked / unranked) ─────────────────────
+let onlineModePanelBuilt = false;
+
+function buildOnlineModePanel() {
+  onlineModePanelBuilt = true;
+  const nameInput = document.getElementById('omode-name');
+  nameInput.oninput = () => {
+    netDisplayName = nameInput.value.trim();
+    localStorage.setItem('bowls_name', netDisplayName);
+  };
+  document.getElementById('online-mode-back').onclick = hideOnlineModePanel;
+  document.getElementById('btnRankedSpeed').onclick = () => startRankedMatch('speed');
+  document.getElementById('btnRankedLeisure').onclick = () => startRankedMatch('leisure');
+  document.getElementById('btnUnranked').onclick = () => {
+    hideOnlineModePanel(true);
+    showOnlinePanel();
+  };
+  document.getElementById('btnCancelRanked').onclick = cancelRankedSearch;
+}
+
+function showOnlineModePanel() {
+  if (!onlineModePanelBuilt) buildOnlineModePanel();
+  document.getElementById('omode-name').value = netDisplayName;
+  document.getElementById('ranked-searching').classList.remove('show');
+  document.getElementById('online-mode-choices').style.display = '';
+  document.getElementById('online-mode-panel').classList.add('show');
+}
+
+// keepMode: don't reset the splash mode pill when chaining into the lobby
+function hideOnlineModePanel(keepMode) {
+  document.getElementById('online-mode-panel').classList.remove('show');
+  if (!keepMode) {
+    splashCfg.mode = 'vs-ai';
+    const modeEl = document.getElementById('sMode');
+    const btns = [...modeEl.querySelectorAll('button')];
+    btns.forEach(b => b.classList.toggle('sel', b.textContent === '1 Player'));
+    const track = modeEl.querySelector('.pill-track');
+    if (track) updatePillTrack(modeEl, track, btns);
+  }
+}
+
+async function startRankedMatch(rankedMode) {
+  if (!netDisplayName) { alert('Please enter a display name'); return; }
+  if (!initSupabase()) { alert('Online play is unavailable right now'); return; }
+  cleanupNet();
+  const tc = rankedMode === 'speed' ? '1m' : '1d';
+  const prof = loadProfile();
+
+  // Prefer joining an existing open ranked match of the same type.
+  const { data: open } = await sb.from('games').select('*')
+    .eq('status', 'waiting').neq('host_name', netDisplayName)
+    .order('created_at', { ascending: true });
+  const match = (open || []).find(g =>
+    g.settings && g.settings.ranked && g.settings.rankedMode === rankedMode);
+  if (match) {
+    joinBowlCfg.p2idx = prof.p1idx != null ? prof.p1idx : 2;
+    joinBowlCfg.p2design = prof.p1design != null ? prof.p1design : 0;
+    joinBowlCfg.p2bias = 1.0;
+    pendingJoinGameId = match.id;
+    confirmJoinLobby();
+    return;
+  }
+
+  // Otherwise host a new ranked match and wait for a quick-match opponent.
+  const settings = {
+    ends: 8, size: 3, biasVal: 1.0,
+    speedVal: 50, bendLeft: 50, bendRight: 50, bg: 'hardwood',
+    p1Color: prof.p1idx != null ? prof.p1idx : 0,
+    p1Design: prof.p1design != null ? prof.p1design : 0,
+    private: false, ranked: true, rankedMode,
+  };
+  const code = await createLobby(settings, tc);
+  if (!code) { alert('Could not create game'); return; }
+  shotClockLimit = getTimeControlMs(tc);
+  pendingHostGameId = code;
+  document.getElementById('online-mode-choices').style.display = 'none';
+  document.getElementById('ranked-searching').classList.add('show');
+  subscribeLobby(async () => {
+    if (!pendingHostGameId || !sb) return;
+    const { data } = await sb.from('games').select('*').eq('id', pendingHostGameId).single();
+    if (data && data.status === 'active' && data.guest_name) {
+      pendingHostGameId = null;
+      onGuestJoined(data);
+    }
+  });
+}
+
+async function cancelRankedSearch() {
+  if (pendingHostGameId) await deleteLobby(pendingHostGameId);
+  cleanupNet();
+  document.getElementById('ranked-searching').classList.remove('show');
+  document.getElementById('online-mode-choices').style.display = '';
+}
+
 function showOnlinePanel() {
   const panel = document.getElementById('online-panel');
   const nameInput = document.getElementById('lobby-name');
@@ -5045,6 +5192,12 @@ function showOnlinePanel() {
 
 function hideOnlinePanel() {
   document.getElementById('online-panel').classList.remove('show');
+  const modePanel = document.getElementById('online-mode-panel');
+  if (modePanel) {
+    modePanel.classList.remove('show');
+    document.getElementById('ranked-searching').classList.remove('show');
+    document.getElementById('online-mode-choices').style.display = '';
+  }
   unsubscribeLobby();
   if (lobbyClockInterval) { clearInterval(lobbyClockInterval); lobbyClockInterval = null; }
   splashCfg.mode = 'vs-ai';
@@ -5353,6 +5506,7 @@ function replayMoves(moves) {
 
 function applyOnlineSettings(s, seed) {
   if (!s) return;
+  onlineRanked = !!s.ranked;
   rngSeed = seed;
   splashCfg.ends = s.ends || 6;
   splashCfg.mode = 'online';
@@ -6084,7 +6238,7 @@ async function awardXP(won, conceded) {
   const lvlInfo = calcLevel(data.xp);
   data.level = lvlInfo.level;
 
-  if (mode === 'online') {
+  if (mode === 'online' && onlineRanked) {
     const oppElo = await getOpponentElo();
     data.elo = calcElo(oldElo, oppElo, won);
   }
