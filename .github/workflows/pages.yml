@@ -45,10 +45,13 @@ jobs:
             # Build number = commits since VERSION's major.minor last changed,
             # so it resets to 1 right after a release bump (v1.1.1, v1.1.2, …)
             # instead of climbing forever across version lines.
-            MM=$(git show origin/dev:short-mat-bowls.html | grep -m1 "const VERSION = " | sed -E "s/.*'([0-9]+\.[0-9]+)\.[0-9]+'.*/\1/")
+            # grep -m1 quits after the first match, which can SIGPIPE the
+            # upstream `git show` before it finishes writing — harmless, but
+            # pipefail would otherwise treat that as a failure, so swallow it.
+            MM=$(git show origin/dev:short-mat-bowls.html | grep -m1 "const VERSION = " | sed -E "s/.*'([0-9]+\.[0-9]+)\.[0-9]+'.*/\1/") || true
             BUILD_NUM=0
             for c in $(git rev-list origin/dev); do
-              cv=$(git show "$c:short-mat-bowls.html" 2>/dev/null | grep -m1 "const VERSION = " | sed -E "s/.*'([0-9]+\.[0-9]+)\.[0-9]+'.*/\1/")
+              cv=$(git show "$c:short-mat-bowls.html" 2>/dev/null | grep -m1 "const VERSION = " | sed -E "s/.*'([0-9]+\.[0-9]+)\.[0-9]+'.*/\1/") || true
               [ "$cv" = "$MM" ] || break
               BUILD_NUM=$((BUILD_NUM + 1))
             done
