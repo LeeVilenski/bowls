@@ -15,12 +15,12 @@ The beta build is patched at deploy time into a *separate* PWA: its service
 worker cache is `bowls-beta-v…` and its manifest name is "Short Mat Bowls
 (Beta)", so it installs alongside production and never shares a cache.
 
-The splash screen shows the live version (`v1.0.0`; beta appends a build stamp
-and `· BETA` in amber, e.g. `v1.0.0+42 · BETA`), so you can always tell which
-build you're looking at. The build stamp is an incrementing number — the
-commit count on `dev` at deploy time — the deploy workflow rewrites it into
-the beta build on every push, so each push to `dev` bumps a number you can
-read at a glance, even between version bumps.
+The splash screen shows the live version (`v1.0.0`; beta replaces the patch
+digit with a build number and appends `· BETA` in amber, e.g.
+`v1.0.597 · BETA`), so you can always tell which build you're looking at. The
+build number is the commit count on `dev` at deploy time — the deploy
+workflow rewrites it into the beta build on every push, so each push to `dev`
+bumps the number you can read at a glance, even between version bumps.
 
 ## Design principles
 

@@ -5055,9 +5055,8 @@ function buildSwatches(id, getIdx, setIdx) {
 function buildSplash() {
   const verEl = document.getElementById('splVersion');
   if (verEl) {
-    verEl.textContent = CHANNEL === 'beta'
-      ? `v${VERSION}${BUILD ? '+' + BUILD : ''} · BETA`
-      : `v${VERSION}`;
+    const betaVer = BUILD ? `${VERSION.split('.').slice(0, 2).join('.')}.${BUILD}` : VERSION;
+    verEl.textContent = CHANNEL === 'beta' ? `v${betaVer} · BETA` : `v${VERSION}`;
     verEl.classList.toggle('beta', CHANNEL === 'beta');
   }
 
