@@ -2287,7 +2287,10 @@ function replayEntryRect() {
 // where it never covers the mat or the swipe zone.
 function replaySideRect() { return { x: 23 - PANEL_BTN.w / 2, y: 224, w: PANEL_BTN.w, h: PANEL_BTN.h }; }
 function replaySideAvailable() {
-  return mode !== 'online' && replayShots.length > 0 && !replayActive && state === 'aim';
+  // Online included: frames are recorded for both players' deliveries
+  // regardless of mode, so a watcher waiting on the opponent's turn can
+  // still review the last shot.
+  return replayShots.length > 0 && !replayActive && state === 'aim';
 }
 
 function drawReplay() {
@@ -2415,7 +2418,7 @@ function drawOverlayUI() {
   const btnW = 156, btnH = 84, btnR = 12;
   const btnY = H - 80;
 
-  // Fire mode button (left side) — only during local aim
+  // Fire mode button (left side) — only when it's actually your delivery
   if (state === 'aim' && !(mode==='online' && playerForTurn(turnIdx)!==localPlayer)) {
     const fx = btnW/2 + 6, fy = btnY;
     ctx.save();
@@ -2427,8 +2430,12 @@ function drawOverlayUI() {
     ctx.fillStyle = fireModeActive ? '#fff' : '#fca5a5';
     ctx.font = 'bold 22px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(fireModeActive ? 'FIRE ●' : 'FIRE', fx, fy);
+  }
 
-    // Show Head button (right side) — toggles overhead top-down view
+  // Head button (right side) — toggles overhead top-down view. Available
+  // throughout aim, including while waiting on the opponent's online turn,
+  // so you can check the head while it's not your shot.
+  if (state === 'aim') {
     const hx = W - btnW/2 - 6, hy = btnY;
     ctx.save();
     ctx.shadowColor = headOverlay ? 'rgba(13,148,136,0.5)' : 'rgba(0,0,0,0.4)';
@@ -4888,6 +4895,11 @@ function processPendingMoves() {
 }
 
 function applyRemoteMove(move) {
+  // The opponent's shot always takes priority — if it lands while we're
+  // browsing the replay viewer, drop out cleanly first so replayActive
+  // doesn't get stuck true (deliverBowl below overwrites `state` directly,
+  // bypassing exitReplay's own state restore).
+  if (state === 'replay' && (move.type === 'shot' || move.type === 'jack')) exitReplay();
   if (move.type === 'jack') {
     jack = { x: move.data.x, y: move.data.y, vx:0, vy:0, stopped:true, offMat:false, offSide:false, inDitch:false };
     beginTurns();
@@ -4937,6 +4949,7 @@ let _shotPreviewApplied = false;
 function onShotPreview(payload) {
   if (payload.player === localPlayer) return;
   if (state === 'moving' || state === 'camera-return') return;
+  if (state === 'replay') exitReplay();   // opponent's shot always interrupts the replay viewer
   _shotPreviewApplied = true;
   _remoteResultSnap = null;
   setBiasDir(payload.player, payload.biasDir);
