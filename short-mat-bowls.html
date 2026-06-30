@@ -507,25 +507,46 @@ button:active { opacity: .7; }
   padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
 }
 #online-mode-panel.show { display: flex; }
-#online-mode-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
+#online-mode-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; }
+#online-mode-choices { display: flex; flex-direction: column; gap: 10px; }
+.omode-group-label {
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.4px;
+  color: #475569; margin: 6px 2px -2px;
+}
 .omode-btn {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-  padding: 14px 16px; border-radius: 12px; border: 1px solid #334155;
+  display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box;
+  padding: 14px 16px; border-radius: 14px; border: 1px solid #1e293b;
   background: #111827; color: #e2e8f0; text-align: left; cursor: pointer;
-  transition: border-color .15s, background .15s;
+  transition: border-color .15s, background .15s, transform .08s;
 }
 .omode-btn:hover { border-color: #3b82f6; }
-.omode-btn.ranked { border-color: #3f3a14; background: #15130a; }
-.omode-btn.ranked:hover { border-color: #eab308; }
+.omode-btn:active { transform: scale(.99); }
+.omode-icon {
+  flex-shrink: 0; width: 42px; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; font-size: 21px;
+  background: #1e293b;
+}
+.omode-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.omode-row { display: flex; align-items: center; gap: 8px; }
 .omode-btn-title { font-size: 16px; font-weight: 800; }
+.omode-btn-sub { font-size: 11px; color: #94a3b8; font-weight: 500; line-height: 1.35; }
+.omode-chev { flex-shrink: 0; color: #475569; font-size: 22px; line-height: 1; font-weight: 700; }
+.omode-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px;
+  background: #1e293b; color: #94a3b8; border: 1px solid #334155;
+}
+.omode-btn.ranked { border-color: #3a341a; background: linear-gradient(135deg, #16140b, #111827 60%); }
+.omode-btn.ranked:hover { border-color: #eab308; }
+.omode-btn.ranked .omode-icon { background: #2a2410; color: #fbbf24; }
 .omode-btn.ranked .omode-btn-title { color: #fbbf24; }
-.omode-btn-sub { font-size: 11px; color: #94a3b8; font-weight: 500; }
+.omode-btn.ranked .omode-badge { background: #2a2410; color: #fbbf24; border-color: #3a341a; }
 #ranked-searching { display: none; flex-direction: column; align-items: center; gap: 14px; padding: 30px 0; }
 #ranked-searching.show { display: flex; }
 #ranked-searching-msg { font-size: 14px; color: #94a3b8; }
 #online-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
 .online-title { font-size: 20px; font-weight: 800; text-align: center; padding: 6px 0; }
-#online-back {
+#online-back, #online-mode-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; align-self: flex-start;
 }
@@ -848,18 +869,32 @@ button:active { opacity: .7; }
     <div id="omode-name-row" class="lobby-name-row">
       <input type="text" id="omode-name" placeholder="Your display name" maxlength="20" autocomplete="off">
     </div>
-    <div id="online-mode-choices" style="display:flex;flex-direction:column;gap:10px">
+    <div id="online-mode-choices">
+      <span class="omode-group-label">Ranked</span>
       <button class="omode-btn ranked" id="btnRankedSpeed">
-        <span class="omode-btn-title">Ranked Speed</span>
-        <span class="omode-btn-sub">8 ends · 1 minute per shot · affects your rating</span>
+        <span class="omode-icon">⚡</span>
+        <span class="omode-text">
+          <span class="omode-row"><span class="omode-btn-title">Speed</span><span class="omode-badge">Rated</span></span>
+          <span class="omode-btn-sub">8 ends · 1 minute per shot · live</span>
+        </span>
+        <span class="omode-chev">›</span>
       </button>
       <button class="omode-btn ranked" id="btnRankedLeisure">
-        <span class="omode-btn-title">Ranked Leisure</span>
-        <span class="omode-btn-sub">Async · 8 ends · 1 day per shot · create &amp; pick up games · affects rating</span>
+        <span class="omode-icon">☕</span>
+        <span class="omode-text">
+          <span class="omode-row"><span class="omode-btn-title">Leisure</span><span class="omode-badge">Rated</span></span>
+          <span class="omode-btn-sub">8 ends · 1 day per shot · async pick-up games</span>
+        </span>
+        <span class="omode-chev">›</span>
       </button>
+      <span class="omode-group-label">Casual</span>
       <button class="omode-btn" id="btnUnranked">
-        <span class="omode-btn-title">Unranked</span>
-        <span class="omode-btn-sub">Custom games · public or private · no rating change</span>
+        <span class="omode-icon">🎯</span>
+        <span class="omode-text">
+          <span class="omode-row"><span class="omode-btn-title">Unranked</span></span>
+          <span class="omode-btn-sub">Custom games · public or private · no rating change</span>
+        </span>
+        <span class="omode-chev">›</span>
       </button>
     </div>
     <div id="ranked-searching">
