@@ -17,10 +17,10 @@ worker cache is `bowls-beta-v…` and its manifest name is "Short Mat Bowls
 
 The splash screen shows the live version (`v1.0.0`; beta replaces the patch
 digit with a build number and appends `· BETA` in amber, e.g.
-`v1.0.597 · BETA`), so you can always tell which build you're looking at. The
-build number is the commit count on `dev` at deploy time — the deploy
-workflow rewrites it into the beta build on every push, so each push to `dev`
-bumps the number you can read at a glance, even between version bumps.
+`v1.0.7 · BETA`), so you can always tell which build you're looking at. The
+build number is the commit count on `dev` since `VERSION`'s major.minor last
+changed — the deploy workflow recomputes it on every push, so it bumps by one
+each push and resets to 1 right after the next version bump.
 
 ## Design principles
 

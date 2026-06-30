@@ -42,7 +42,16 @@ jobs:
           # Test channel = dev, served at /beta/ with isolated cache + name so
           # it installs as a separate PWA and can't evict the production cache.
           if git rev-parse --verify origin/dev >/dev/null 2>&1; then
-            BUILD_NUM=$(git rev-list --count origin/dev)
+            # Build number = commits since VERSION's major.minor last changed,
+            # so it resets to 1 right after a release bump (v1.1.1, v1.1.2, …)
+            # instead of climbing forever across version lines.
+            MM=$(git show origin/dev:short-mat-bowls.html | grep -m1 "const VERSION = " | sed -E "s/.*'([0-9]+\.[0-9]+)\.[0-9]+'.*/\1/")
+            BUILD_NUM=0
+            for c in $(git rev-list origin/dev); do
+              cv=$(git show "$c:short-mat-bowls.html" 2>/dev/null | grep -m1 "const VERSION = " | sed -E "s/.*'([0-9]+\.[0-9]+)\.[0-9]+'.*/\1/")
+              [ "$cv" = "$MM" ] || break
+              BUILD_NUM=$((BUILD_NUM + 1))
+            done
             mkdir -p _site/beta
             git archive origin/dev | tar -x -C _site/beta
             sed -i "s/bowls-v/bowls-beta-v/" _site/beta/sw.js
