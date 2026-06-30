@@ -149,12 +149,12 @@ button:active { opacity: .7; }
   border: 2px solid #334155; width: 100%; letter-spacing: 0.3px;
 }
 #btnResume:hover { border-color: #475569; color: #e2e8f0; }
-#btnAch, #btnProfile {
+#btnAch, #btnProfile, #btnHistory {
   padding: 10px; font-size: 13px; font-weight: 700;
   background: #1e293b; color: #94a3b8; border-radius: 10px;
   border: 1px solid #334155; width: 100%; margin-top: -4px;
 }
-#btnAch:hover, #btnProfile:hover { background: #334155; color: #e2e8f0; }
+#btnAch:hover, #btnProfile:hover, #btnHistory:hover { background: #334155; color: #e2e8f0; }
 
 #game-settings-panel {
   position: fixed; inset: 0; z-index: 250; background: #0a0f1e;
@@ -198,6 +198,24 @@ button:active { opacity: .7; }
 }
 #profile-panel.show { display: flex; }
 #profile-inner { width: 100%; max-width: 440px; }
+#history-panel {
+  position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none; flex-direction: column; align-items: center;
+  padding: max(env(safe-area-inset-top),12px) 14px max(env(safe-area-inset-bottom),16px);
+}
+#history-panel.show { display: flex; }
+#history-inner { width: 100%; max-width: 440px; }
+#history-back {
+  padding: 6px 14px; font-size: 12px; background: #1e293b; color: #94a3b8;
+  border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
+}
+.hist-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.hist-tab {
+  flex: 1; padding: 10px; font-size: 13px; font-weight: 700;
+  background: #111827; color: #94a3b8; border: 1px solid #1e293b; border-radius: 10px;
+}
+.hist-tab.sel { background: #1e293b; color: #e2e8f0; border-color: #3b82f6; }
 #game-settings-back, #profile-back {
   padding: 6px 14px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
@@ -718,6 +736,7 @@ button:active { opacity: .7; }
     <button id="btnStart">Start Game</button>
     <button id="btnResume" style="display:none">Resume Game</button>
     <button id="btnProfile">👤 Profile</button>
+    <button id="btnHistory">📜 History</button>
     <button id="btnAch">🏆 Achievements</button>
     <button id="btnLeaderboard">📊 Rankings</button>
     <button id="btnTournaments">🏆 Tournaments</button>
@@ -821,10 +840,19 @@ button:active { opacity: .7; }
       <div class="spl-head">🏆 Tournaments</div>
       <div id="profile-tour-stats"></div>
     </div>
-    <div class="spl-card">
-      <div class="spl-head">Match History</div>
-      <div id="profile-history"></div>
+  </div>
+</div>
+
+<div id="history-panel">
+  <div id="history-inner">
+    <button id="history-back">&larr; Back</button>
+    <div class="profile-title">📜 History</div>
+    <div class="hist-tabs">
+      <button class="hist-tab sel" data-tab="matches">Matches</button>
+      <button class="hist-tab" data-tab="tours">Tournaments</button>
     </div>
+    <div id="history-matches" class="hist-tabpane"></div>
+    <div id="history-tours" class="hist-tabpane" style="display:none"></div>
   </div>
 </div>
 
@@ -6264,7 +6292,7 @@ function statRow(label, val) {
 }
 
 function renderMatchHistory() {
-  const el = document.getElementById('profile-history');
+  const el = document.getElementById('history-matches');
   const history = loadHistory();
   if (!history.length) { el.innerHTML = '<div class="hist-empty">No games played yet</div>'; return; }
   el.innerHTML = '';
@@ -6615,7 +6643,6 @@ function showProfilePanel() {
   buildProfilePanel();
   renderProfileStats();
   renderTourProfileStats();
-  renderMatchHistory();
   renderXPCard();
   updateAuthUI();
   document.getElementById('profile-panel').classList.add('show');
@@ -6626,6 +6653,45 @@ document.getElementById('profile-back').onclick = () => {
   document.getElementById('profile-panel').classList.remove('show');
   applyProfileToSplash();
 };
+
+// ── History (match results + past tournaments) ──────────────────
+function setHistoryTab(tab) {
+  document.querySelectorAll('#history-panel .hist-tab').forEach(b =>
+    b.classList.toggle('sel', b.dataset.tab === tab));
+  document.getElementById('history-matches').style.display = tab === 'tours' ? 'none' : '';
+  document.getElementById('history-tours').style.display = tab === 'tours' ? '' : 'none';
+}
+
+function renderHistoryTours() {
+  const el = document.getElementById('history-tours');
+  const arch = loadTourArchive();
+  if (!arch.length) { el.innerHTML = '<div class="hist-empty">No tournaments played yet</div>'; return; }
+  el.innerHTML = arch.map(t => {
+    const champ = escHtml(compName(t, t.champion));
+    const d = new Date(t.archivedAt || Date.now());
+    const dateStr = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    const type = t.format === 'knockout' ? 'Knockout' : 'Round Robin';
+    return `<div class="tour-arch-row" data-arch="${escHtml(t.id)}">` +
+      `<span class="tour-arch-info"><strong>${escHtml(t.name)}</strong><br>` +
+      `<small>${type} · ${t.competitors.length} players · ${dateStr}</small></span>` +
+      `<span class="tour-arch-champ">🏆 ${champ}</span></div>`;
+  }).join('');
+  el.querySelectorAll('[data-arch]').forEach(r =>
+    r.onclick = () => openArchivedTour(r.getAttribute('data-arch'), () => showHistoryPanel('tours')));
+}
+
+function showHistoryPanel(tab) {
+  renderMatchHistory();
+  renderHistoryTours();
+  setHistoryTab(tab || 'matches');
+  document.getElementById('history-panel').classList.add('show');
+}
+
+document.getElementById('btnHistory').onclick = () => showHistoryPanel('matches');
+document.getElementById('history-back').onclick = () =>
+  document.getElementById('history-panel').classList.remove('show');
+document.querySelectorAll('#history-panel .hist-tab').forEach(b =>
+  b.onclick = () => setHistoryTab(b.dataset.tab));
 
 function applyProfileToSplash() {
   const prof = loadProfile();
@@ -6836,6 +6902,7 @@ function restoreTour() {
 const TOUR_ARCHIVE_KEY = 'bowls_tour_archive';
 const TOUR_ARCHIVE_MAX = 30;
 let tourView = null;        // an archived tournament being viewed read-only, or null
+let tourViewReturn = null;  // where to return when leaving the read-only archive view
 function loadTourArchive() { try { return JSON.parse(localStorage.getItem(TOUR_ARCHIVE_KEY)) || []; } catch { return []; } }
 function saveTourArchive(a) { localStorage.setItem(TOUR_ARCHIVE_KEY, JSON.stringify(a)); }
 function archiveTour(t) {
@@ -7133,7 +7200,6 @@ function renderTourSetup() {
     `<div class="spl-card"><div class="spl-head">Competitors <span id="tour-comp-count" style="color:#64748b;font-weight:600"></span></div>` +
       `<div id="tour-comp-list"></div>` +
       `<div class="tour-add-row"><button class="tour-add" id="tour-add-human">+ Human</button><button class="tour-add" id="tour-add-ai">+ AI</button></div></div>` +
-    renderPastTournaments() +
     `<button id="tour-create">Create Tournament</button>`;
   document.getElementById('tour-name').oninput = e => s.name = e.target.value;
   seg('tour-format', [['Round Robin', 'round-robin'], ['Knockout', 'knockout']], () => s.format, v => s.format = v);
@@ -7142,26 +7208,7 @@ function renderTourSetup() {
   document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
   document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
   document.getElementById('tour-create').onclick = createTournament;
-  document.querySelectorAll('[data-arch]').forEach(r =>
-    r.onclick = () => openArchivedTour(r.getAttribute('data-arch')));
   renderTourComps();
-}
-
-function renderPastTournaments() {
-  const arch = loadTourArchive();
-  if (!arch.length) return '';
-  let h = `<div class="spl-card"><div class="spl-head">Past Tournaments <span style="color:#64748b;font-weight:600">(${arch.length})</span></div>`;
-  arch.forEach(t => {
-    const champ = escHtml(compName(t, t.champion));
-    const d = new Date(t.archivedAt || Date.now());
-    const dateStr = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-    const type = t.format === 'knockout' ? 'Knockout' : 'Round Robin';
-    h += `<div class="tour-arch-row" data-arch="${escHtml(t.id)}">` +
-      `<span class="tour-arch-info"><strong>${escHtml(t.name)}</strong><br>` +
-      `<small>${type} · ${t.competitors.length} players · ${dateStr}</small></span>` +
-      `<span class="tour-arch-champ">🏆 ${champ}</span></div>`;
-  });
-  return h + `</div>`;
 }
 
 function renderTourComps() {
@@ -7271,15 +7318,24 @@ function openTourHub() {
   syncTourBtn();
 }
 
-// Read-only view of a finished tournament from the archive.
-function openArchivedTour(id) {
+// Read-only view of a finished tournament from the archive. returnFn is called
+// when leaving the view (back / delete) so it can land back where it was opened.
+function openArchivedTour(id, returnFn) {
   const t = loadTourArchive().find(x => x && x.id === id);
   if (!t) return;
   tourView = t;
+  tourViewReturn = returnFn || null;
   hideTourPanels();
   renderTourHub();
   document.getElementById('splash').classList.remove('hidden');
   document.getElementById('tournament-hub-panel').classList.add('show');
+}
+
+function leaveArchiveView() {
+  const r = tourViewReturn;
+  tourView = null; tourViewReturn = null;
+  document.getElementById('tournament-hub-panel').classList.remove('show');
+  (r || openTourSetup)();
 }
 
 function roundName(count) {
@@ -7357,7 +7413,7 @@ function renderTourHub() {
   if (del) del.onclick = () => {
     if (!confirm('Delete this tournament from history?')) return;
     saveTourArchive(loadTourArchive().filter(x => x.id !== t.id));
-    tourView = null; hideTourPanels(); openTourSetup();
+    leaveArchiveView();
     try { syncPlayerToServer(loadXP()); } catch {}
   };
 }
@@ -7384,7 +7440,7 @@ function initTournaments() {
   };
   document.getElementById('tour-setup-back').onclick = () => document.getElementById('tournament-setup-panel').classList.remove('show');
   document.getElementById('tour-hub-back').onclick = () => {
-    if (tourView) { tourView = null; openTourSetup(); }
+    if (tourView) leaveArchiveView();
     else document.getElementById('tournament-hub-panel').classList.remove('show');
   };
 }
