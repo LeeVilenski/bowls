@@ -1063,8 +1063,11 @@ button:active { opacity: .7; }
 // Bump VERSION on every production release and keep sw.js CACHE in step
 // (cache name is 'bowls-v' + VERSION). CHANNEL is 'prod' in source; the
 // Pages deploy workflow rewrites it to 'beta' for the /beta/ test build.
+// BUILD is '' in source — the deploy workflow stamps it with the short
+// commit SHA of `dev` on every beta build, so each push to dev is visible.
 const VERSION = '1.0.0';
 const CHANNEL = 'prod';
+const BUILD = '';
 
 // ── Canvas & core layout ─────────────────────────────────────────
 const canvas = document.getElementById('canvas');
@@ -5051,7 +5054,9 @@ function buildSwatches(id, getIdx, setIdx) {
 function buildSplash() {
   const verEl = document.getElementById('splVersion');
   if (verEl) {
-    verEl.textContent = CHANNEL === 'beta' ? `v${VERSION} · BETA` : `v${VERSION}`;
+    verEl.textContent = CHANNEL === 'beta'
+      ? `v${VERSION}${BUILD ? '+' + BUILD : ''} · BETA`
+      : `v${VERSION}`;
     verEl.classList.toggle('beta', CHANNEL === 'beta');
   }
 
