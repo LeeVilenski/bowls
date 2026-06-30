@@ -1,71 +1,104 @@
 # Releasing
 
-Short Mat Bowls ships as **two channels on one GitHub Pages site**:
+Short Mat Bowls ships as **two channels from one GitHub Pages site**:
 
 | Channel | URL | Built from | Changes when |
 |---------|-----|-----------|--------------|
-| **Production** | https://leevilenski.github.io/bowls/ | `main` | you merge to `main` |
-| **Beta (test)** | https://leevilenski.github.io/bowls/beta/short-mat-bowls.html | `dev` | you push to `dev` |
+| **Production** | https://leevilenski.github.io/bowls/ | `main` | a release PR merges into `main` |
+| **Beta (test)** | https://leevilenski.github.io/bowls/beta/short-mat-bowls.html | `dev` | anything lands on `dev` |
 
 `.github/workflows/pages.yml` rebuilds the whole site on every push to either
 branch. **Production is always taken from `origin/main`**, so it only changes
-when `main` changes — pushing to `dev` can never alter it.
+when `main` changes — work on `dev` can never alter it.
 
 The beta build is patched at deploy time into a *separate* PWA: its service
 worker cache is `bowls-beta-v…` and its manifest name is "Short Mat Bowls
 (Beta)", so it installs alongside production and never shares a cache.
 
-The splash screen shows the live version (`v1.0.0`, beta adds `· BETA` in
+The splash screen shows the live version (`v1.0.0`; beta appends `· BETA` in
 amber), so you can always tell which build you're looking at.
+
+## Design principles
+
+- **`dev` is a sandbox.** Break it freely; only beta is affected. Fix forward.
+- **`main` is production and protected.** It changes only through a reviewed,
+  revertible release PR — never a direct push.
+- **Everything is reversible.** Every release is a tagged commit reached via a
+  PR, so any prior state can be restored with another PR. No step here rewrites
+  history or is destructive.
 
 ## One-time setup
 
 1. **Settings → Pages → Source = "GitHub Actions"** (not "Deploy from a branch").
 2. **Settings → Environments → `github-pages` → "Deployment branches and tags":**
-   allow **both `main` and `dev`**.
-   Without this, `dev` deploys fail with *"branch dev is not allowed to deploy
-   to github-pages"*. This is safe — production content is always built from
-   `main` no matter which branch triggered the run.
+   allow **both `main` and `dev`** (the `dev` rule must be lowercase to match
+   the branch). Without this, `dev` deploys fail with *"branch dev is not
+   allowed to deploy to github-pages"*. Safe, because production content is
+   always built from `main` regardless of which branch triggered the run.
+3. **Settings → General → Default branch:** set to **`dev`**, so new work
+   starts on the test channel by default.
+4. **Settings → Branches → protect `main`:** "Require a pull request before
+   merging" (0 required approvals is fine for solo). Optionally tick "Do not
+   allow bypassing the above settings" for a hard stop against accidental
+   direct pushes to production.
 
 ## Day-to-day (test channel)
 
 ```sh
-git checkout dev
+git switch dev
+git pull
 # ...make changes...
-git push                      # → /beta/ redeploys, production untouched
+git commit -am "Try a new bias curve"
+git push                      # → /beta/ redeploys in ~1 min; production untouched
 ```
 
-Open the beta URL on your phone, **Add to Home Screen** to install "Bowls β"
-alongside the production app, and test.
+Open the beta URL on your phone (**Add to Home Screen** to install "Bowls β"
+alongside production) and test. Iterate on `dev` until it works — a broken
+`dev` only ever affects beta, never the live app.
 
 ## Cutting a release
 
+Release **only when the tested `dev` build is confirmed good.** Because `main`
+is protected, a release goes through a PR — reviewable and revertible.
+
 ```sh
-git checkout main && git pull
-git merge dev                       # bring tested changes into production
-./scripts/bump-version.sh 1.1.0     # updates VERSION + sw.js cache together
+# 1. Bump the version on dev (keeps dev and main in lockstep)
+git switch dev && git pull
+./scripts/bump-version.sh 1.1.0     # updates splash VERSION + sw.js cache name
 git commit -am "Release v1.1.0"
-git tag v1.1.0
-git push && git push --tags         # → production redeploys at the new version
-```
-
-Use [semver](https://semver.org/): patch (`1.0.x`) for fixes, minor (`1.x.0`)
-for features, major (`x.0.0`) for breaking changes. The git tag is your
-rollback point.
-
-## Rolling back
-
-Safest — revert the bad commit so history stays linear:
-
-```sh
-git checkout main
-git revert <bad-commit>             # then bump-version + push as a new release
 git push
 ```
 
-Or hard-reset to a known-good tag (rewrites history, use with care):
+```
+# 2. Open and merge the release PR
+#    GitHub → Pull requests → New → base: main  ←  compare: dev → merge
+#    Production redeploys at v1.1.0 once it merges.
+```
 
 ```sh
-git reset --hard v1.0.0
-git push --force-with-lease
+# 3. Tag the release commit so the version is a recoverable point
+git switch main && git pull
+git tag v1.1.0
+git push --tags
 ```
+
+Use [semver](https://semver.org/): patch (`1.0.x`) for fixes, minor (`1.x.0`)
+for features, major (`x.0.0`) for breaking changes.
+
+## Rolling back
+
+Every release is tagged, so the last good state is always recoverable. Roll
+back the same way you release — through a PR, so it stays reviewed and leaves a
+clear history:
+
+```sh
+# Restore the known-good app files from the last good tag onto a branch
+git switch -c rollback-to-v1.0.0 main
+git checkout v1.0.0 -- short-mat-bowls.html sw.js
+git commit -am "Roll back to v1.0.0"
+git push -u origin rollback-to-v1.0.0
+# Open a PR from rollback-to-v1.0.0 into main and merge → production reverts.
+```
+
+This needs no force-push and works even with `main` fully protected. It only
+touches the two versioned files, so your docs and workflow stay current.
