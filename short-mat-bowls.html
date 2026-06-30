@@ -336,6 +336,16 @@ button:active { opacity: .7; }
 #tournament-setup-panel.show, #tournament-hub-panel.show { display: flex; }
 #tour-setup-inner, #tour-hub-inner { width: 100%; max-width: 440px; }
 #tour-setup-inner { padding-bottom: 80px; }
+#tour-hub-inner { padding-bottom: 150px; }
+#tour-hub-actions {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 310;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 14px max(env(safe-area-inset-bottom),14px);
+  background: linear-gradient(to top, #0a0f1e 72%, rgba(10,15,30,0));
+  pointer-events: none;
+}
+.tour-actions-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+.tour-actions-inner .tour-btn { margin-top: 0; }
 #tour-setup-back, #tour-hub-back {
   padding: 8px 16px; font-size: 12px; background: #1e293b; color: #94a3b8;
   border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px;
@@ -373,6 +383,15 @@ button:active { opacity: .7; }
 }
 .tour-btn-secondary { padding: 11px; font-size: 13px; font-weight: 700;
   background: #1e293b; color: #f87171; border: 1px solid #334155; border-radius: 10px; width: 100%; }
+.tour-arch-row { display: flex; align-items: center; gap: 10px; padding: 11px 4px;
+  cursor: pointer; border-bottom: 1px solid #1e293b; }
+.tour-arch-row:last-child { border-bottom: none; }
+.tour-arch-info { flex: 1; min-width: 0; font-size: 13px; color: #cbd5e1; line-height: 1.4;
+  overflow: hidden; }
+.tour-arch-info strong { font-weight: 700; }
+.tour-arch-info small { color: #64748b; }
+.tour-arch-champ { flex: 0 0 auto; font-size: 12px; font-weight: 700; color: #fbbf24;
+  max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .tour-comp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; }
 .tour-comp-kind { font-size: 16px; flex: 0 0 auto; }
 .tour-comp-name { flex: 1; min-width: 0; background: #0f172a; border: 1px solid #334155;
@@ -1002,6 +1021,7 @@ button:active { opacity: .7; }
     <button id="tour-hub-back">&larr; Back</button>
     <div id="tour-hub-content"></div>
   </div>
+  <div id="tour-hub-actions"></div>
 </div>
 
 <script>
@@ -6359,20 +6379,22 @@ async function syncPlayerToServer(data) {
     level: data.level,
     elo: data.elo
   };
-  try {
-    const extended = Object.assign({}, row, {
-      match_history: loadHistory(),
-      stats: loadStats(),
-      profile: loadProfile()
-    });
-    const { error } = await sb.from('players').upsert(extended, { onConflict: 'device_id' });
+  const extras = {
+    match_history: loadHistory(),
+    stats: loadStats(),
+    profile: loadProfile()
+  };
+  // Try richest payload first and degrade gracefully if a column is missing
+  // (e.g. tour_archive not yet added to the table) so the rest still syncs.
+  const attempts = [
+    Object.assign({}, row, extras, { tour_archive: loadTourArchive() }),
+    Object.assign({}, row, extras),
+    row
+  ];
+  for (let i = 0; i < attempts.length; i++) {
+    const { error } = await sb.from('players').upsert(attempts[i], { onConflict: 'device_id' });
     if (!error) { updateAuthSyncStatus('synced'); return; }
-    throw error;
-  } catch {
-    await sb.from('players').upsert(row, { onConflict: 'device_id' }).then(({ error }) => {
-      if (error) console.error('syncPlayer', error);
-      else updateAuthSyncStatus('synced');
-    });
+    if (i === attempts.length - 1) console.error('syncPlayer', error);
   }
 }
 
@@ -6467,6 +6489,9 @@ async function restoreFromCloud(user) {
         const localStats = loadStats();
         const merged = mergeStats(localStats, cloud.stats);
         saveStats(merged);
+      }
+      if (cloud.tour_archive && Array.isArray(cloud.tour_archive)) {
+        saveTourArchive(mergeTourArchives(loadTourArchive(), cloud.tour_archive));
       }
       if (cloud.profile && typeof cloud.profile === 'object') {
         const localProf = loadProfile();
@@ -6806,6 +6831,35 @@ function restoreTour() {
   if (s && s.tour) { activeTour = s.tour; activeTourMatch = s.live || null; }
 }
 
+// Finished tournaments are kept in a local archive (and best-effort cloud
+// backup) so the standings/fixtures survive starting a new tournament.
+const TOUR_ARCHIVE_KEY = 'bowls_tour_archive';
+const TOUR_ARCHIVE_MAX = 30;
+let tourView = null;        // an archived tournament being viewed read-only, or null
+function loadTourArchive() { try { return JSON.parse(localStorage.getItem(TOUR_ARCHIVE_KEY)) || []; } catch { return []; } }
+function saveTourArchive(a) { localStorage.setItem(TOUR_ARCHIVE_KEY, JSON.stringify(a)); }
+function archiveTour(t) {
+  if (!t || t.status !== 'finished') return;
+  const snap = JSON.parse(JSON.stringify(t));
+  snap.archivedAt = snap.archivedAt || Date.now();
+  const a = loadTourArchive();
+  const i = a.findIndex(x => x && x.id === snap.id);
+  if (i >= 0) a[i] = snap; else a.unshift(snap);
+  a.sort((x, y) => (y.archivedAt || 0) - (x.archivedAt || 0));
+  saveTourArchive(a.slice(0, TOUR_ARCHIVE_MAX));
+  try { syncPlayerToServer(loadXP()); } catch {}   // best-effort cloud backup
+}
+function mergeTourArchives(local, cloud) {
+  const byId = {};
+  [...(local || []), ...(cloud || [])].forEach(t => {
+    if (!t || !t.id) return;
+    if (!byId[t.id] || (t.archivedAt || 0) > (byId[t.id].archivedAt || 0)) byId[t.id] = t;
+  });
+  return Object.values(byId)
+    .sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0))
+    .slice(0, TOUR_ARCHIVE_MAX);
+}
+
 function compById(t, id) { return t.competitors.find(c => c.id === id) || null; }
 function matchById(t, id) { return t.matches.find(m => m.id === id) || null; }
 function compName(t, id) { if (id === 'BYE') return 'Bye'; if (!id) return 'TBD'; const c = compById(t, id); return c ? c.name : '?'; }
@@ -6943,6 +6997,7 @@ function checkTourComplete(t) {
     const champ = compById(t, t.champion);
     if (champ && champ.kind === 'human') ts.won++;
     saveTourStats(ts);
+    archiveTour(t);
   }
 }
 
@@ -7047,6 +7102,7 @@ function finishTourMatchReturn() {
 
 // ── Setup form ────────────────────────────────────────────────────
 function openTourSetup() {
+  tourView = null;
   hideTourPanels();
   const prof = loadProfile();
   const myName = (localStorage.getItem('bowls_name') || '').trim() || 'You';
@@ -7077,6 +7133,7 @@ function renderTourSetup() {
     `<div class="spl-card"><div class="spl-head">Competitors <span id="tour-comp-count" style="color:#64748b;font-weight:600"></span></div>` +
       `<div id="tour-comp-list"></div>` +
       `<div class="tour-add-row"><button class="tour-add" id="tour-add-human">+ Human</button><button class="tour-add" id="tour-add-ai">+ AI</button></div></div>` +
+    renderPastTournaments() +
     `<button id="tour-create">Create Tournament</button>`;
   document.getElementById('tour-name').oninput = e => s.name = e.target.value;
   seg('tour-format', [['Round Robin', 'round-robin'], ['Knockout', 'knockout']], () => s.format, v => s.format = v);
@@ -7085,7 +7142,26 @@ function renderTourSetup() {
   document.getElementById('tour-add-human').onclick = () => { if (s.comps.length < 8) { s.comps.push({ kind: 'human', name: 'Player ' + (s.comps.length + 1), aiLevel: 1, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
   document.getElementById('tour-add-ai').onclick = () => { if (s.comps.length < 8) { const l = Math.min(s.comps.length % 4, 3); s.comps.push({ kind: 'ai', name: AI_PLAYERS[l].name, aiLevel: l, bowlIdx: s.comps.length % BOWL_COLOURS.length, designIdx: 0, biasVal: 1.0 }); renderTourComps(); } };
   document.getElementById('tour-create').onclick = createTournament;
+  document.querySelectorAll('[data-arch]').forEach(r =>
+    r.onclick = () => openArchivedTour(r.getAttribute('data-arch')));
   renderTourComps();
+}
+
+function renderPastTournaments() {
+  const arch = loadTourArchive();
+  if (!arch.length) return '';
+  let h = `<div class="spl-card"><div class="spl-head">Past Tournaments <span style="color:#64748b;font-weight:600">(${arch.length})</span></div>`;
+  arch.forEach(t => {
+    const champ = escHtml(compName(t, t.champion));
+    const d = new Date(t.archivedAt || Date.now());
+    const dateStr = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    const type = t.format === 'knockout' ? 'Knockout' : 'Round Robin';
+    h += `<div class="tour-arch-row" data-arch="${escHtml(t.id)}">` +
+      `<span class="tour-arch-info"><strong>${escHtml(t.name)}</strong><br>` +
+      `<small>${type} · ${t.competitors.length} players · ${dateStr}</small></span>` +
+      `<span class="tour-arch-champ">🏆 ${champ}</span></div>`;
+  });
+  return h + `</div>`;
 }
 
 function renderTourComps() {
@@ -7187,11 +7263,23 @@ function createTournament() {
 // ── Hub ───────────────────────────────────────────────────────────
 function openTourHub() {
   if (!activeTour) { openTourSetup(); return; }
+  tourView = null;
   hideTourPanels();
   renderTourHub();
   document.getElementById('splash').classList.remove('hidden');
   document.getElementById('tournament-hub-panel').classList.add('show');
   syncTourBtn();
+}
+
+// Read-only view of a finished tournament from the archive.
+function openArchivedTour(id) {
+  const t = loadTourArchive().find(x => x && x.id === id);
+  if (!t) return;
+  tourView = t;
+  hideTourPanels();
+  renderTourHub();
+  document.getElementById('splash').classList.remove('hidden');
+  document.getElementById('tournament-hub-panel').classList.add('show');
 }
 
 function roundName(count) {
@@ -7228,7 +7316,8 @@ function renderStandings(t) {
 }
 
 function renderTourHub() {
-  const t = activeTour;
+  const t = tourView || activeTour;
+  const readOnly = !!tourView;
   let h = `<div class="tour-title">${escHtml(t.name)}</div>` +
     `<div class="tour-sub">${t.format === 'knockout' ? 'Knockout' : 'Round Robin'} · ${t.competitors.length} players · ${t.ends} ends</div>`;
   if (t.status === 'finished') h += `<div class="tour-champ">🏆 ${escHtml(compName(t, t.champion))} wins!</div>`;
@@ -7246,21 +7335,38 @@ function renderTourHub() {
       h += `</div>`;
     });
   }
-  h += `<div class="tour-actions">`;
-  if (t.status === 'finished') h += `<button class="tour-btn" id="tour-new">New tournament</button>`;
-  h += `<button class="tour-btn-secondary" id="tour-abandon">Abandon tournament</button></div>`;
   const el = document.getElementById('tour-hub-content');
   el.innerHTML = h;
   el.querySelectorAll('[data-play]').forEach(b => b.onclick = () => playTourMatch(b.getAttribute('data-play')));
+
+  // Actions live in a fixed footer pinned to the bottom of the screen.
+  let af = '';
+  if (readOnly) {
+    af = `<button class="tour-btn-secondary" id="tour-arch-del">Delete from history</button>`;
+  } else {
+    if (t.status === 'finished') af += `<button class="tour-btn" id="tour-new">New tournament</button>`;
+    af += `<button class="tour-btn-secondary" id="tour-abandon">Abandon tournament</button>`;
+  }
+  const actEl = document.getElementById('tour-hub-actions');
+  actEl.innerHTML = `<div class="tour-actions-inner">${af}</div>`;
   const ab = document.getElementById('tour-abandon');
   if (ab) ab.onclick = () => { if (confirm('Abandon this tournament?')) { clearTour(); hideTourPanels(); syncTourBtn(); } };
   const nw = document.getElementById('tour-new');
   if (nw) nw.onclick = () => { clearTour(); hideTourPanels(); syncTourBtn(); openTourSetup(); };
+  const del = document.getElementById('tour-arch-del');
+  if (del) del.onclick = () => {
+    if (!confirm('Delete this tournament from history?')) return;
+    saveTourArchive(loadTourArchive().filter(x => x.id !== t.id));
+    tourView = null; hideTourPanels(); openTourSetup();
+    try { syncPlayerToServer(loadXP()); } catch {}
+  };
 }
 
 function hideTourPanels() {
   document.getElementById('tournament-setup-panel').classList.remove('show');
   document.getElementById('tournament-hub-panel').classList.remove('show');
+  const actEl = document.getElementById('tour-hub-actions');
+  if (actEl) actEl.innerHTML = '';
 }
 
 function syncTourBtn() {
@@ -7277,7 +7383,10 @@ function initTournaments() {
     else openTourSetup();
   };
   document.getElementById('tour-setup-back').onclick = () => document.getElementById('tournament-setup-panel').classList.remove('show');
-  document.getElementById('tour-hub-back').onclick = () => document.getElementById('tournament-hub-panel').classList.remove('show');
+  document.getElementById('tour-hub-back').onclick = () => {
+    if (tourView) { tourView = null; openTourSetup(); }
+    else document.getElementById('tournament-hub-panel').classList.remove('show');
+  };
 }
 
 buildSplash();
