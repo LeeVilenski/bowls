@@ -855,7 +855,7 @@ button:active { opacity: .7; }
       </button>
       <button class="omode-btn ranked" id="btnRankedLeisure">
         <span class="omode-btn-title">Ranked Leisure</span>
-        <span class="omode-btn-sub">8 ends · 1 day per shot · affects your rating</span>
+        <span class="omode-btn-sub">Async · 8 ends · 1 day per shot · create &amp; pick up games · affects rating</span>
       </button>
       <button class="omode-btn" id="btnUnranked">
         <span class="omode-btn-title">Unranked</span>
@@ -872,7 +872,8 @@ button:active { opacity: .7; }
 <div id="online-panel">
   <div id="online-inner">
     <button id="online-back">&larr; Back</button>
-    <div class="online-title">Online</div>
+    <div class="online-title" id="online-lobby-title">Online</div>
+    <div id="online-lobby-note" class="cg-profile-note" style="display:none">Async games — create a few and pick up others' games whenever you log in.</div>
     <div id="lobby-name-row">
       <input type="text" id="lobby-name" placeholder="Your display name" maxlength="20" autocomplete="off">
     </div>
@@ -882,7 +883,7 @@ button:active { opacity: .7; }
       <button id="btnJoinCode">Join</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-      <span class="lobby-section">Open Games</span>
+      <span class="lobby-section" id="open-games-label">Open Games</span>
       <button id="btnRefreshLobby">Refresh</button>
     </div>
     <div id="lobby-list"><div class="lobby-empty">No games available</div></div>
@@ -4273,6 +4274,8 @@ let localPlayer = 0;
 let onlineGameId = '';
 let onlineOpponentName = '';
 let onlineRanked = false;   // only ranked online matches affect Elo rating
+let onlineRankedMode = null; // 'speed' | 'leisure' | null (unranked)
+let lobbyMode = 'unranked'; // which lobby the online panel is showing: 'unranked' | 'leisure'
 let moveNum = 0;
 let shotClockLimit = 0;
 let shotClockStart = 0;
@@ -4367,9 +4370,17 @@ async function listLobbies() {
   if (netDisplayName) q = q.neq('host_name', netDisplayName);
   const { data, error } = await q.order('created_at', { ascending: false });
   if (error) { console.error('listLobbies', error); return []; }
-  // Private games are joinable by code only; ranked games are quick-match only —
-  // keep both out of the public unranked lobby.
+  if (lobbyMode === 'leisure') {
+    // Ranked Leisure lobby: only open ranked-leisure games, to pick up.
+    return (data || []).filter(g => isLeisureGame(g) && !(g.settings && g.settings.private));
+  }
+  // Unranked lobby: private games are join-by-code only; ranked games (speed
+  // quick-match and leisure) are handled elsewhere — keep both out.
   return (data || []).filter(g => !(g.settings && (g.settings.private || g.settings.ranked)));
+}
+
+function isLeisureGame(g) {
+  return !!(g && g.settings && g.settings.ranked && g.settings.rankedMode === 'leisure');
 }
 
 async function listMyGames() {
@@ -4394,7 +4405,10 @@ async function listMyGames() {
     }
     liveGames.push(g);
   }
-  return liveGames;
+  // Leisure lobby lists only ranked-leisure games; the unranked lobby lists
+  // everything else (so unranked and any stray ranked-speed games resume there).
+  if (lobbyMode === 'leisure') return liveGames.filter(isLeisureGame);
+  return liveGames.filter(g => !isLeisureGame(g));
 }
 
 function isGameFinishedByMoves(moves) {
@@ -5098,10 +5112,13 @@ function buildOnlineModePanel() {
   };
   document.getElementById('online-mode-back').onclick = hideOnlineModePanel;
   document.getElementById('btnRankedSpeed').onclick = () => startRankedMatch('speed');
-  document.getElementById('btnRankedLeisure').onclick = () => startRankedMatch('leisure');
+  document.getElementById('btnRankedLeisure').onclick = () => {
+    hideOnlineModePanel(true);
+    showOnlinePanel('leisure');
+  };
   document.getElementById('btnUnranked').onclick = () => {
     hideOnlineModePanel(true);
-    showOnlinePanel();
+    showOnlinePanel('unranked');
   };
   document.getElementById('btnCancelRanked').onclick = cancelRankedSearch;
 }
@@ -5182,11 +5199,39 @@ async function cancelRankedSearch() {
   document.getElementById('online-mode-choices').style.display = '';
 }
 
-function showOnlinePanel() {
+// Ranked Leisure is correspondence-style: create games into the open pool for
+// others to pick up, rather than blocking on a "searching" screen. The host
+// resumes from My Games when it's their turn.
+async function createLeisureGame() {
+  if (!netDisplayName) { alert('Please enter a display name'); return; }
+  if (!initSupabase()) { alert('Online play is unavailable right now'); return; }
+  const prof = loadProfile();
+  const settings = {
+    ends: 8, size: 3, biasVal: prof.biasVal != null ? prof.biasVal : 1.0,
+    speedVal: 50, bendLeft: 50, bendRight: 50, bg: 'hardwood',
+    p1Color: prof.p1idx != null ? prof.p1idx : 0,
+    p1Design: prof.p1design != null ? prof.p1design : 0,
+    private: false, ranked: true, rankedMode: 'leisure',
+  };
+  const code = await createLobby(settings, '1d');
+  if (!code) { alert('Could not create game'); return; }
+  // Leave it in the pool — don't bind this client to the game.
+  onlineGameId = ''; localPlayer = 0;
+  refreshLobby();
+}
+
+function showOnlinePanel(modeArg) {
+  lobbyMode = modeArg === 'leisure' ? 'leisure' : 'unranked';
+  const isLeisure = lobbyMode === 'leisure';
   const panel = document.getElementById('online-panel');
   const nameInput = document.getElementById('lobby-name');
   nameInput.value = netDisplayName;
   if (!onlinePanelBuilt) buildOnlinePanel();
+  document.getElementById('online-lobby-title').textContent = isLeisure ? 'Ranked Leisure' : 'Unranked';
+  document.getElementById('online-lobby-note').style.display = isLeisure ? '' : 'none';
+  document.getElementById('open-games-label').textContent = isLeisure ? 'Open Leisure Games' : 'Open Games';
+  document.getElementById('join-code-row').style.display = isLeisure ? 'none' : '';
+  document.getElementById('btnCreateGame').textContent = isLeisure ? 'Create Leisure Game' : 'Create Game';
   panel.classList.add('show');
   refreshLobby();
   if (!lobbyClockInterval) lobbyClockInterval = setInterval(tickLobbyClocks, 1000);
@@ -5220,7 +5265,10 @@ function buildOnlinePanel() {
 
   document.getElementById('online-back').onclick = hideOnlinePanel;
   document.getElementById('btnRefreshLobby').onclick = refreshLobby;
-  document.getElementById('btnCreateGame').onclick = showCreatePanel;
+  document.getElementById('btnCreateGame').onclick = () => {
+    if (lobbyMode === 'leisure') createLeisureGame();
+    else showCreatePanel();
+  };
   document.getElementById('btnJoinCode').onclick = joinByCode;
   document.getElementById('join-code-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); joinByCode(); }
@@ -5509,6 +5557,7 @@ function replayMoves(moves) {
 function applyOnlineSettings(s, seed) {
   if (!s) return;
   onlineRanked = !!s.ranked;
+  onlineRankedMode = s.rankedMode || null;
   rngSeed = seed;
   splashCfg.ends = s.ends || 6;
   splashCfg.mode = 'online';
@@ -5761,7 +5810,7 @@ function backToLobby() {
   hideGameSettingsPanel();
   document.getElementById('splash').classList.remove('hidden');
   syncResumeBtn();
-  showOnlinePanel();
+  showOnlinePanel(onlineRankedMode === 'leisure' ? 'leisure' : 'unranked');
 }
 
 function showSplash() {
