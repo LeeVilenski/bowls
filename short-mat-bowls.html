@@ -1603,11 +1603,11 @@ function startGame() {
   seededRng = mulberry32(rngSeed);
   bowls=[]; jack=null; scores=[0,0]; endNum=1;
   replayShots=[]; _recFrames=null;
-  // In picked-up async (leisure) games the joiner (player 2) leads the first
-  // end, so the creator gets the small last-bowl advantage and the joiner isn't
-  // left waiting straight after picking the game up. Deterministic from settings,
-  // so both clients agree. Later ends follow the usual winner-leads rule.
-  jackOwner = (mode === 'online' && onlineRankedMode === 'leisure') ? 2 : 1;
+  // In online games the joiner (player 2) leads the first end, so the creator
+  // gets the small last-bowl advantage of going second and the joiner isn't left
+  // waiting straight after picking the game up. Deterministic (same for both
+  // clients). Later ends follow the usual winner-leads rule.
+  jackOwner = (mode === 'online') ? 2 : 1;
   turnIdx=0; delivDir=1;
   jackOffCounts=[0,0]; lastJackHitter=null;
   shotClockForfeits=[0,0]; shotClockExpired=false; serverTimeOffset=0; serverOffsetInit=false; clockDisplayMs=-1; lastMoveServerTs=0;
@@ -5330,9 +5330,8 @@ async function refreshLobby() {
       const opp = isHost ? (g.guest_name || '?') : g.host_name;
       const lm = g._lastMove;
       const localP = isHost ? 1 : 2;
-      // First player leads before any moves: player 2 in picked-up leisure
-      // games, player 1 otherwise.
-      const firstP = isLeisureGame(g) ? 2 : 1;
+      // Before any moves, the joiner (player 2) leads in every online game.
+      const firstP = 2;
       const yourTurn = lm ? (lm.player !== localP) : (firstP === localP);
       const turnLabel = yourTurn ? 'Your turn' : 'Their turn';
       const turnClass = yourTurn ? 'my-game-turn you' : 'my-game-turn them';
