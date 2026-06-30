@@ -1,4 +1,7 @@
-const CACHE = 'bowls-v19';
+// Keep this in step with VERSION in short-mat-bowls.html — bumping it on each
+// release forces a fresh cache. The Pages deploy workflow rewrites 'bowls-v'
+// to 'bowls-beta-v' for the /beta/ test build so the two PWAs never share a cache.
+const CACHE = 'bowls-v1.0.0';
 const ASSETS = [
   './',
   './short-mat-bowls.html',
