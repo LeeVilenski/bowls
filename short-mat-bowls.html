@@ -2105,6 +2105,17 @@ function advanceEnd() {
   startEnd();
 }
 
+async function markGameFinished() {
+  if (mode !== 'online' || !sb || !onlineGameId) return;
+  try {
+    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
+  } catch (e) {
+    console.error('markGameFinished', e);
+    sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId).catch(() => {});
+  }
+  localStorage.removeItem('bowls_activeGame');
+}
+
 async function gameOver() {
   state = 'game-over';
   clearSavedGame();
@@ -2127,10 +2138,7 @@ async function gameOver() {
     else if (scores[1]>scores[0]) res=`<span style="color:#f87171">${n2} wins</span> ${scores[1]}–${scores[0]}`;
     else                          res=`Draw! ${scores[0]}–${scores[1]}`;
   }
-  if (mode === 'online' && sb && onlineGameId) {
-    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
-    localStorage.removeItem('bowls_activeGame');
-  }
+  await markGameFinished();
   awardXP(won, false);
   msg(`Game over — ${res}`);
 }
@@ -2151,10 +2159,7 @@ async function finishConcede(concedingPlayer) {
   const me = myPlayerIdx();
   const conWon = concedingPlayer !== me;
   recordCurrentGame(conWon, true);
-  if (mode === 'online' && sb && onlineGameId) {
-    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
-    localStorage.removeItem('bowls_activeGame');
-  }
+  await markGameFinished();
   awardXP(conWon, true);
   if (concedingPlayer === localPlayer) {
     msg(`Game over — <span style="color:#ef4444">You conceded</span>. ${scores[0]}–${scores[1]}`);
@@ -3991,11 +3996,8 @@ async function finishClockForfeit(forfeitingPlayer) {
   const fWon = forfeitingPlayer !== me;
   checkAchievements('game_over', { concede: true, concedingPlayer: forfeitingPlayer });
   recordCurrentGame(fWon, false);
+  await markGameFinished();
   awardXP(fWon, true);
-  if (mode === 'online' && sb && onlineGameId) {
-    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
-    localStorage.removeItem('bowls_activeGame');
-  }
   if (forfeitingPlayer === localPlayer) {
     msg(`Game over — <span style="color:#ef4444">You lost on time</span> (3 shot forfeits). ${scores[0]}–${scores[1]}. Press New Game to play again.`);
   } else {
@@ -4648,10 +4650,7 @@ async function claimAbandonedWin() {
   clearSavedGame();
   checkAchievements('game_over');
   recordCurrentGame(true, false);
-  if (mode === 'online' && sb && onlineGameId) {
-    await sb.from('games').update({ status: 'finished' }).eq('id', onlineGameId);
-    localStorage.removeItem('bowls_activeGame');
-  }
+  await markGameFinished();
   awardXP(true, true);
   msg(`Game over — <span style="color:#22c55e">Opponent disconnected. You win!</span> ${scores[0]}–${scores[1]}`);
 }
@@ -5497,6 +5496,11 @@ async function confirmJoinLobby() {
 }
 
 async function doResumeLobby(game) {
+  if (game.status === 'finished') {
+    alert('This game has already ended.');
+    refreshLobby();
+    return;
+  }
   cleanupNet();
   onlineGameId = game.id;
   const isHost = game.host_name === netDisplayName;
@@ -6062,6 +6066,7 @@ function getOpponentName() {
 }
 
 function recordCurrentGame(won, conceded) {
+  if (_replaying) return;
   const me = myPlayerIdx();
   const myScore = scores[me - 1], oppScore = scores[me === 1 ? 1 : 0];
   const endsPlayed = conceded ? endNum : endNum - 1;
@@ -6334,6 +6339,7 @@ function countMyEndsWon() {
 }
 
 async function awardXP(won, conceded) {
+  if (_replaying) return;
   const data = loadXP();
   const oldElo = data.elo;
   const endsWon = countMyEndsWon();
