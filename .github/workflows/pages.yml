@@ -1,0 +1,62 @@
+name: Deploy to GitHub Pages
+
+# Production is the site root, served from `main`.
+# The test channel is /beta/, served from the `dev` branch.
+# A push to either branch rebuilds the whole site, so production only ever
+# changes when something lands on `main`.
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once; let an in-progress one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout (all branches)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assemble site (prod root + beta subfolder)
+        run: |
+          set -euo pipefail
+          rm -rf _site && mkdir -p _site
+
+          # Production = main, served as-is at the site root.
+          git archive origin/main | tar -x -C _site
+
+          # Test channel = dev, served at /beta/ with isolated cache + name so
+          # it installs as a separate PWA and can't evict the production cache.
+          if git rev-parse --verify origin/dev >/dev/null 2>&1; then
+            mkdir -p _site/beta
+            git archive origin/dev | tar -x -C _site/beta
+            sed -i "s/bowls-v/bowls-beta-v/" _site/beta/sw.js
+            sed -i "s/const CHANNEL = 'prod'/const CHANNEL = 'beta'/" _site/beta/short-mat-bowls.html
+            sed -i 's/"name": "Short Mat Bowls"/"name": "Short Mat Bowls (Beta)"/' _site/beta/manifest.json
+            sed -i 's/"short_name": "Bowls"/"short_name": "Bowls β"/' _site/beta/manifest.json
+          else
+            echo "No origin/dev branch yet — skipping beta channel."
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
