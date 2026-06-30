@@ -75,11 +75,35 @@ perspR(my, r) // scale a radius by depth
 
 After install, runs full-screen (standalone) with no browser chrome, cached for offline use.
 
-## Workflow 
-- Work out of branches, ideally named after issue numbers.
-- When asked to fix a bug or implement a feature, always:
-  1. Create a GitHub issue describing the problem
-  2. Fix it
-  3. Wait for confirmation that fixes have solved issue
-  4. Create a PR that references the issue (e.g. "Closes #X") and close
+## Branching & release channels
+
+Two channels are served from one GitHub Pages site (see `RELEASING.md`):
+
+| Branch | Channel | URL | Role |
+|--------|---------|-----|------|
+| `dev`  | **beta / test** | `…/bowls/beta/short-mat-bowls.html` | default working branch |
+| `main` | **production**  | `…/bowls/` | release-only (protected) |
+
+**Default working branch is `dev`.** Do all work on `dev` (or short branches
+that merge into `dev`). Merging into `dev` is what puts a change on the beta
+URL — `dev` is the sandbox, so getting changes in is unguarded. Production is
+never touched.
+
+**Test on the beta URL, iterating on `dev` until it works.** Confirmation
+happens on beta — which is *why* a change must reach `dev` before it can be
+called "working". A broken `dev` only affects beta; fix it forward.
+
+**Never put changes on `main` except a deliberate release the user asks for.**
+`main` is protected, so a release goes through a PR:
+1. On `dev`, run `./scripts/bump-version.sh X.Y.Z` (bumps the splash `VERSION`
+   and the `sw.js` cache name together) and commit.
+2. Open a PR from `dev` into `main` and merge it → production redeploys.
+3. Tag the release: `git tag vX.Y.Z && git push --tags`.
+
+## Workflow
+- For a substantial bug/feature, open a GitHub issue to track it (optional for
+  small tweaks).
+- Make the change on `dev`, or on a short branch opened as a PR **into `dev`**.
+- Once it's on `dev`, test it on the beta URL and iterate until confirmed.
+- Release to production only when the user explicitly asks (steps above).
 
