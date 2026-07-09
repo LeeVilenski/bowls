@@ -1279,8 +1279,11 @@ let lastJackHitter = null;   // player who last struck the jack
 let tutorialMode  = false;
 let tutIntroIdx   = 0;      // current intro card index
 let tutTomShotNum = 0;      // 1–4: which scripted bad shot Tom is on
-let tutNoBias     = false;  // suppress bias for Tom's scripted straight shots
+let tutNoBias      = false;  // suppress bias for Tom's scripted straight shots
 let tutPendingCard = null;  // { onDismiss } — set while a mid-game card shows
+let tutEnd2Active    = false; // true during the advanced-rules demo segment
+let tutEnd2Completed = false; // true once end-2 demos are done (so tutorialDone goes to splash)
+let tutDemoIdx       = 0;    // 1–4: which demo shot we're on in end 2
 
 const TUT_TOM_NAME = 'Tutorial Tom';
 
@@ -1336,6 +1339,25 @@ const TUT_TOM_CARDS = [
   {
     title: '⬆ Too Short!',
     body: 'Not enough power! Tom\'s bowl stopped before the dead line — dead. Your bowl must reach past the white dead line (across the upper part of the mat) to count as a live bowl.',
+  },
+];
+
+const TUT_DEMO_CARDS = [
+  {
+    title: '🎯 Toucher!',
+    body: 'Tom\'s bowl touched the jack while rolling — it\'s a TOUCHER (shown by a ring on the bowl). Touchers are special: if the jack is later knocked into the ditch, only toucher bowls can score from there.',
+  },
+  {
+    title: '🕳️ Jack in the Ditch!',
+    body: 'Tom knocked the jack into the far ditch! The end isn\'t dead — play continues. But only toucher bowls can score when the jack is in the ditch. Use the HEAD button for a top-down view to see who\'s closest.',
+  },
+  {
+    title: '↔ Jack Off the Side!',
+    body: 'When the jack goes off the side of the mat, the end restarts from jack placement. The player responsible gets a count (1/3, 2/3…). Three times in one end and their opponent automatically wins 3 penalty points!',
+  },
+  {
+    title: '💥 Firing at Bowls!',
+    body: 'Tom used extra power to drive that bowl into a different position! Tap FIRE before delivering for a harder, straighter shot. It\'s great for removing blocking bowls from the head — your opponent\'s or even your own.',
   },
 ];
 
@@ -2211,6 +2233,13 @@ function _doOnAllStopped() {
   if (mode === 'online') processPendingMoves();
   if (state === 'moving' || state === 'game-over') return;
 
+  // Tutorial end 2 (advanced-rules demos): intercept after each Tom demo shot
+  if (tutEnd2Active) {
+    tutNoBias = false;
+    tutShowGameCard(TUT_DEMO_CARDS[tutDemoIdx - 1], tutRunNextDemo);
+    return;
+  }
+
   // Tutorial: show explanation card after each of Tom's scripted bad shots
   if (tutorialMode && playerForTurn(turnIdx - 1) === 2 && tutTomShotNum >= 1 && tutTomShotNum <= 4) {
     const card = TUT_TOM_CARDS[tutTomShotNum - 1];
@@ -2248,6 +2277,12 @@ function onAllStopped() {
 }
 
 function handleJackOffSide() {
+  // Tutorial end 2 demo 3: jack went off side as expected — show the explanation card
+  if (tutEnd2Active) {
+    tutNoBias = false;
+    tutShowGameCard(TUT_DEMO_CARDS[tutDemoIdx - 1], tutRunNextDemo);
+    return;
+  }
   // Flush deferred shot send (jack-off-side is a physics outcome too)
   if (mode === 'online' && _pendingShotData) {
     const data = _pendingShotData;
@@ -6141,6 +6176,7 @@ function showSplash() {
   syncResumeBtn();
   // Reset any lingering tutorial state
   tutorialMode = false; tutNoBias = false; tutTomShotNum = 0; tutPendingCard = null;
+  tutEnd2Active = false; tutEnd2Completed = false; tutDemoIdx = 0;
   tutHideCardImmediate();
 }
 
@@ -6265,7 +6301,7 @@ function tutorialTomShot() {
     case 1: angle = -Math.PI / 2;        speed = 3.6; break;  // straight into block
     case 2: angle = -Math.PI / 2 + 0.72; speed = 4.2; break;  // wide right, off the side
     case 3: angle = -Math.PI / 2 + 0.10; speed = 7.0; break;  // angled right of block, too long, far ditch
-    case 4: angle = -Math.PI / 2;        speed = 2.7; break;  // too short — almost reaches far dead line
+    case 4: angle = -Math.PI / 2 - 0.10; speed = 2.7; break;  // angled left of block, stops short of far dead line
     default: angle = -Math.PI / 2;       speed = 3.0;
   }
 
@@ -6278,11 +6314,106 @@ function tutorialTomShot() {
 }
 
 function tutorialDone() {
+  if (!tutEnd2Active && !tutEnd2Completed) {
+    // End 1 just finished — launch the advanced-rules demos
+    tutStartEnd2();
+    return;
+  }
+  // End 2 demos finished — full cleanup and back to splash
   tutorialMode = false;
-  tutNoBias = false;
-  tutTomShotNum = 0;
-  tutPendingCard = null;
+  tutEnd2Active = false;
+  tutEnd2Completed = false;
+  tutNoBias = false; tutTomShotNum = 0; tutDemoIdx = 0; tutPendingCard = null;
   showSplash();
+}
+
+function tutStartEnd2() {
+  tutEnd2Active = true;
+  tutDemoIdx = 0;
+  clearTimeout(aiTimer);
+  bowls = []; jack = null;
+  replayShots = []; _recFrames = null;
+  state = 'idle';
+  delivPos = null;
+  resetCam(); updateHUD();
+  msg('');
+  tutShowGameCard({
+    title: '🎓 What Else Can Happen?',
+    body: 'Tom will now demonstrate 4 situations you\'ll encounter in a real game. No bowling from you — just watch and read!',
+  }, tutRunNextDemo);
+}
+
+function tutRunNextDemo() {
+  tutDemoIdx++;
+  clearTimeout(aiTimer);
+  bowls = bowls.filter(b => !b.offMat); // keep only live bowls from previous demo
+  delivPos = null;
+  switch (tutDemoIdx) {
+    case 1: tutDemoSetup1(); break;
+    case 2: tutDemoSetup2(); break;
+    case 3: tutDemoSetup3(); break;
+    case 4: tutDemoSetup4(); break;
+    default:
+      tutEnd2Active = false;
+      tutEnd2Completed = true;
+      tutorialDone();
+      break;
+  }
+}
+
+function tutEnd2Shoot(angle, speed) {
+  tutNoBias = true;
+  state = 'ai-turn';
+  msg('Tutorial Tom is demonstrating…');
+  aiTimer = setTimeout(() => {
+    if (state !== 'ai-turn') return;
+    deliverBowl(2, angle, speed);
+  }, 1200);
+}
+
+function tutDemoSetup1() {
+  // Demo 1: Toucher — Tom rolls to the jack and touches it while rolling
+  bowls = [];
+  jack = { x: jackLineX(), y: 185, vx: 0, vy: 0, stopped: true,
+           offMat: false, inDitch: false, offSide: false };
+  msg('Watch Tom roll a toucher…');
+  tutEnd2Shoot(-Math.PI / 2, 3.7);
+}
+
+function tutDemoSetup2() {
+  // Demo 2: Jack in ditch — Tom fires the jack into the far ditch
+  bowls = [];
+  jack = { x: jackLineX(), y: 155, vx: 0, vy: 0, stopped: true,
+           offMat: false, inDitch: false, offSide: false };
+  msg('Watch what happens when the jack goes in the ditch…');
+  tutEnd2Shoot(-Math.PI / 2, 7.0);
+}
+
+function tutDemoSetup3() {
+  // Demo 3: Jack off side — Tom aims at a jack placed near the right edge
+  bowls = [];
+  const jackX = MAT.x + MAT.w - RJ - 5;
+  jack = { x: jackX, y: 155, vx: 0, vy: 0, stopped: true,
+           offMat: false, inDitch: false, offSide: false };
+  const bsY = MAT.y + (1 - L.MAT_LEN) * MAT.h; // delivery y
+  const angle = Math.atan2(155 - bsY, jackX - jackLineX());
+  msg('Watch what happens when the jack goes off the side…');
+  tutEnd2Shoot(angle, 7.0);
+}
+
+function tutDemoSetup4() {
+  // Demo 4: FIRE — Tom drives a player bowl out of the head
+  bowls = [];
+  jack = { x: jackLineX() - 20, y: 130, vx: 0, vy: 0, stopped: true,
+           offMat: false, inDitch: false, offSide: false };
+  // Place a stationary player-1 bowl in Tom's path
+  bowls.push({ x: jackLineX(), y: 175, vx: 0, vy: 0,
+                player: 1, bias: biasDirs[0], stopped: true,
+                offMat: false, toucher: false, inDitch: false,
+                rotAngle: 0, trail: [], restProgress: 0, delivering: false,
+                design: splashCfg.p1design });
+  msg('Watch Tom fire a bowl out of the head…');
+  tutEnd2Shoot(-Math.PI / 2, 7.0);
 }
 
 function drawTutorialAnnotations() {
