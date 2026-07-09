@@ -1272,7 +1272,7 @@ let jackOwner = 1;
 let turnIdx   = 0;
 let delivDir  = 1;   // 1 = bowl from bottom; -1 = from top
 let aiTimer   = null;
-let jackOffCounts  = [0, 0]; // per-player count of knocking jack off the side (resets each end)
+let jackOffCounts  = [0, 0]; // per-player count of knocking jack off the side (resets each game)
 let lastJackHitter = null;   // player who last struck the jack
 
 // ── Tutorial Mode ─────────────────────────────────────────────────
@@ -1354,7 +1354,7 @@ const TUT_DEMO_CARDS = [
   },
   {
     title: '↔ Jack Off the Side!',
-    body: 'When the jack goes off the side of the mat, the end restarts from jack placement. The player responsible gets a count (1/3, 2/3…). Three times in one end and their opponent automatically wins 3 penalty points!',
+    body: 'When the jack goes off the side of the mat, the end restarts from jack placement. The player responsible gets a count (1/3, 2/3…). Three times in a game and their opponent automatically wins 3 penalty points!',
   },
   {
     title: '💥 Firing at Bowls!',
@@ -1862,7 +1862,7 @@ function startGame() {
 }
 
 function startEnd() {
-  bowls=[]; jack=null; turnIdx=0; lastJackHitter=null; jackOffCounts=[0,0];
+  bowls=[]; jack=null; turnIdx=0; lastJackHitter=null;
   // Carry over only the previous end's final delivery so it can still be
   // reviewed from the new end (a misclick past "tap to continue" won't lose it).
   replayShots = replayShots.length ? [replayShots[replayShots.length - 1]] : [];
