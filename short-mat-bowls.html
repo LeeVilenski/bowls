@@ -1346,7 +1346,7 @@ const TUT_TOM_CARDS = [
 const TUT_DEMO_CARDS = [
   {
     title: '🎯 Toucher!',
-    body: 'Tom\'s bowl touched the jack while rolling — it\'s a TOUCHER (shown by a ring on the bowl). Touchers are special: if the jack is later knocked into the ditch, only toucher bowls can enter the ditch — any non-toucher that rolls in is dead.',
+    body: 'Tom\'s bowl touched the jack while rolling — it\'s a TOUCHER (shown by a T symbol on the bowl). Touchers are special: if the jack is later knocked into the ditch, only toucher bowls can enter the ditch — any non-toucher that rolls in is dead.',
   },
   {
     title: '🕳️ Jack in the Ditch!',
@@ -1354,7 +1354,7 @@ const TUT_DEMO_CARDS = [
   },
   {
     title: '↔ Jack Off the Side!',
-    body: 'When the jack goes off the side of the mat, the end restarts from jack placement. The player responsible gets a count (1/3, 2/3…). Three times in one end and their opponent automatically wins 3 penalty points!',
+    body: 'When the jack goes off the side of the mat, the end restarts from jack placement. The player responsible gets a count (1/3, 2/3…). Three times in a game and their opponent automatically wins 3 penalty points!',
   },
   {
     title: '💥 Firing at Bowls!',
@@ -6456,14 +6456,16 @@ function tutDemoSetup2() {
 }
 
 function tutDemoSetup3() {
-  // Demo 3: Jack off side — deliver from x=300 (right of block) aiming at jack near right edge.
-  // Delivering from x=300 keeps the bowl well clear of the block (passes ~x=331 at block height).
+  // Demo 3: Jack off side — deliver from far left (x=85) aimed at jack to the right of centre.
+  // Bowl passes the block at x≈283 (right side, well clear of block at x=200–240).
+  // The oblique collision angle gives the jack ~4.4 px/frame rightward velocity, so it
+  // exits the right side of the mat in ~4 frames — a clearly lateral shot.
   bowls = [];
-  const jackX = 356;
-  const jackY = 160;
+  const jackX = 350;
+  const jackY = 350;
   jack = { x: jackX, y: jackY, vx: 0, vy: 0, stopped: true,
            offMat: false, inDitch: false, offSide: false };
-  const delivX = 300;
+  const delivX = 85;
   const bsY = MAT.y + (1 - L.MAT_LEN) * MAT.h;
   delivPos = { x: delivX, y: bsY };
   const angle = Math.atan2(jackY - bsY, jackX - delivX);
