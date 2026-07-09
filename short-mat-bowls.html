@@ -350,6 +350,45 @@ button:active { opacity: .7; }
   border: 1px solid #334155; width: 100%; margin-top: -4px;
 }
 #btnTournaments:hover { background: #334155; color: #e2e8f0; }
+#btnTutorial {
+  padding: 10px; font-size: 13px; font-weight: 700;
+  background: #0f2a1a; color: #4ade80; border-radius: 10px;
+  border: 1px solid #166534; width: 100%; margin-top: -4px;
+}
+#btnTutorial:hover { background: #166534; color: #86efac; }
+
+/* ── Tutorial Overlay ─────────────────────────────────────────────── */
+#tutorial-overlay {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;
+  display: none; justify-content: center; align-items: flex-end;
+}
+#tut-card {
+  width: 100%; max-width: 440px;
+  background: rgba(10,15,30,0.97);
+  border-top: 2px solid #1e40af;
+  padding: 16px 18px 0;
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+  pointer-events: auto;
+}
+#tutorial-overlay.tut-visible #tut-card { transform: translateY(0); }
+#tut-pip-row { display: flex; gap: 5px; margin-bottom: 12px; }
+.tut-pip { flex: 1; height: 3px; border-radius: 2px; background: #1e293b; transition: background 0.2s; }
+.tut-pip.tut-done { background: #3b82f6; }
+.tut-pip.tut-cur  { background: #93c5fd; }
+#tut-title { font-size: 17px; font-weight: 800; color: #fff; margin-bottom: 7px; }
+#tut-body  { font-size: 13px; color: #94a3b8; line-height: 1.55; margin-bottom: 14px; white-space: pre-line; }
+#tut-next-btn {
+  width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
+  background: linear-gradient(135deg,#1d4ed8,#6d28d9); color: #fff;
+  border-radius: 10px; border: none; cursor: pointer; margin-bottom: 6px;
+}
+#tut-skip-btn {
+  display: block; width: 100%; padding: 7px; font-size: 12px; font-weight: 600;
+  background: none; color: #475569; border: none; cursor: pointer; margin-bottom: 4px;
+}
+
 #tournament-setup-panel, #tournament-hub-panel {
   position: fixed; inset: 0; z-index: 300; background: #0a0f1e;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -741,6 +780,7 @@ button:active { opacity: .7; }
 
     <button id="btnStart">Start Game</button>
     <button id="btnResume" style="display:none">Resume Game</button>
+    <button id="btnTutorial">📖 How to Play</button>
     <button id="btnProfile">👤 Profile</button>
     <button id="btnHistory">📜 History</button>
     <button id="btnAch">🏆 Achievements</button>
@@ -876,6 +916,16 @@ button:active { opacity: .7; }
   <div class="toast-text">
     <div class="toast-lbl">Achievement Unlocked</div>
     <div class="toast-name" id="toast-name"></div>
+  </div>
+</div>
+
+<div id="tutorial-overlay">
+  <div id="tut-card">
+    <div id="tut-pip-row"></div>
+    <div id="tut-title"></div>
+    <div id="tut-body"></div>
+    <button id="tut-next-btn">Next →</button>
+    <button id="tut-skip-btn">Skip tutorial</button>
   </div>
 </div>
 
@@ -1225,6 +1275,70 @@ let aiTimer   = null;
 let jackOffCounts  = [0, 0]; // per-player count of knocking jack off the side (resets each game)
 let lastJackHitter = null;   // player who last struck the jack
 
+// ── Tutorial Mode ─────────────────────────────────────────────────
+let tutorialMode  = false;
+let tutIntroIdx   = 0;      // current intro card index
+let tutTomShotNum = 0;      // 1–4: which scripted bad shot Tom is on
+let tutNoBias     = false;  // suppress bias for Tom's scripted straight shots
+let tutPendingCard = null;  // { onDismiss } — set while a mid-game card shows
+
+const TUT_TOM_NAME = 'Tutorial Tom';
+
+const TUT_INTRO_CARDS = [
+  {
+    title: 'Welcome to Short Mat Bowls!',
+    body: 'Your goal is simple: roll your bowls closer to the small white ball — the jack — than your opponent. The player whose bowl is nearest at the end of each round scores!',
+  },
+  {
+    title: 'How an End Works',
+    body: 'A game is played over several Ends. In each End both players take turns delivering 4 bowls each. The player with the closest bowl to the jack scores — one point per bowl that\'s nearer than any opponent bowl.',
+  },
+  {
+    title: 'The Jack',
+    body: 'The small white ball is the jack. Before each End it\'s placed on the yellow centre line. The yellow zone on the mat shows where the jack must land.',
+  },
+  {
+    title: 'Watch Out — The Centre Block',
+    body: 'The white barrier in the middle of the mat is the centre block. If your bowl hits it, the bowl is immediately dead and won\'t count for scoring! Aim around it — or use FIRE mode for a powerful straight shot.',
+  },
+  {
+    title: 'Dead Lines & Ditches',
+    body: 'Your bowl must cross the near dead line (shown in red) to count as a live bowl. If it stops short, it\'s dead.\n\nThere are also narrow ditch zones at both ends of the mat — bowls rolling into them are also dead.',
+  },
+  {
+    title: 'Aim & Deliver',
+    body: 'Drag left or right on the mat to adjust your aim angle. Then swipe upward to deliver — the higher your swipe, the more power.\n\nThe aim arrow shows your current direction.',
+  },
+  {
+    title: 'Bias & Buttons',
+    body: '◀ ▶ tap arrows to choose which way your bowl curves (bias).\n\nFIRE — extra power, straighter path through bowls.\nHEAD — top-down view to see who\'s closest.\n⏩ 3× — speed up rolling bowls.',
+  },
+  {
+    title: 'Time to Play!',
+    body: 'Play one End against Tutorial Tom. He\'ll show you exactly what NOT to do — each of his bowls demonstrates a common mistake.\n\nPlace the jack on the yellow zone to begin!',
+    isLast: true,
+  },
+];
+
+const TUT_TOM_CARDS = [
+  {
+    title: '⬛ Centre Block!',
+    body: 'Tutorial Tom hit the centre block — his bowl is dead and won\'t count! Always aim your bowl around the block. FIRE mode lets you punch through it hard if needed.',
+  },
+  {
+    title: '↔ Off the Side!',
+    body: 'Tom\'s bowl went off the side of the mat — dead! Keep your aim in check. The mat is 1.83m wide, so an extreme angle or too much bias will send the bowl off the edge.',
+  },
+  {
+    title: '🔴 Into the Far Ditch!',
+    body: 'Too much power! Tom\'s bowl rolled into the far ditch zone — dead. The ditch is the 300mm strip right against each end board. Dial back your power to avoid it.',
+  },
+  {
+    title: '⬆ Too Short!',
+    body: 'Not enough power! Tom\'s bowl stopped before the dead line — dead. Your bowl must travel past the near dead line (the red line on your side) to count as a live bowl.',
+  },
+];
+
 let mouse    = { x: 0, y: 0, down: false };
 let aimActive = false;
 let headOverlay = false;
@@ -1358,6 +1472,7 @@ function updateHUD() {
 
 // ── Physics ───────────────────────────────────────────────────────
 function applyBias(obj, bias) {
+  if (tutNoBias && obj.player === 2) return; // scripted straight shot for Tutorial Tom
   const spd = Math.hypot(obj.vx, obj.vy);
   if (spd < 0.01) return;
   const movingForward = delivDir === 1 ? obj.vy < 0 : obj.vy > 0;
@@ -1605,6 +1720,12 @@ const AI_PLAYERS = [
 ];
 let aiLevel = 1;
 
+function aiName(short) {
+  if (tutorialMode) return short ? 'Tom' : TUT_TOM_NAME;
+  const n = AI_PLAYERS[aiLevel].name;
+  return short ? n.split(' ')[0] : n;
+}
+
 function aiPickShot() {
   if (!jack || jack.offMat) return null;
   const ai  = AI_PLAYERS[aiLevel];
@@ -1726,12 +1847,12 @@ function startEnd() {
   localAcked = false; opponentAcked = false; pendingMoves = [];
   resetCam(); resetAim();
   state='place-jack'; syncFireBtn();
-  if (jackOwner === 2 && mode === 'vs-ai') {
+  if (jackOwner === 2 && mode === 'vs-ai' && !tutorialMode) {
     aiPlaceJack();
   } else if (mode === 'online' && jackOwner !== localPlayer) {
     msg(`<span style="color:#94a3b8">Opponent placing jack…</span>`);
   } else {
-    msg(`Place jack along yellow line`);
+    msg(tutorialMode ? 'Place the jack — tap on the yellow zone' : 'Place jack along yellow line');
   }
 }
 
@@ -1748,7 +1869,7 @@ function aiPlaceJack() {
 }
 
 function endLabel() { return endNum > ENDS ? `Extra End ${endNum - ENDS}` : `End ${endNum}/${ENDS}`; }
-function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'online') saveGameState(buildSuspendedState()); }
+function beginTurns() { promptPlayer(playerForTurn(turnIdx)); if (mode !== 'online' && !tutorialMode) saveGameState(buildSuspendedState()); }
 
 function promptPlayer(p, opts) {
   if (playerBiasMults[p - 1] != null) biasMult = playerBiasMults[p - 1];
@@ -1777,9 +1898,23 @@ function promptPlayer(p, opts) {
   if (mode === 'online' && p === localPlayer && !resuming) {
     sendBroadcast('clock', { start: shotClockStart, mn: moveNum });
   }
+  if (tutorialMode && p === 2) {
+    tutorialTomShot();
+    return;
+  }
+  if (tutorialMode && p === 1) {
+    state = 'aim'; syncFireBtn();
+    const bowlNum = Math.ceil((turnIdx + 1) / 2);
+    if (bowlNum >= 4) {
+      msg('Your final bowl — complete the end!');
+    } else {
+      msg(`Bowl ${bowlNum} of 4 — swipe up to deliver`);
+    }
+    return;
+  }
   if (p === 2 && mode === 'vs-ai') {
     state = 'ai-turn';
-    msg(`<span style="color:#f87171">${AI_PLAYERS[aiLevel].name}</span> is aiming…`);
+    msg(`<span style="color:#f87171">${aiName()}</span> is aiming…`);
     aiTimer = setTimeout(() => {
       if (state !== 'ai-turn') return;
       const shot = aiPickShot();
@@ -2071,12 +2206,26 @@ function _doOnAllStopped() {
     }
     if (jack && jack.inDitch && !_preShot.jackInDitch) unlockAch('ditch_jack');
   }
+  tutNoBias = false; // reset after each shot
   turnIdx++;
   if (mode === 'online') processPendingMoves();
   if (state === 'moving' || state === 'game-over') return;
+
+  // Tutorial: show explanation card after each of Tom's scripted bad shots
+  if (tutorialMode && playerForTurn(turnIdx - 1) === 2 && tutTomShotNum >= 1 && tutTomShotNum <= 4) {
+    const card = TUT_TOM_CARDS[tutTomShotNum - 1];
+    if (turnIdx >= BPP * 2) {
+      tutShowGameCard(card, () => finishEnd());
+    } else {
+      const nextT = turnIdx;
+      tutShowGameCard(card, () => promptPlayer(playerForTurn(nextT)));
+    }
+    return;
+  }
+
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
-  if (mode !== 'online') saveGameState(buildSuspendedState());
+  if (mode !== 'online' && !tutorialMode) saveGameState(buildSuspendedState());
 }
 
 function onAllStopped() {
@@ -2130,6 +2279,22 @@ function handleJackOffSide() {
 function finishEnd() {
   state = 'end-result';
   const res = applyEndScore();
+  if (tutorialMode) {
+    tutNoBias = false;
+    let resultLine;
+    if (res) {
+      const winner = res.winner === 1 ? 'You' : TUT_TOM_NAME;
+      resultLine = `${winner} score${res.winner === 1 ? '' : 's'} ${res.pts} point${res.pts !== 1 ? 's' : ''}!`;
+    } else {
+      resultLine = 'Dead end — no jack in play.';
+    }
+    tutShowGameCard({
+      title: '🎉 End Complete!',
+      body: `${resultLine}\n\nBowls are scored by distance — one point for each of your bowls closer to the jack than any of your opponent's.\n\nYou're ready to play a real game!`,
+    }, tutorialDone);
+    msg('Tutorial complete!');
+    return;
+  }
   if (res) {
     const col  = res.winner===1 ? '#60a5fa' : '#f87171';
     const name = res.winner===1 ? 'Player 1' : (mode==='vs-ai' ? 'AI' : 'Player 2');
@@ -2267,6 +2432,7 @@ function draw() {
   if (headOverlay) drawHeadOverlay();
   drawOverlayUI();
   drawGameMenu();
+  if (tutorialMode) drawTutorialAnnotations();
 }
 
 // ── Replay view & controls ────────────────────────────────────────
@@ -2566,7 +2732,7 @@ function drawGameMenu() {
   ctx.font = 'bold 20px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('GAME MENU', W / 2, menuItemY(0, items.length) - 50);
 
-  const n2 = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name : (mode === 'online' ? 'Opponent' : 'Player 2');
+  const n2 = mode === 'vs-ai' ? aiName() : (mode === 'online' ? 'Opponent' : 'Player 2');
   ctx.fillStyle = '#64748b';
   ctx.font = '12px Segoe UI';
   ctx.fillText(`${scores[0]} – ${scores[1]}  ·  End ${endNum}/${ENDS}  ·  P1 vs ${n2}`, W / 2, menuItemY(0, items.length) - 28);
@@ -2595,7 +2761,7 @@ function drawEndResultsTable() {
   const tableX = W / 2 - MENU_BTN_W / 2;
   const resultsIdx = items.findIndex(m => m.id === 'results');
   const tableY = menuItemY(resultsIdx, items.length) + MENU_BTN_H + 6;
-  const n2 = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0] : (mode === 'online' ? 'Opp' : 'P2');
+  const n2 = mode === 'vs-ai' ? aiName(true) : (mode === 'online' ? 'Opp' : 'P2');
 
   const rowH = 26;
   const rows = endHistory.length || 0;
@@ -3410,7 +3576,7 @@ function drawSidePanels() {
 
   // Right — P2/AI
   ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(W-SP,0,SP,H);
-  const lbl2 = mode==='vs-ai'? AI_PLAYERS[aiLevel].name.split(' ')[0] : (mode==='online'?'Opp':'P2');
+  const lbl2 = mode==='vs-ai'? aiName(true) : (mode==='online'?'Opp':'P2');
   ctx.fillStyle=C.p2; ctx.font='bold 12px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(lbl2,W-SC,18);
   ctx.font='bold 26px Segoe UI';
@@ -3499,7 +3665,7 @@ function drawSidePanels() {
       let count = 0;
       for (const e of dists) { if (e.p === holder) count++; else break; }
       const col = holder === 1 ? C.p1 : C.p2;
-      const label = holder === 1 ? 'P1' : (mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0] : 'P2');
+      const label = holder === 1 ? 'P1' : (mode === 'vs-ai' ? aiName(true) : 'P2');
       const btnW2 = 156;
       const sx = holder === 1 ? btnW2/2 + 6 : W - btnW2/2 - 6;
       const sy = H - 80 - 84/2 - 30;
@@ -3942,7 +4108,7 @@ function drawHeadOverlay() {
   // Broadcast-style scoreboard panel
   {
     const p1Label = 'P1';
-    const p2Label = mode === 'vs-ai' ? AI_PLAYERS[aiLevel].name.split(' ')[0].toUpperCase() : 'P2';
+    const p2Label = mode === 'vs-ai' ? aiName(true).toUpperCase() : 'P2';
     const rowH = 22, nameW = 90, scoreW = 28, panelW = nameW + scoreW;
     const panelX = viewX + 4, panelY = viewY + viewH - 3 * rowH - 4;
 
@@ -4145,6 +4311,9 @@ function hitPanelBtn(p, cx) {
 
 function handlePointerDown(p) {
   mouse = { x: p.x, y: p.y, down: true };
+
+  // Tutorial card blocks canvas interaction while showing
+  if (tutorialMode && tutPendingCard) { mouse.down = false; return; }
 
   // Game menu intercepts all taps when open
   if (gameMenuOpen) {
@@ -5086,6 +5255,19 @@ function buildSplash() {
     }
   };
   document.getElementById('btnResume').onclick = resumeGame;
+  document.getElementById('btnTutorial').onclick = startTutorial;
+
+  // Tutorial overlay buttons
+  document.getElementById('tut-next-btn').onclick = () => {
+    if (tutPendingCard) {
+      tutDismissGameCard();
+    } else {
+      tutNextIntroCard();
+    }
+  };
+  document.getElementById('tut-skip-btn').onclick = () => {
+    tutHideCard(tutStartGame);
+  };
 }
 
 let gameSettingsBuilt = false;
@@ -5957,6 +6139,221 @@ function showSplash() {
   hideGameSettingsPanel();
   document.getElementById('splash').classList.remove('hidden');
   syncResumeBtn();
+  // Reset any lingering tutorial state
+  tutorialMode = false; tutNoBias = false; tutTomShotNum = 0; tutPendingCard = null;
+  tutHideCardImmediate();
+}
+
+// ── Tutorial functions ────────────────────────────────────────────
+function tutHideCardImmediate() {
+  const ov = document.getElementById('tutorial-overlay');
+  ov.classList.remove('tut-visible');
+  ov.style.display = 'none';
+}
+
+function startTutorial() {
+  document.getElementById('splash').classList.add('hidden');
+  tutorialMode = true;
+  tutIntroIdx = 0;
+  tutTomShotNum = 0;
+  tutNoBias = false;
+  tutPendingCard = null;
+  state = 'idle'; syncFireBtn();
+  tutShowIntroCard();
+}
+
+function tutShowIntroCard() {
+  const card = TUT_INTRO_CARDS[tutIntroIdx];
+  const total = TUT_INTRO_CARDS.length;
+
+  const pipRow = document.getElementById('tut-pip-row');
+  pipRow.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('div');
+    d.className = 'tut-pip' + (i < tutIntroIdx ? ' tut-done' : i === tutIntroIdx ? ' tut-cur' : '');
+    pipRow.appendChild(d);
+  }
+
+  document.getElementById('tut-title').textContent = card.title;
+  document.getElementById('tut-body').textContent = card.body;
+  document.getElementById('tut-next-btn').textContent = card.isLast ? 'Place the Jack →' : 'Next →';
+  document.getElementById('tut-skip-btn').style.display = card.isLast ? 'none' : 'block';
+
+  const ov = document.getElementById('tutorial-overlay');
+  ov.style.display = 'flex';
+  requestAnimationFrame(() => ov.classList.add('tut-visible'));
+}
+
+function tutNextIntroCard() {
+  tutIntroIdx++;
+  if (tutIntroIdx >= TUT_INTRO_CARDS.length) {
+    tutHideCard(tutStartGame);
+  } else {
+    tutShowIntroCard();
+  }
+}
+
+function tutHideCard(callback) {
+  const ov = document.getElementById('tutorial-overlay');
+  ov.classList.remove('tut-visible');
+  setTimeout(() => {
+    ov.style.display = 'none';
+    if (callback) callback();
+  }, 360);
+}
+
+function tutStartGame() {
+  // Set up a 1-end vs-AI game against Tutorial Tom
+  clearSavedGame(); suspendedGame = null;
+  mode = 'vs-ai';
+  aiLevel = 0;
+  ENDS = 1;
+  RB = 13;
+  biasMult = 0.15; biasMultLeft = 0.15; biasMultRight = 0.15;
+  friction = FRICTION;
+  playerBiasMults = [null, null];
+  biasDirs = ['right', 'right'];
+  bgStyle = splashCfg.bg || 'hardwood';
+
+  const col1 = BOWL_COLOURS[0]; C.p1 = col1.main; C.p1d = col1.dark;
+  const col2 = BOWL_COLOURS[1]; C.p2 = col2.main; C.p2d = col2.dark;
+  document.getElementById('lbl2').textContent = 'AI';
+
+  clearTimeout(aiTimer);
+  bowls = []; jack = null; scores = [0, 0]; endNum = 1;
+  replayShots = []; _recFrames = null;
+  jackOwner = 2;   // Tom "leads" so his shots go first each pair
+  turnIdx = 0; delivDir = 1;
+  jackOffCounts = [0, 0]; lastJackHitter = null;
+  endHistory = []; gameMenuOpen = false;
+  shotClockForfeits = [0, 0]; shotClockExpired = false; clockDisplayMs = -1;
+  resetCam(); resetAim(); updateHUD();
+  // Start the end — player places the jack (even though jackOwner=2)
+  state = 'place-jack'; syncFireBtn();
+  msg('Place the jack — tap anywhere on the yellow zone');
+}
+
+function tutShowGameCard(card, onDismiss) {
+  tutPendingCard = { onDismiss };
+
+  document.getElementById('tut-pip-row').innerHTML = '';
+  document.getElementById('tut-title').textContent = card.title;
+  document.getElementById('tut-body').textContent = card.body;
+  document.getElementById('tut-next-btn').textContent = 'Got it →';
+  document.getElementById('tut-skip-btn').style.display = 'none';
+
+  const ov = document.getElementById('tutorial-overlay');
+  ov.style.display = 'flex';
+  requestAnimationFrame(() => ov.classList.add('tut-visible'));
+}
+
+function tutDismissGameCard() {
+  const cb = tutPendingCard ? tutPendingCard.onDismiss : null;
+  tutPendingCard = null;
+  tutHideCard(cb || null);
+}
+
+function tutorialTomShot() {
+  const sn = ++tutTomShotNum;
+  let angle, speed;
+  tutNoBias = true;
+  setBiasDir(2, 'right');
+
+  switch (sn) {
+    case 1: angle = -Math.PI / 2;        speed = 3.6; break;  // straight into block
+    case 2: angle = -Math.PI / 2 + 0.72; speed = 4.2; break;  // wide right, off the side
+    case 3: angle = -Math.PI / 2;        speed = 7.0; break;  // too long, far ditch
+    case 4: angle = -Math.PI / 2;        speed = 1.4; break;  // too short
+    default: angle = -Math.PI / 2;       speed = 3.0;
+  }
+
+  state = 'ai-turn';
+  msg(`Tutorial Tom is delivering…`);
+  aiTimer = setTimeout(() => {
+    if (state !== 'ai-turn') return;
+    deliverBowl(2, angle, speed);
+  }, 1200);
+}
+
+function tutorialDone() {
+  tutorialMode = false;
+  tutNoBias = false;
+  tutTomShotNum = 0;
+  tutPendingCard = null;
+  showSplash();
+}
+
+function drawTutorialAnnotations() {
+  if (!tutorialMode || !(state === 'idle' || state === 'place-jack')) return;
+  const idx = tutIntroIdx;
+  if (idx >= TUT_INTRO_CARDS.length) return;
+
+  ctx.save();
+
+  if (idx === 2) {
+    // Highlight the jack zone
+    const lo = Math.min(jackYMin(), jackYMax()), hi = Math.max(jackYMin(), jackYMax());
+    const jx = jackLineX();
+    const tl = m2s(jx - 30, lo), br = m2s(jx + 30, hi);
+    ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.rect(tl.x, tl.y, br.x - tl.x, br.y - tl.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const mid = m2s(jx, (lo + hi) / 2);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('Jack Zone', mid.x, tl.y - 6);
+  }
+
+  if (idx === 3) {
+    // Highlight the centre block
+    const bl = m2s(FENDER.x, FENDER.y), br = m2s(FENDER.x + FENDER.w, FENDER.y + FENDER.h);
+    ctx.save();
+    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 16;
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.rect(bl.x - 6, bl.y - 4, (br.x - bl.x) + 12, (br.y - bl.y) + 8); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('Centre Block — avoid this!', (bl.x + br.x) / 2, bl.y - 8);
+  }
+
+  if (idx === 4) {
+    // Highlight near dead line
+    const dy = nearDeadY();
+    const dl = m2s(MAT.x, dy), dr = m2s(MAT.x + MAT.w, dy);
+    ctx.save();
+    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 10;
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(dl.x, dl.y); ctx.lineTo(dr.x, dr.y); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText('← Dead line (must cross this)', dl.x + 4, dl.y - 4);
+  }
+
+  if (idx === 5) {
+    // Highlight the delivery mat and swipe arrow
+    const dm = doormatBounds();
+    const ml = m2s(dm.x1, dm.y1), mr = m2s(dm.x2, dm.y2);
+    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.rect(ml.x - 2, ml.y, mr.x - ml.x + 4, mr.y - ml.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#60a5fa';
+    ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('Delivery mat', (ml.x + mr.x) / 2, mr.y + 4);
+    // Upward arrow
+    const ax = P.cx, ay = mr.y + 60;
+    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay); ctx.lineTo(ax, ay - 55);
+    ctx.moveTo(ax - 10, ay - 40); ctx.lineTo(ax, ay - 58); ctx.lineTo(ax + 10, ay - 40);
+    ctx.stroke();
+    ctx.fillStyle = '#60a5fa';
+    ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('Swipe up to deliver', ax, ay + 6);
+  }
+
+  ctx.restore();
 }
 
 // ── Achievement system ────────────────────────────────────────────
@@ -6125,7 +6522,7 @@ function recordGame(result) {
 }
 
 function getOpponentName() {
-  if (mode === 'vs-ai') return AI_PLAYERS[aiLevel].name;
+  if (mode === 'vs-ai') return aiName();
   if (mode === 'online') return onlineOpponentName || 'Opponent';
   return 'Player 2';
 }
