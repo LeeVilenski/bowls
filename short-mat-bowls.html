@@ -1284,6 +1284,7 @@ let tutPendingCard = null;  // { onDismiss } — set while a mid-game card shows
 let tutEnd2Active    = false; // true during the advanced-rules demo segment
 let tutEnd2Completed = false; // true once end-2 demos are done (so tutorialDone goes to splash)
 let tutDemoIdx       = 0;    // 1–4: which demo shot we're on in end 2
+let tutFreePlay      = false; // true during post-tutorial free practice session
 
 const TUT_TOM_NAME = 'Tutorial Tom';
 
@@ -2252,9 +2253,12 @@ function _doOnAllStopped() {
     return;
   }
 
+  // Free play: skip player 2's turn slots so only player 1 bowls
+  if (tutFreePlay && playerForTurn(turnIdx) === 2) turnIdx++;
+
   if (turnIdx >= BPP * 2) { finishEnd(); return; }
   promptPlayer(playerForTurn(turnIdx));
-  if (mode !== 'online' && !tutorialMode) saveGameState(buildSuspendedState());
+  if (mode !== 'online' && !tutorialMode && !tutFreePlay) saveGameState(buildSuspendedState());
 }
 
 function onAllStopped() {
@@ -2314,6 +2318,16 @@ function handleJackOffSide() {
 function finishEnd() {
   state = 'end-result';
   const res = applyEndScore();
+  if (tutFreePlay) {
+    tutNoBias = false;
+    tutShowGameCard({
+      title: '🎳 End Complete!',
+      body: 'Nice bowling! Bowl another end, or head back to the menu whenever you\'re ready.',
+      nextLabel: 'Bowl Again →',
+      altBtn: { label: 'Back to Menu', action: showSplash },
+    }, () => { headOverlay = false; endNum++; startEnd(); });
+    return;
+  }
   if (tutorialMode) {
     tutNoBias = false;
     let resultLine;
@@ -6176,7 +6190,7 @@ function showSplash() {
   syncResumeBtn();
   // Reset any lingering tutorial state
   tutorialMode = false; tutNoBias = false; tutTomShotNum = 0; tutPendingCard = null;
-  tutEnd2Active = false; tutEnd2Completed = false; tutDemoIdx = 0;
+  tutEnd2Active = false; tutEnd2Completed = false; tutDemoIdx = 0; tutFreePlay = false;
   tutHideCardImmediate();
 }
 
@@ -6271,14 +6285,64 @@ function tutStartGame() {
   msg('Place the jack — tap anywhere on the yellow zone');
 }
 
+function tutStartFreePlay() {
+  tutFreePlay = true;
+  clearSavedGame(); suspendedGame = null;
+  mode = 'vs-ai';
+  aiLevel = 0;
+  ENDS = 999;
+  RB = 13;
+  biasMult = splashCfg.biasVal;
+  biasMultLeft  = (splashCfg.bendLeft  / 100) * 0.20;
+  biasMultRight = (splashCfg.bendRight / 100) * 0.20;
+  friction = FRICTION;
+  playerBiasMults = [null, null];
+  biasDirs = ['right', 'right'];
+  bgStyle = splashCfg.bg || 'hardwood';
+
+  const col1 = BOWL_COLOURS[0]; C.p1 = col1.main; C.p1d = col1.dark;
+  const col2 = BOWL_COLOURS[1]; C.p2 = col2.main; C.p2d = col2.dark;
+  document.getElementById('lbl2').textContent = '';
+
+  clearTimeout(aiTimer);
+  bowls = []; jack = null; scores = [0, 0]; endNum = 1;
+  replayShots = []; _recFrames = null;
+  jackOwner = 1;
+  turnIdx = 0; delivDir = 1;
+  jackOffCounts = [0, 0]; lastJackHitter = null;
+  endHistory = []; gameMenuOpen = false;
+  shotClockForfeits = [0, 0]; shotClockExpired = false; clockDisplayMs = -1;
+  resetCam(); resetAim(); updateHUD();
+
+  tutShowGameCard({
+    title: '🎳 Free Practice',
+    body: 'Bowl as many ends as you like — no opponent, no pressure. Place the jack anywhere on the yellow zone and roll all four bowls.',
+    nextLabel: 'Let\'s go! →',
+    altBtn: { label: 'Back to Menu', action: showSplash },
+  }, () => {
+    state = 'place-jack'; syncFireBtn();
+    msg('Place the jack — tap on the yellow zone');
+  });
+}
+
 function tutShowGameCard(card, onDismiss) {
   tutPendingCard = { onDismiss };
 
   document.getElementById('tut-pip-row').innerHTML = '';
   document.getElementById('tut-title').textContent = card.title;
   document.getElementById('tut-body').textContent = card.body;
-  document.getElementById('tut-next-btn').textContent = 'Got it →';
-  document.getElementById('tut-skip-btn').style.display = 'none';
+  document.getElementById('tut-next-btn').textContent = card.nextLabel || 'Got it →';
+
+  const skipBtn = document.getElementById('tut-skip-btn');
+  if (card.altBtn) {
+    skipBtn.textContent = card.altBtn.label;
+    skipBtn.onclick = () => { tutPendingCard = null; tutHideCard(card.altBtn.action); };
+    skipBtn.style.display = '';
+  } else {
+    skipBtn.textContent = 'Skip tutorial';
+    skipBtn.onclick = () => { tutHideCard(tutStartGame); };
+    skipBtn.style.display = 'none';
+  }
 
   const ov = document.getElementById('tutorial-overlay');
   ov.style.display = 'flex';
@@ -6319,12 +6383,12 @@ function tutorialDone() {
     tutStartEnd2();
     return;
   }
-  // End 2 demos finished — full cleanup and back to splash
+  // End 2 demos finished — launch free practice
   tutorialMode = false;
   tutEnd2Active = false;
   tutEnd2Completed = false;
   tutNoBias = false; tutTomShotNum = 0; tutDemoIdx = 0; tutPendingCard = null;
-  showSplash();
+  tutStartFreePlay();
 }
 
 function tutStartEnd2() {
