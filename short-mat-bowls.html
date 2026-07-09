@@ -1287,7 +1287,7 @@ const TUT_TOM_NAME = 'Tutorial Tom';
 const TUT_INTRO_CARDS = [
   {
     title: 'Welcome to Short Mat Bowls!',
-    body: 'Your goal is simple: roll your bowls closer to the small white ball — the jack — than your opponent. The player whose bowl is nearest at the end of each round scores!',
+    body: 'Your goal is simple: roll your bowls closer to the small yellow ball — the jack — than your opponent. The player whose bowl is nearest at the end of each round scores!',
   },
   {
     title: 'How an End Works',
@@ -1295,15 +1295,15 @@ const TUT_INTRO_CARDS = [
   },
   {
     title: 'The Jack',
-    body: 'The small white ball is the jack. Before each End it\'s placed on the yellow centre line. The yellow zone on the mat shows where the jack must land.',
+    body: 'The small yellow ball is the jack. Before each End it\'s placed on the yellow centre line. The yellow zone on the mat shows where the jack must land.',
   },
   {
     title: 'Watch Out — The Centre Block',
-    body: 'The white barrier in the middle of the mat is the centre block. If your bowl hits it, the bowl is immediately dead and won\'t count for scoring! Aim around it — or use FIRE mode for a powerful straight shot.',
+    body: 'The white barrier in the middle of the mat is the centre block. If your bowl hits it, the bowl is immediately dead and won\'t count for scoring! You must always aim your bowl around it — hitting the block is never a legal shot.',
   },
   {
     title: 'Dead Lines & Ditches',
-    body: 'Your bowl must cross the near dead line (shown in red) to count as a live bowl. If it stops short, it\'s dead.\n\nThere are also narrow ditch zones at both ends of the mat — bowls rolling into them are also dead.',
+    body: 'Your bowl must reach past the dead line (the white line across the upper part of the mat) to count as a live bowl. If it stops short, it\'s dead.\n\nThere are also narrow ditch zones at both ends of the mat — bowls rolling into them are also dead.',
   },
   {
     title: 'Aim & Deliver',
@@ -1311,7 +1311,7 @@ const TUT_INTRO_CARDS = [
   },
   {
     title: 'Bias & Buttons',
-    body: '◀ ▶ tap arrows to choose which way your bowl curves (bias).\n\nFIRE — extra power, straighter path through bowls.\nHEAD — top-down view to see who\'s closest.\n⏩ 3× — speed up rolling bowls.',
+    body: '◀ ▶ tap arrows to choose which way your bowl curves (bias).\n\nFIRE — extra power, straighter path (useful for knocking other bowls away).\nHEAD — top-down view to see who\'s closest.\n⏩ 3× — speed up rolling bowls.',
   },
   {
     title: 'Time to Play!',
@@ -1323,7 +1323,7 @@ const TUT_INTRO_CARDS = [
 const TUT_TOM_CARDS = [
   {
     title: '⬛ Centre Block!',
-    body: 'Tutorial Tom hit the centre block — his bowl is dead and won\'t count! Always aim your bowl around the block. FIRE mode lets you punch through it hard if needed.',
+    body: 'Tutorial Tom hit the centre block — his bowl is dead and won\'t count! Always aim your bowl around the block. There\'s no way through it — hitting the block is always dead.',
   },
   {
     title: '↔ Off the Side!',
@@ -1335,7 +1335,7 @@ const TUT_TOM_CARDS = [
   },
   {
     title: '⬆ Too Short!',
-    body: 'Not enough power! Tom\'s bowl stopped before the dead line — dead. Your bowl must travel past the near dead line (the red line on your side) to count as a live bowl.',
+    body: 'Not enough power! Tom\'s bowl stopped before the dead line — dead. Your bowl must reach past the white dead line (across the upper part of the mat) to count as a live bowl.',
   },
 ];
 
@@ -6209,7 +6209,9 @@ function tutStartGame() {
   aiLevel = 0;
   ENDS = 1;
   RB = 13;
-  biasMult = 0.15; biasMultLeft = 0.15; biasMultRight = 0.15;
+  biasMult = splashCfg.biasVal;
+  biasMultLeft  = (splashCfg.bendLeft  / 100) * 0.20;
+  biasMultRight = (splashCfg.bendRight / 100) * 0.20;
   friction = FRICTION;
   playerBiasMults = [null, null];
   biasDirs = ['right', 'right'];
@@ -6262,8 +6264,8 @@ function tutorialTomShot() {
   switch (sn) {
     case 1: angle = -Math.PI / 2;        speed = 3.6; break;  // straight into block
     case 2: angle = -Math.PI / 2 + 0.72; speed = 4.2; break;  // wide right, off the side
-    case 3: angle = -Math.PI / 2;        speed = 7.0; break;  // too long, far ditch
-    case 4: angle = -Math.PI / 2;        speed = 1.4; break;  // too short
+    case 3: angle = -Math.PI / 2 + 0.10; speed = 7.0; break;  // angled right of block, too long, far ditch
+    case 4: angle = -Math.PI / 2;        speed = 2.7; break;  // too short — almost reaches far dead line
     default: angle = -Math.PI / 2;       speed = 3.0;
   }
 
@@ -6318,17 +6320,17 @@ function drawTutorialAnnotations() {
   }
 
   if (idx === 4) {
-    // Highlight near dead line
-    const dy = nearDeadY();
+    // Highlight the far dead line — this is the scoring threshold (bowl must reach past this to be live)
+    const dy = yFromFar(L.DEAD);
     const dl = m2s(MAT.x, dy), dr = m2s(MAT.x + MAT.w, dy);
     ctx.save();
-    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 10;
-    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(255,255,255,0.8)'; ctx.shadowBlur = 12;
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(dl.x, dl.y); ctx.lineTo(dr.x, dr.y); ctx.stroke();
     ctx.restore();
-    ctx.fillStyle = '#ef4444';
+    ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText('← Dead line (must cross this)', dl.x + 4, dl.y - 4);
+    ctx.fillText('← Dead line (bowl must reach past this)', dl.x + 4, dl.y - 4);
   }
 
   if (idx === 5) {
