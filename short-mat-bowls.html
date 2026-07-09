@@ -1272,7 +1272,7 @@ let jackOwner = 1;
 let turnIdx   = 0;
 let delivDir  = 1;   // 1 = bowl from bottom; -1 = from top
 let aiTimer   = null;
-let jackOffCounts  = [0, 0]; // per-player count of knocking jack off the side (resets each game)
+let jackOffCounts  = [0, 0]; // per-player count of knocking jack off the side (resets each end)
 let lastJackHitter = null;   // player who last struck the jack
 
 // ── Tutorial Mode ─────────────────────────────────────────────────
@@ -1862,7 +1862,7 @@ function startGame() {
 }
 
 function startEnd() {
-  bowls=[]; jack=null; turnIdx=0; lastJackHitter=null;
+  bowls=[]; jack=null; turnIdx=0; lastJackHitter=null; jackOffCounts=[0,0];
   // Carry over only the previous end's final delivery so it can still be
   // reviewed from the new end (a misclick past "tap to continue" won't lose it).
   replayShots = replayShots.length ? [replayShots[replayShots.length - 1]] : [];
@@ -6456,14 +6456,16 @@ function tutDemoSetup2() {
 }
 
 function tutDemoSetup3() {
-  // Demo 3: Jack off side — deliver from x=300 (right of block) aiming at jack near right edge.
-  // Delivering from x=300 keeps the bowl well clear of the block (passes ~x=331 at block height).
+  // Demo 3: Jack off side — deliver from far left (x=85) aimed at jack to the right of centre.
+  // Bowl passes the block at x≈283 (right side, well clear of block at x=200–240).
+  // The oblique collision angle gives the jack ~4.4 px/frame rightward velocity, so it
+  // exits the right side of the mat in ~4 frames — a clearly lateral shot.
   bowls = [];
-  const jackX = 356;
-  const jackY = 160;
+  const jackX = 350;
+  const jackY = 350;
   jack = { x: jackX, y: jackY, vx: 0, vy: 0, stopped: true,
            offMat: false, inDitch: false, offSide: false };
-  const delivX = 300;
+  const delivX = 85;
   const bsY = MAT.y + (1 - L.MAT_LEN) * MAT.h;
   delivPos = { x: delivX, y: bsY };
   const angle = Math.atan2(jackY - bsY, jackX - delivX);
