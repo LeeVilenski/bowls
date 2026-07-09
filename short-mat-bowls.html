@@ -6372,48 +6372,55 @@ function tutEnd2Shoot(angle, speed) {
 }
 
 function tutDemoSetup1() {
-  // Demo 1: Toucher — Tom rolls to the jack and touches it while rolling
+  // Demo 1: Toucher — Tom angles right of block (-π/2+0.10) and grazes the jack.
+  // Jack at x=278 sits ~17px off the bowl path at y=185, so the bowl barely touches it.
   bowls = [];
-  jack = { x: jackLineX(), y: 185, vx: 0, vy: 0, stopped: true,
+  jack = { x: 278, y: 185, vx: 0, vy: 0, stopped: true,
            offMat: false, inDitch: false, offSide: false };
   msg('Watch Tom roll a toucher…');
-  tutEnd2Shoot(-Math.PI / 2, 3.7);
+  tutEnd2Shoot(-Math.PI / 2 + 0.10, 3.8);
 }
 
 function tutDemoSetup2() {
-  // Demo 2: Jack in ditch — Tom fires the jack into the far ditch
+  // Demo 2: Jack in ditch — Tom angles right of block and hits the jack head-on.
+  // At angle -π/2+0.10 the path crosses x≈298 when y=155, matching the jack.
   bowls = [];
-  jack = { x: jackLineX(), y: 155, vx: 0, vy: 0, stopped: true,
+  jack = { x: 298, y: 155, vx: 0, vy: 0, stopped: true,
            offMat: false, inDitch: false, offSide: false };
   msg('Watch what happens when the jack goes in the ditch…');
-  tutEnd2Shoot(-Math.PI / 2, 7.0);
+  tutEnd2Shoot(-Math.PI / 2 + 0.10, 7.0);
 }
 
 function tutDemoSetup3() {
-  // Demo 3: Jack off side — Tom aims at a jack placed near the right edge
+  // Demo 3: Jack off side — deliver from x=300 (right of block) aiming at jack near right edge.
+  // Delivering from x=300 keeps the bowl well clear of the block (passes ~x=331 at block height).
   bowls = [];
-  const jackX = MAT.x + MAT.w - RJ - 5;
-  jack = { x: jackX, y: 155, vx: 0, vy: 0, stopped: true,
+  const jackX = 356;
+  const jackY = 160;
+  jack = { x: jackX, y: jackY, vx: 0, vy: 0, stopped: true,
            offMat: false, inDitch: false, offSide: false };
-  const bsY = MAT.y + (1 - L.MAT_LEN) * MAT.h; // delivery y
-  const angle = Math.atan2(155 - bsY, jackX - jackLineX());
+  const delivX = 300;
+  const bsY = MAT.y + (1 - L.MAT_LEN) * MAT.h;
+  delivPos = { x: delivX, y: bsY };
+  const angle = Math.atan2(jackY - bsY, jackX - delivX);
   msg('Watch what happens when the jack goes off the side…');
   tutEnd2Shoot(angle, 7.0);
 }
 
 function tutDemoSetup4() {
-  // Demo 4: FIRE — Tom drives a player bowl out of the head
+  // Demo 4: FIRE — Tom angles left of block (-π/2-0.10) and drives the player bowl away.
+  // At that angle the path crosses x≈144 when y=175, where we place the player bowl.
+  // Jack at (200,130) is well clear of Tom's post-collision path.
   bowls = [];
-  jack = { x: jackLineX() - 20, y: 130, vx: 0, vy: 0, stopped: true,
+  jack = { x: 200, y: 130, vx: 0, vy: 0, stopped: true,
            offMat: false, inDitch: false, offSide: false };
-  // Place a stationary player-1 bowl in Tom's path
-  bowls.push({ x: jackLineX(), y: 175, vx: 0, vy: 0,
-                player: 1, bias: biasDirs[0], stopped: true,
-                offMat: false, toucher: false, inDitch: false,
-                rotAngle: 0, trail: [], restProgress: 0, delivering: false,
-                design: splashCfg.p1design });
+  bowls.push({ x: 144, y: 175, vx: 0, vy: 0,
+               player: 1, bias: biasDirs[0], stopped: true,
+               offMat: false, toucher: false, inDitch: false,
+               rotAngle: 0, trail: [], restProgress: 0, delivering: false,
+               design: splashCfg.p1design });
   msg('Watch Tom fire a bowl out of the head…');
-  tutEnd2Shoot(-Math.PI / 2, 7.0);
+  tutEnd2Shoot(-Math.PI / 2 - 0.10, 7.0);
 }
 
 function drawTutorialAnnotations() {
